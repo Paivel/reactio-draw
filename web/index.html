@@ -1434,6 +1434,64 @@ svg#mol.pan {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
+/* the side panel folds to a thin strip at the right (desktop layout only), and opens again from it */
+.sidefold {
+  flex: none;
+  order: -1;
+  margin: 0 2px 4px 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.sidefold:hover {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--panel);
+}
+.sidefold svg {
+  width: 14px;
+  height: 14px;
+}
+@media (max-width: 1060px) {
+  .sidefold {
+    display: none;
+  }
+}
+@media (min-width: 1061px) {
+  html.side-folded .editor {
+    grid-template-columns: auto minmax(0, 1fr) 34px;
+  }
+  html.side-folded aside.info {
+    padding: 0;
+    overflow: hidden;
+  }
+  html.side-folded aside.info > :not(.tabs) {
+    display: none !important;
+  }
+  html.side-folded aside.info .tabs {
+    margin: 0;
+    padding: 8px 0 0;
+    border-bottom: 0;
+    justify-content: center;
+    background: transparent;
+  }
+  html.side-folded aside.info .tabs > :not(.sidefold) {
+    display: none;
+  }
+  html.side-folded .sidefold {
+    margin: 0;
+  }
+  html.side-folded .sidefold svg {
+    transform: scaleX(-1);
+  }
+}
 /* Analysis tab: three groups that open and close (remembered) */
 .agrp {
   border-bottom: 1px solid var(--line);
@@ -2861,6 +2919,7 @@ html {
           <button class="tb" id="freeBond" aria-pressed="false" title="Free bonds: any length and angle (or hold Alt while dragging)"><svg viewBox="0 0 22 22"><line x1="3" y1="18" x2="17" y2="6" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="6" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M13 3.5l1 1.5M20 9l-1.6-.6M3 13h4M5 11v4" stroke="currentColor" stroke-width="1.2"/></svg></button>
           <button class="tb" data-act="stereoGrp" title="Stereo group: mark the selected stereocentres abs (absolute configuration), &amp; (racemate: both configurations present) or or (relative configuration: one of the two, not known which)"><svg viewBox="0 0 22 22"><path d="M3 15l6-4" stroke="currentColor" stroke-width="1.5"/><path d="M9 11l6 3.2-1 1.6z" fill="currentColor"/><path d="M9 11V4" stroke="currentColor" stroke-width="1.5"/><text x="13.5" y="9" font-size="7.5" font-style="italic" font-weight="600" fill="currentColor" font-family="sans-serif">&amp;1</text></svg></button>
           <button class="tb" data-act="merge" title="Merge structures: atoms lying on top of each other become one (with two structures selected and none overlapping, their two closest atoms)"><svg viewBox="0 0 22 22"><polygon points="2,9 6,5 10,9 6,13" fill="none" stroke="currentColor" stroke-width="1.5"/><polygon points="10,9 14,5 18,9 14,13" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="10" cy="9" r="2.3" fill="currentColor"/><path d="M6 17h8" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          <button class="tb" data-act="clean2d" title="Clean Up 2D: lays the selected structures out flat — a structure turned in 3D becomes a flat drawing again (its configuration kept as wedges and hashes), and bridged rings such as norbornane are drawn flat, the bridge inside the ring"><svg viewBox="0 0 22 22"><polygon points="11,1.5 16,4.4 16,10.2 11,13.1 6,10.2 6,4.4" fill="none" stroke="currentColor" stroke-width="1.4"/><text x="11" y="21" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="7.5" font-weight="700" fill="currentColor">2D</text></svg></button>
         </div>
         <div class="tbg" aria-label="Colors">
           <button class="tb" data-act="hlPop" title="Highlight colors (atoms and bonds)"><svg viewBox="0 0 22 22"><path d="M4 15l7-11 7 11" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 19h18" stroke="#ffc53d" stroke-width="4"/></svg></button>
@@ -2925,6 +2984,7 @@ html {
         <button class="tab" role="tab" data-tab="lib" aria-selected="false">Labels</button>
         <button class="tab" role="tab" data-tab="keys" aria-selected="false">Settings</button>
         <button class="tab" role="tab" data-tab="infow" aria-selected="false">Info</button>
+        <button class="sidefold" data-act="sideFold" aria-expanded="true" title="Hide the side panel (the sheet gets wider)"><svg viewBox="0 0 16 16"><path d="M6 3.5L10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
 
       <div class="pane" data-pane="analysis">
@@ -3873,7 +3933,7 @@ function kdOf(st) {
     ANG = 1.54 / L;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.3';
+  const RD_VERSION = '1.4';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -6594,7 +6654,7 @@ function kdOf(st) {
       return best;
     }
     const pinned = pos.map(p => !!p);
-    const cages = cageSystems(n, g.edges, rings),
+    const cages = cleanFlat ? [] : cageSystems(n, g.edges, rings),
       cageOf = new Array(n).fill(null),
       fixed = new Array(n).fill(false);
     cages.forEach(c => {
@@ -6663,14 +6723,68 @@ function kdOf(st) {
       });
     }
     function placeSystem(ri, u) {
-      const S = systems[sysOfRing[ri]];
-      if (S.length < 2 || S.some(r => done[r])) return false;
-      const atoms = [...new Set(S.flatMap(r => rings[r]))];
+      const Sg = systems[sysOfRing[ri]];
+      if (Sg.length < 2 || Sg.some(r => done[r])) return false;
+      const atoms = [...new Set(Sg.flatMap(r => rings[r]))];
       if (atoms.some(v => cageOf[v] || (v !== u && pos[v]))) return false;
+      /* Clean Up 2D: a bridged pair (two rings sharing a path of three atoms or more, as in norbornane) is drawn flat: the ring
+         round both (the envelope) is laid out with the others, and the inner atoms of the shared path go inside it, between
+         its two ends */
+      let LR = Sg.map(r => rings[r].slice());
+      const bridges = [];
+      /* of the three paths between the two bridgeheads, the bridge (drawn inside) is the shortest (of two as short, the one
+         carrying less), the other two make the envelope: camphor is a hexagon with the CMe2 bridge inside */
+      const outside = v => adj[v].filter(([w]) => !atoms.includes(w)).length;
+      const envelope = (A, B) => {
+        const sh = A.filter(v => B.includes(v)),
+          run = R => {
+            const n = R.length,
+              k = R.findIndex((v, i) => sh.includes(v) && !sh.includes(R[(i - 1 + n) % n]));
+            if (k < 0) return null;
+            const Q = [...R.slice(k), ...R.slice(0, k)];
+            return Q.slice(0, sh.length).every(v => sh.includes(v)) ? Q : null;
+          };
+        const QA = run(A),
+          QB = run(B);
+        if (!QA || !QB) return null;
+        const k = sh.length,
+          b1 = QA[0],
+          b2 = QA[k - 1];
+        let outB = [...QB.slice(k - 1), QB[0]];
+        if (outB[0] === b1) outB.reverse();
+        if (outB[0] !== b2 || outB[outB.length - 1] !== b1) return null;
+        /* the inner atoms of each path, from b1 to b2 */
+        const paths = [QA.slice(1, k - 1), QA.slice(k).reverse(), outB.slice(1, -1).reverse()];
+        const bi = [0, 1, 2].sort(
+          (x, y) =>
+            paths[x].length - paths[y].length ||
+            paths[x].reduce((t, v) => t + outside(v), 0) - paths[y].reduce((t, v) => t + outside(v), 0)
+        )[0];
+        if (!paths[bi].length) return null;
+        const [p, q] = [0, 1, 2].filter(x => x !== bi).map(x => paths[x]);
+        return { ring: [b1, ...p, b2, ...q.slice().reverse()], bridge: { ends: [b1, b2], inner: paths[bi] } };
+      };
+      for (let round = 0; cleanFlat && round < 3; round++) {
+        let pi = -1,
+          pj = -1;
+        for (let i = 0; i < LR.length && pi < 0; i++)
+          for (let j = i + 1; j < LR.length; j++)
+            if (LR[i].filter(v => LR[j].includes(v)).length > 2) {
+              pi = i;
+              pj = j;
+              break;
+            }
+        if (pi < 0) break;
+        const env = envelope(LR[pi], LR[pj]);
+        if (!env) return false;
+        bridges.push(env.bridge);
+        LR = LR.filter((_, q) => q !== pi && q !== pj).concat([env.ring]);
+      }
+      const S = LR.map((_, q) => q);
       const P = new Map(),
         isP = v => P.has(v),
         placedR = new Set();
-      const sharedN = (a, b) => rings[a].filter(v => rings[b].includes(v)).length,
+      const sharedN = (a, b) => LR[a].filter(v => LR[b].includes(v)).length,
         fusedN = r => S.filter(o => o !== r && sharedN(r, o) >= 2).length;
       /* bridged systems (two rings sharing three atoms or more: norbornane, morphine, strychnine) keep the ring-by-ring layout */
       for (let i = 0; i < S.length; i++)
@@ -6679,12 +6793,12 @@ function kdOf(st) {
          between them takes up the strain, as acenaphthene is drawn (naphthalene flat, the five-membered ring slightly wide) */
       const seed = [...S].sort(
         (a, b) =>
-          (rings[b].length === 6) - (rings[a].length === 6) ||
+          (LR[b].length === 6) - (LR[a].length === 6) ||
           fusedN(b) - fusedN(a) ||
-          rings[b].includes(u) - rings[a].includes(u)
+          LR[b].includes(u) - LR[a].includes(u)
       )[0];
       {
-        const r = rings[seed],
+        const r = LR[seed],
           k = r.length,
           R = L / (2 * Math.sin(Math.PI / k));
         r.forEach((v, j) =>
@@ -6700,16 +6814,16 @@ function kdOf(st) {
           bs = -1;
         for (const r of S) {
           if (placedR.has(r)) continue;
-          const c = rings[r].filter(isP).length;
+          const c = LR[r].filter(isP).length;
           if (c < 2) continue;
-          const sc = c * 10 + (rings[r].length === 6 ? 1 : 0);
+          const sc = c * 10 + (LR[r].length === 6 ? 1 : 0);
           if (sc > bs) {
             bs = sc;
             best = r;
           }
         }
         if (best < 0) return false;
-        const r = rings[best],
+        const r = LR[best],
           k = r.length;
         /* the placed atoms must be one run round the ring: turn the ring so the run comes first */
         let st = -1;
@@ -6792,13 +6906,68 @@ function kdOf(st) {
           });
         placedR.add(best);
       }
-      /* a flat drawing or none: every bond of the system the standard length and no two atoms on top of each other */
+      /* the inner atoms of a bridge: evenly between its ends, bowed a little off the straight line so the bridge reads as one */
+      const inner = new Set(bridges.flatMap(b => b.inner));
+      if (bridges.length) (pos.flatBridges = pos.flatBridges || []).push(...bridges);
+      for (const br of bridges) {
+        const A = P.get(br.ends[0]),
+          B = P.get(br.ends[1]),
+          k = br.inner.length;
+        if (!A || !B) return false;
+        const dx = B.x - A.x,
+          dy = B.y - A.y,
+          d = Math.hypot(dx, dy) || 1;
+        /* bowed toward the side of the envelope that carries less, so what hangs on the bridge has room there */
+        const ring = LR[LR.length - 1],
+          i1 = ring.indexOf(br.ends[0]),
+          i2 = ring.indexOf(br.ends[1]);
+        let side = 1;
+        if (i1 >= 0 && i2 >= 0) {
+          const a1 = Math.min(i1, i2),
+            a2 = Math.max(i1, i2),
+            sideP = ring.slice(a1 + 1, a2),
+            sideQ = [...ring.slice(a2 + 1), ...ring.slice(0, a1)],
+            load = vs => vs.reduce((t, v) => t + outside(v), 0),
+            pc = vs => vs.reduce((t, v) => t + ((P.get(v).x - A.x) * -dy + (P.get(v).y - A.y) * dx), 0);
+          const less = load(sideP) <= load(sideQ) ? sideP : sideQ;
+          if (less.length && pc(less) < 0) side = -1;
+        }
+        br.inner.forEach((v, j) => {
+          const t = (j + 1) / (k + 1),
+            bow = Math.sin(Math.PI * t) * L * 0.2 * side;
+          P.set(v, { x: A.x + dx * t - (dy / d) * bow, y: A.y + dy * t + (dx / d) * bow });
+        });
+      }
+      /* what hangs on a one-atom bridge (the CMe2 of camphor) points out of the ring on the side the bridge bows to, across
+         the ring's edge, as camphor is drawn flat */
+      const hang = new Set();
+      for (const br of bridges) {
+        if (br.inner.length !== 1) continue;
+        const v = br.inner[0],
+          subs = adj[v].map(([w]) => w).filter(w => !atoms.includes(w) && !pos[w] && !P.has(w));
+        if (!subs.length || subs.length > 2) continue;
+        const A = P.get(br.ends[0]),
+          B = P.get(br.ends[1]),
+          V = P.get(v),
+          base = Math.atan2(V.y - (A.y + B.y) / 2, V.x - (A.x + B.x) / 2),
+          spread = subs.length === 2 ? [-0.25, 0.25] : [0];
+        subs.forEach((w, j) => {
+          P.set(w, { x: V.x + L * Math.cos(base + spread[j]), y: V.y + L * Math.sin(base + spread[j]) });
+          hang.add(w);
+          atoms.push(w);
+        });
+      }
+      /* a flat drawing or none: every bond of the system the standard length (a bridge's within half of it) and no two atoms
+         on top of each other */
       {
         const sysE = g.edges.filter(e => P.has(e.a) && P.has(e.b));
         if (
-          sysE.some(
-            e => Math.abs(Math.hypot(P.get(e.a).x - P.get(e.b).x, P.get(e.a).y - P.get(e.b).y) - L) > L * 0.02
-          )
+          sysE.some(e => {
+            const l = Math.hypot(P.get(e.a).x - P.get(e.b).x, P.get(e.a).y - P.get(e.b).y);
+            return inner.has(e.a) || inner.has(e.b) || hang.has(e.a) || hang.has(e.b)
+              ? l < L * 0.5 || l > L * 1.5
+              : Math.abs(l - L) > L * 0.02;
+          })
         )
           return false;
         const bonded = new Set(sysE.flatMap(e => [e.a + ',' + e.b, e.b + ',' + e.a])),
@@ -6808,7 +6977,9 @@ function kdOf(st) {
             if (bonded.has(vs[i] + ',' + vs[j])) continue;
             const p = P.get(vs[i]),
               q = P.get(vs[j]);
-            if (Math.hypot(p.x - q.x, p.y - q.y) < L * 0.75) return false;
+            const lim =
+              hang.has(vs[i]) || hang.has(vs[j]) ? 0.35 : inner.has(vs[i]) || inner.has(vs[j]) ? 0.5 : 0.75;
+            if (Math.hypot(p.x - q.x, p.y - q.y) < L * lim) return false;
           }
       }
       /* into place: the bond the system hangs on points straight out of it, towards the atom it hangs on (the middle of them when
@@ -6893,7 +7064,9 @@ function kdOf(st) {
         }
       }
       for (const [v, p] of bestT) if (!pos[v]) pos[v] = p;
-      S.forEach(r => {
+      /* a flat bridged system keeps its shape: the bridge sits close to the ring atoms on purpose */
+      if (bridges.length) for (const v of bestT.keys()) fixed[v] = true;
+      Sg.forEach(r => {
         done[r] = true;
       });
       for (const v of atoms)
@@ -7326,7 +7499,8 @@ function kdOf(st) {
   /* sandwich complexes keep their perspective drawing in Clean Up; pressing Clean Up again right away rebuilds them flat anyway */
   const keepShape = fr => fr.some(a => a.hap || a.multi);
   let cleanSkipped = 0,
-    cleanForce = false;
+    cleanForce = false,
+    cleanFlat = false; /* Clean Up 2D: every ring system flat, bridged ones included (no perspective cage drawings) */
   /* an alkyne carrying two metals (the Co2(CO)6 complex of the Nicholas reaction): the four atoms are all bonded to each other, which no flat layout
    draws cleanly. Clean Up lays out the structure without the two metals and then puts them on the free side of the C–C bond, the four atoms
    a trapezoid with its diagonals (the usual drawing of the tetrahedron), so each metal's label has room */
@@ -7776,6 +7950,84 @@ function kdOf(st) {
         a.x = best[i].x + cx;
         a.y = best[i].y + cy;
       });
+      /* Clean Up 2D: turned so that most ring bonds stand on the hexagon grid (vertical, or at ±30° to the vertical), the
+         smallest turn that does it */
+      if (cleanFlat) {
+        const ringB = new Set();
+        for (const r of molRings(fr)) r.forEach((x, i) => ringB.add(x.id + ',' + r[(i + 1) % r.length].id));
+        const ang = mol.bonds
+          .filter(b => ringB.has(b.a + ',' + b.b) || ringB.has(b.b + ',' + b.a))
+          .map(b => {
+            const p = atomById(b.a),
+              q = atomById(b.b);
+            return Math.atan2(q.y - p.y, q.x - p.x);
+          });
+        if (ang.length) {
+          const S60 = Math.PI / 3,
+            md = x => ((x % S60) + S60) % S60;
+          let bestR = 0,
+            bestN = -1;
+          for (const a0 of ang) {
+            let r = md(Math.PI / 2 - a0);
+            if (r > S60 / 2) r -= S60;
+            const n = ang.filter(
+              t =>
+                Math.abs(md(t + r) - md(Math.PI / 2)) < 0.03 ||
+                Math.abs(md(t + r) - md(Math.PI / 2)) > S60 - 0.03
+            ).length;
+            if (n > bestN || (n === bestN && Math.abs(r) < Math.abs(bestR))) {
+              bestN = n;
+              bestR = r;
+            }
+          }
+          if (Math.abs(bestR) > 1e-3) {
+            const c = Math.cos(bestR),
+              sn = Math.sin(bestR),
+              mx = fr.reduce((t, a) => t + a.x, 0) / fr.length,
+              my = fr.reduce((t, a) => t + a.y, 0) / fr.length;
+            fr.forEach(a => {
+              const x = a.x - mx,
+                y = a.y - my;
+              a.x = mx + x * c - y * sn;
+              a.y = my + x * sn + y * c;
+            });
+          }
+        }
+      }
+      /* Clean Up 2D: what hangs on a one-atom bridge (the CMe2 of camphor) points out of the ring on the side the bridge
+         bows to, across the ring's edge, as camphor is drawn flat */
+      if (cleanFlat && pos && pos.flatBridges)
+        for (const br of pos.flatBridges) {
+          if (br.inner.length !== 1) continue;
+          const V = fr[br.inner[0]],
+            A = fr[br.ends[0]],
+            B = fr[br.ends[1]];
+          if (!V || !A || !B) continue;
+          const subs = neighbors(V).filter(o => o !== A && o !== B);
+          if (!subs.length || subs.length > 2) continue;
+          const base = Math.atan2(V.y - (A.y + B.y) / 2, V.x - (A.x + B.x) / 2),
+            spread = subs.length === 2 ? [-0.25, 0.25] : [0];
+          /* the two keep their order round the bridge atom */
+          subs.sort((p, q) => Math.atan2(p.y - V.y, p.x - V.x) - Math.atan2(q.y - V.y, q.x - V.x));
+          subs.forEach((w, j) => {
+            const tx = V.x + L * Math.cos(base + spread[j]),
+              ty = V.y + L * Math.sin(base + spread[j]),
+              dx = tx - w.x,
+              dy = ty - w.y,
+              seen = new Set([V.id, w.id]),
+              st = [w];
+            while (st.length) {
+              const u = st.pop();
+              u.x += dx;
+              u.y += dy;
+              for (const o of neighbors(u))
+                if (!seen.has(o.id)) {
+                  seen.add(o.id);
+                  st.push(o);
+                }
+            }
+          });
+        }
     }
   }
   /* rings of the drawn molecule (for ring fill and properties) */
@@ -12799,7 +13051,7 @@ function kdOf(st) {
       e.preventDefault();
       closeOverlay(escApply);
     } else if (mod && !e.altKey && (k === 'b' || k === 'i' || k === 'u')) {
-    /* Ctrl/Cmd+B, I, U: bold, italic, underline; Ctrl+= subscript, Ctrl+Shift+= superscript, on the selected characters */
+      /* Ctrl/Cmd+B, I, U: bold, italic, underline; Ctrl+= subscript, Ctrl+Shift+= superscript, on the selected characters */
       e.preventDefault();
       ovlCmd({ b: 'bold', i: 'italic', u: 'underline' }[k]);
     } else if (mod && !e.altKey && (e.code === 'Equal' || k === '=' || k === '+')) {
@@ -13652,7 +13904,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     o.texts.forEach(([t]) => {
       xs.push(t.x, t.x + textW(t));
-      ys.push(t.y - tSize(t), t.y + 4);
+      ys.push(t.y - tSize(t), t.y + 4 + tExtra(t));
     });
     if (!xs.length) return null;
     const x0 = Math.min(...xs) - 16,
@@ -13869,7 +14121,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         x0: t.x,
         x1: t.x + textW(t),
         y0: t.y - tSize(t),
-        y1: t.y + 3,
+        y1: t.y + 3 + tExtra(t),
         move: (dx, dy) => {
           t.x += dx;
           t.y += dy;
@@ -14642,7 +14894,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         applySym(h.atom, chgMode, e.shiftKey);
         commit();
       } else if (!h && /^(p?-?1)$/.test(chgMode)) {
-      /* in the air: a free charge there (it counts for the structure it stands by) */
+        /* in the air: a free charge there (it counts for the structure it stands by) */
         snap();
         freeCharge(chgMode.endsWith('-1') ? -1 : 1, chgMode.startsWith('p') ? 'p' : 'c', p.x, p.y);
         commit();
@@ -15914,6 +16166,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cage5', 'Bicyclo[3.3.1]nonane', ''],
       ['cage6', 'Cubane', ''],
       ['act:cleanRxn', 'Clean Up Reaction', 'Ctrl+Shift+KeyX'],
+      ['act:clean2d', 'Clean Up 2D (flat)', ''],
       ['act:expand', 'Expand Label', ''],
       ['act:contract', 'Contract Labels', ''],
       ['act:bondSel', 'Bond the two selected atoms and clean up', 'Ctrl+Shift+KeyL'],
@@ -17530,7 +17783,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           setHover(null);
         }
       } else if (hover.bond) {
-      /* as the eraser does: an atom left on its own goes with the bond */
+        /* as the eraser does: an atom left on its own goes with the bond */
         eraseBond(hover.bond);
         setHover(null);
       } else if (hover.arrow) {
@@ -18055,7 +18308,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const out = [];
       for (const f of fragments()) if (!f.some(a => ids.has(a.id))) out.push(fragBox(f));
       for (const t of mol.texts)
-        out.push({ x0: t.x - 4, x1: t.x + textW(t) + 4, y0: t.y - tSize(t) - 4, y1: t.y + 6 });
+        out.push({ x0: t.x - 4, x1: t.x + textW(t) + 4, y0: t.y - tSize(t) - 4, y1: t.y + 6 + tExtra(t) });
       for (const r of mol.arrows) {
         try {
           const b = arrowBox(r);
@@ -18097,7 +18350,56 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       placed.push(fragBox(fr));
     }
   }
-  function doClean() {
+  /* a structure turned in 3D (Shape 3D, 3D rotate) made flat again for Clean Up 2D: its configuration is read from the 3D
+     shape, the drawing as seen now gets wedges and hashes that say the same, and the depth is dropped; the layout that
+     follows keeps those wedges (and E/Z) as for any drawing */
+  function flatten3D(fr) {
+    if (!fr.some(a => a.z !== undefined)) return;
+    const ids = new Set(fr.map(a => a.id)),
+      fb = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
+    try {
+      if (!fr.some(a => a.multi || a.label)) {
+        const O = oclLoad(),
+          M = O.Molecule;
+        const [f, b2] = hLast(fr, fb);
+        const om = M.fromMolfile(molBlock(f, b2, ''));
+        if (oclSame(om, f, b2)) {
+          f.forEach((a, i) =>
+            om.setAtomZ(i, (a.z || 0) * ANG)
+          ); /* z toward the viewer, as Shape 3D builds it */
+          om.ensureHelperArrays(M.cHelperParities);
+          f.forEach((a, i) => om.setAtomZ(i, 0));
+          for (let k = 0; k < om.getAllBonds(); k++)
+            if (om.getBondType(k) === M.cBondTypeUp || om.getBondType(k) === M.cBondTypeDown)
+              om.setBondType(k, M.cBondTypeSingle);
+          om.setParitiesValid(0);
+          om.setStereoBondsFromParity();
+          fb.forEach(b => {
+            if (b.stereo === 'wedge' || b.stereo === 'hash') b.stereo = null;
+          });
+          for (let k = 0; k < om.getAllBonds(); k++) {
+            const t = om.getBondType(k);
+            if (t !== M.cBondTypeUp && t !== M.cBondTypeDown) continue;
+            const A = f[om.getBondAtom(0, k)],
+              B = f[om.getBondAtom(1, k)],
+              b = b2.find(x => (x.a === A.id && x.b === B.id) || (x.a === B.id && x.b === A.id));
+            if (!b || b.order !== 1) continue;
+            b.a = A.id;
+            b.b = B.id;
+            b.stereo = t === M.cBondTypeUp ? 'wedge' : 'hash';
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('flatten3D', e);
+    }
+    for (const a of fr) {
+      delete a.z;
+      delete a.zx;
+      delete a.zy;
+    }
+  }
+  function doClean(flat) {
     const frs = fragments();
     let t;
     if (sel.size) t = frs.filter(f => f.some(a => sel.has(a.id)));
@@ -18121,10 +18423,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       again = doClean.last && doClean.last.key === key && Date.now() - doClean.last.at < 5000;
     const before = t.map(fragBox);
     cleanForce = again;
+    cleanFlat = !!flat;
     try {
+      if (flat) t.forEach(flatten3D);
       cleanFragments(t);
     } finally {
       cleanForce = false;
+      cleanFlat = false;
     }
     const skipped = cleanSkipped;
     doClean.last = skipped ? { key, at: Date.now() } : null;
@@ -18158,7 +18463,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             ' as a flat structure'
         : again
           ? 'Rebuilt as a flat structure'
-          : 'Structure cleaned up'
+          : flat
+            ? 'Laid out flat (2D)'
+            : 'Structure cleaned up'
     );
   }
   /* free-bond clean up: keep every bond length; straighten acyclic bonds to 15° steps, moving whatever hangs beyond them rigidly; rings stay as drawn */
@@ -19185,6 +19492,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         toast('Expanded ' + t.length + ' label(s)');
       }
     } else if (a === 'clean') doClean();
+    else if (a === 'clean2d') doClean(true);
     else if (a === 'cleanRxn') {
       if (sel.size || selTxt.size) cleanSelectedReaction();
       else cleanReaction();
@@ -20076,6 +20384,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     document.querySelectorAll('.tab').forEach(t => t.setAttribute('aria-selected', t.dataset.tab === name));
     document.querySelectorAll('.pane').forEach(p => (p.hidden = p.dataset.pane !== name));
     if (name === 'infow') updateInfoWin();
+    /* a tab opened while the side panel is folded (a hotkey, Settings from a menu) opens the panel too */
+    if (document.documentElement.classList.contains('side-folded'))
+      document.querySelector('[data-act=sideFold]')?.click();
   }
   document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => openTab(t.dataset.tab)));
   const PT = [
@@ -20804,7 +21115,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* equivalents are 1 unless entered: a reactant or product left empty counts (and shows) as 1 equiv */
     for (const r of [...rows, ...hiddenRows]) {
       const k = kindOf(r);
-      if ((k === 'reactant' || k === 'product') && (r.eq === '' || r.eq == null)) r.eq = 1;
+      /* (a volume kept without density or molarity leaves them empty: unknown until typed) */
+      if (
+        (k === 'reactant' || k === 'product') &&
+        (r.eq === '' || r.eq == null) &&
+        !(num(r.vpm) > 0 || num(r.fixV) > 0)
+      )
+        r.eq = 1;
     }
     if (!rows.some(r => r.id === S.limiting && kindOf(r) === 'reactant')) {
       const f =
@@ -20828,6 +21145,30 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!l) return NaN;
     const e = num(l.eq);
     return (isFinite(e) ? e : 1) * baseN();
+  }
+  /* a volume typed for a reactant or catalyst with neither density nor molarity is kept as volume per mmol of that
+     reagent: its equivalents can still be changed, and the volume follows its moles (twice the equivalents or twice the
+     limiting reagent's moles, twice the volume); a density or molarity typed later takes over */
+  function freeVol(r, mmol) {
+    /* equivalents not typed: their moles are unknown and shown empty; the volume then goes as 1 equiv would */
+    if (!(mmol > 0) && !isFinite(num(r.eq))) mmol = baseN();
+    if (num(r.fixV) > 0 && mmol > 0) {
+      r.vpm = num(r.fixV) / mmol;
+      delete r.fixV;
+    }
+    if (num(r.vpm) > 0) return mmol > 0 ? num(r.vpm) * mmol : NaN;
+    return num(r.fixV) > 0 ? num(r.fixV) : NaN;
+  }
+  /* equivalents typed by hand: marked when typed (or set by typed moles or mass); in a document from before the mark,
+     any value other than the default (1, or 0.05 for a catalyst) was typed */
+  function eqTyped(r) {
+    if (r.eqMan) return true;
+    const e = num(r.eq);
+    return isFinite(e) && Math.abs(e - (kindOf(r) === 'catalyst' ? 0.05 : 1)) > 1e-9;
+  }
+  function dropFreeVol(r) {
+    delete r.vpm;
+    delete r.fixV;
   }
   function calc(r) {
     const k = kindOf(r),
@@ -20864,6 +21205,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let vol = NaN;
     if (conc > 0) vol = mmol / conc;
     else if (rho > 0) vol = sample / rho / 1000;
+    else vol = freeVol(r, mmol);
     return { mmol, pure, sample, vol, pur, conc };
   }
   const KLBL = { reactant: 'Reactant', catalyst: 'Catalyst', solvent: 'Solvent', product: 'Product' };
@@ -21249,6 +21591,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const k = kindOf(r);
     if ((k === 'reactant' || k === 'catalyst') && r.id !== S.limiting && S.base > 0) {
       r.eq = mmol / S.base;
+      r.eqMan = true;
       return;
     }
     const eq = num(r.eq) > 0 ? num(r.eq) : r.id === S.limiting || kindOf(r) === 'product' ? 1 : NaN;
@@ -21282,6 +21625,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         keepMeasured(r, c);
         delete r.meas;
       } else if (f !== 'ppur') keepMeasured(r, c);
+      if (num(r.rho) > 0 || num(r.conc) > 0) dropFreeVol(r);
     } else if (f === 'eq' && k === 'solvent') {
       /* a solvent's equivalents set its volume: equiv × limiting moles × MW / density */
       const x = plain(),
@@ -21299,6 +21643,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         );
     } else if (f === 'eq') {
       const x = plain();
+      r.eqMan = v !== '';
       r.eq = v === '' ? '' : k === 'catalyst' && !/eq/i.test(v) ? x / 100 : x;
     } else if (f === 'conc') {
       const C = P('conc');
@@ -21311,6 +21656,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } else {
         r.conc = v === '' ? '' : C;
         keepMeasured(r, c);
+        if (num(r.conc) > 0) dropFreeVol(r);
       }
     } else if (f === 'mmol') {
       if (k !== 'solvent') {
@@ -21330,11 +21676,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (f === 'vol') {
       const V = P('vol');
       if (k === 'solvent') r.svol = v === '' ? '' : V;
-      else if (V > 0) {
+      else if (V > 0 || v === '') {
         const cc = num(r.conc),
           rho = num(r.rho);
         if (cc > 0) setBaseFrom(r, V * cc);
         else if (rho > 0 && mw > 0) setBaseFrom(r, (V * rho * 1000 * c.pur) / 100 / mw);
+        else if (r.id !== S.limiting && (k === 'reactant' || k === 'catalyst')) {
+          /* no density, no molarity: the volume is kept for the reagent's present moles */
+          dropFreeVol(r);
+          if (V > 0) {
+            /* equivalents not typed by hand (not even 1): equivalents, moles and mass are hidden until they are */
+            const typed = eqTyped(r);
+            if (!typed) r.eq = '';
+            const n = typed && c.mmol > 0 ? c.mmol : baseN();
+            if (n > 0) r.vpm = V / n;
+            else r.fixV = V;
+          }
+        }
       }
       r.meas = 'vol';
     } else if (f === 'expM') {
@@ -21383,6 +21741,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (isFinite(q)) x.eq = +(q / k).toPrecision(6);
         });
         if (S.base > 0) S.base *= k;
+        /* a kept volume without equivalents goes with the scale: it stays as it is */
+        rows.forEach(x => {
+          if (num(x.vpm) > 0 && !isFinite(num(x.eq))) x.vpm = num(x.vpm) / k;
+        });
       }
       S.limiting = r.id;
       renderTable();
@@ -23034,8 +23396,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             (eqv || 0).toFixed(2),
             3,
             {
-              ed: k === 'solvent' ? eqv > 0 : isFinite(eqv) && Math.abs(eqv - 1) > 1e-9,
-              quiet: k === 'solvent' && !(eqv > 0)
+              ed: k === 'solvent' ? eqv > 0 : isFinite(eqv) && eqv > 0 && Math.abs(eqv - 1) > 1e-9,
+              /* a solvent without volume, or a volume kept without density: no equivalents to show */
+              quiet: (k === 'solvent' || !isFinite(num(row.eq))) && !(eqv > 0)
             }
           ];
           V[7] = [
@@ -29963,6 +30326,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           else if (ed(9)) row.meas = 'vol';
           else if (ed(13)) row.meas = 'mol';
           if (kindOf(row) === 'solvent' && n(9) > 0) row.svol = n(9);
+          /* a volume without density or molarity (as Reactio Draw writes a kept volume): kept, the equivalents only if given */ else if (
+            (kindOf(row) === 'reactant' || kindOf(row) === 'catalyst') &&
+            ed(9) &&
+            n(9) > 0 &&
+            !(n(10) > 0) &&
+            !(n(12) > 0) &&
+            !(val(c, 4) && val(c, 4).v === '1')
+          ) {
+            dropFreeVol(row);
+            row.fixV = n(9);
+            if (!(n(6) > 0)) row.eq = '';
+          }
           if (val(c, 4) && val(c, 4).v === '1') {
             lim = row;
             if (n(13) > 0) S.base = n(13) * 1000;
@@ -31810,7 +32185,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (id === 'cmd:newDoc' || id === 'cmd:closeDoc' || id === 'cmd:reopenDoc') return 'File';
     if (/^cmd:/.test(id)) return 'Edit';
     if (
-      /^(clean|act:(cleanRxn|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
+      /^(clean|act:(cleanRxn|clean2d|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
         id
       )
     )
@@ -32164,7 +32539,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           };
         };
         if (st.atoms.length) U(fragBox(st.atoms));
-        for (const t of st.texts) U({ x0: t.x, x1: t.x + textW(t), y0: t.y - tSize(t), y1: t.y + 4 });
+        for (const t of st.texts)
+          U({ x0: t.x, x1: t.x + textW(t), y0: t.y - tSize(t), y1: t.y + 4 + tExtra(t) });
         return b;
       };
       let left = null,
@@ -34530,8 +34906,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let inner = '';
     if (t.kind === 'radar')
       inner =
-        '<polygon points="17.0,1.0 26.5,6.5 26.5,17.5 17.0,23.0 7.5,17.5 7.5,6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><polygon points="17.0,6.5 21.8,9.2 21.8,14.7 17.0,17.5 12.2,14.8 12.2,9.2" fill="none" stroke="currentColor" stroke-width=".8" opacity=".55"/><path d="M17 12L17.0 1.0M17 12L26.5 6.5M17 12L26.5 17.5M17 12L17.0 23.0M17 12L7.5 17.5M17 12L7.5 6.5" stroke="currentColor" stroke-width=".8" opacity=".55"/><polygon points="17.0,2.7 22.2,9.0 26.0,17.2 17.0,16.4 9.9,16.1 11.3,8.7" fill="#3b82f6" fill-opacity=".3" stroke="#2563eb" stroke-width="1.5" stroke-linejoin="round"/>'; /* a radar: hexagonal grid, spokes, one data polygon */
-    else if (t.kind === 'pie')
+        '<polygon points="17.0,1.0 26.5,6.5 26.5,17.5 17.0,23.0 7.5,17.5 7.5,6.5" fill="none" stroke="currentColor" stroke-width="1.2"/><polygon points="17.0,6.5 21.8,9.2 21.8,14.7 17.0,17.5 12.2,14.8 12.2,9.2" fill="none" stroke="currentColor" stroke-width=".8" opacity=".55"/><path d="M17 12L17.0 1.0M17 12L26.5 6.5M17 12L26.5 17.5M17 12L17.0 23.0M17 12L7.5 17.5M17 12L7.5 6.5" stroke="currentColor" stroke-width=".8" opacity=".55"/><polygon points="17.0,2.7 22.2,9.0 26.0,17.2 17.0,16.4 9.9,16.1 11.3,8.7" fill="#3b82f6" fill-opacity=".3" stroke="#2563eb" stroke-width="1.5" stroke-linejoin="round"/>';
+    /* a radar: hexagonal grid, spokes, one data polygon */ else if (t.kind === 'pie')
       inner = pieSVG(
         {
           x1: 7,
@@ -37542,7 +37918,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if ((a && a.what) === 'reaction') cleanReaction();
       else {
         snap();
-        cleanFragments(fragments());
+        const frs = fragments();
+        cleanFlat = !!(a && a.flat);
+        try {
+          if (cleanFlat) frs.forEach(flatten3D);
+          cleanFragments(frs);
+        } finally {
+          cleanFlat = false;
+        }
         commit();
       }
       return { ok: true };
@@ -40099,7 +40482,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return false;
       }
     } else if (window.claude && !window.rdDesktop && ext !== 'json')
-    /* the hosted view saves common extensions only: chemistry files travel inside a zip there */
+      /* the hosted view saves common extensions only: chemistry files travel inside a zip there */
       await offerFile(name + '.zip', zipOf([[name, body]]));
     else await offerFile(name, typeof body === 'string' ? body : new Blob([body]));
     if (fh && mode !== 'copy') fhPut(t.id, fh);
@@ -40780,6 +41163,32 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     id: 'tool:act:gridShow',
     ctx: 'tool',
     label: 'Show / hide the stoichiometry grid',
+    def: ''
+  });
+  /* the side panel folds to a thin strip at the right and opens again (remembered on this computer) */
+  {
+    const fb = document.querySelector('[data-act=sideFold]');
+    const set = on => {
+      document.documentElement.classList.toggle('side-folded', on);
+      fb.setAttribute('aria-expanded', String(!on));
+      fb.title = on ? 'Show the side panel' : 'Hide the side panel (the sheet gets wider)';
+    };
+    try {
+      set(localStorage.getItem('rd.sidefold') === '1');
+    } catch (e) {}
+    fb.addEventListener('click', () => {
+      const on = !document.documentElement.classList.contains('side-folded');
+      set(on);
+      try {
+        localStorage.setItem('rd.sidefold', on ? '1' : '0');
+      } catch (e) {}
+      window.dispatchEvent(new Event('resize'));
+    });
+  }
+  ACTIONS.push({
+    id: 'tool:act:sideFold',
+    ctx: 'tool',
+    label: 'Hide / show the side panel',
     def: ''
   });
   /* the editor always fills the browser window: panels flush to the edges, no page header */

@@ -46,7 +46,8 @@ Useful commands
                                                        a product-ratio chart (also size, hole, legend, percentages…)
   addRadar        {"axes": [{"label": "H2O", "value": 80}, ...], "x": 300, "y": 200}
                                                        a sensitivity screen (also size, min, max, step, shape, zones…)
-  addReaction, addText, import, delete, clear, undo, redo, clean, setStyle, setRole, setAmount, help
+  clean           {"what": "reaction"} or {"flat": true}  Clean Up Reaction, Clean Up 2D (flat), or Clean Up Structure ({})
+  addReaction, addText, import, delete, clear, undo, redo, setStyle, setRole, setAmount, help
   Every SMILES in the answers carries the drawn stereochemistry: @/@@ from wedges and hashes, / and \ for E/Z.
 
 For one-off jobs without the app open (pictures, conversion, checks), use the command line: "Command line.txt".

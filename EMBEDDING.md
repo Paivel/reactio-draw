@@ -80,7 +80,8 @@ function rd(op, args) {
 | `scheme` | — | the reaction: reactants, products, reaction SMILES |
 | `table` | — | the reagent table (equivalents, masses, volumes, yield) |
 | `setAmount` | `{formula\|name\|id, field, value}` | fills a cell of the reagent table |
-| `setRole`, `setStyle`, `addReaction`, `addText`, `delete`, `clean`, `undo`, `redo`, `clear` | | editing |
+| `clean` | `{what: "reaction"}`, `{flat: true}` or — | Clean Up Reaction, Clean Up 2D (flat), or Clean Up Structure |
+| `setRole`, `setStyle`, `addReaction`, `addText`, `delete`, `undo`, `redo`, `clear` | | editing |
 | `nmr` | `{nucleus: "1H"\|"13C"\|"19F"\|"31P", index}` | predicted shifts |
 | `inchi` | `{index}` or `{smiles}` | InChI and InChIKey |
 | `smilesFromName` | `{name}` | SMILES from a common or systematic name (systematic: desktop apps only) |

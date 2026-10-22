@@ -14,11 +14,11 @@ your changes.
 
 | Part | About where | What is there |
 | --- | --- | --- |
-| CSS | lines 1–2713 | all styles; colour tokens on `:root`, dark theme, the top bar and panels |
-| HTML | 2713–3155 | the layout (below); every button carries a `data-tool`, `data-act` or `data-tab` attribute |
-| Desktop bridge | 3156–3220 | how the page talks to the Windows, Mac and Linux apps (`window.rdNative`, `rdDesktop`) |
-| **Editor code** | 3220–41350 | everything else in this guide |
-| Bundled libraries and data | 41350–end | each a single very long line; skip them when reading (below) |
+| CSS | lines 1–2771 | all styles; colour tokens on `:root`, dark theme, the top bar and panels |
+| HTML | 2771–3215 | the layout (below); every button carries a `data-tool`, `data-act` or `data-tab` attribute |
+| Desktop bridge | 3216–3280 | how the page talks to the Windows, Mac and Linux apps (`window.rdNative`, `rdDesktop`) |
+| **Editor code** | 3280–41759 | everything else in this guide |
+| Bundled libraries and data | 41759–end | each a single very long line; skip them when reading (below) |
 
 The HTML layout: `#docTabs` (document tabs), `#tools` (left toolbar), `#cv` with `#topbar` and the
 drawing `<svg id="mol">`, the right panel `aside.info` with its panes (`analysis`, `infow`, `chars`, `lib`,
