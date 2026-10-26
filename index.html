@@ -7003,6 +7003,141 @@ function kdOf(st) {
           placedR.add(best);
           continue;
         }
+        /* a ring of seven or more across a biaryl bond (the dioxaphosphepine of the BINOL phosphates, a dibenzoxepine): the
+           second aryl is laid as the mirror image of the first across that bond, both upright on the grid, the atoms off the
+           two aryls point straight out of their rings, and only what lies between them (the P) takes up the strain */
+        if (k >= 7 && np === 2) {
+          const hexIn = (u, v) => S.some(o => o !== best && LR[o].length === 6 && LR[o].includes(u) && LR[o].includes(v));
+          let seq = null,
+            q0 = null,
+            q1 = null;
+          if (hexIn(free[0], free[1])) {
+            seq = free;
+            q1 = path[1];
+            q0 = path[0];
+          } else if (hexIn(free[free.length - 1], free[free.length - 2])) {
+            seq = free.slice().reverse();
+            q1 = path[0];
+            q0 = path[1];
+          }
+          /* q1 bonded to seq[0] (the biaryl bond), q0 the other end of the placed run, seq[last] off q0 */
+          const nb = v => adj[v].map(([w]) => w).filter(w => atoms.includes(w) && P.has(w));
+          if (seq && seq.length >= 5) {
+            const out = v => {
+              const ns = nb(v);
+              if (ns.length !== 2) return null;
+              const V = P.get(v),
+                mx = (P.get(ns[0]).x + P.get(ns[1]).x) / 2 - V.x,
+                my = (P.get(ns[0]).y + P.get(ns[1]).y) / 2 - V.y,
+                l = Math.hypot(mx, my);
+              return l > 1e-6 ? { x: -mx / l, y: -my / l } : null;
+            };
+            const d1 = out(q1),
+              d0 = out(q0);
+            if (d1 && d0) {
+              const Q1 = P.get(q1),
+                Q0 = P.get(q0),
+                F0 = { x: Q1.x + L * d1.x, y: Q1.y + L * d1.y },
+                /* mirror across the line through the middle of the biaryl bond, square to it */
+                mxp = (Q1.x + F0.x) / 2,
+                myp = (Q1.y + F0.y) / 2,
+                side = q => (q.x - mxp) * d1.x + (q.y - myp) * d1.y,
+                mir = q => {
+                  const t = side(q);
+                  return { x: q.x - 2 * t * d1.x, y: q.y - 2 * t * d1.y };
+                },
+                F1 = mir(Q0),
+                mid = seq.slice(3, -1),
+                m2 = mid.length;
+              /* the middle atoms between the two ends, on an arc of bonds the standard length, bulging away from the aryls */
+              const arc = (X1, X0) => {
+                const dd = Math.hypot(X0.x - X1.x, X0.y - X1.y);
+                if (!(dd > 0.3 * L && dd < (m2 + 1) * L * 0.999)) return null;
+                const f = t => (L * Math.sin(((m2 + 1) * t) / 2)) / Math.sin(t / 2) - dd;
+                let lo = 1e-6,
+                  hi = (2 * Math.PI) / (m2 + 1) - 1e-6;
+                for (let it = 0; it < 60; it++) {
+                  const md = (lo + hi) / 2;
+                  if (f(md) > 0) lo = md;
+                  else hi = md;
+                }
+                const th = (lo + hi) / 2,
+                  Rc = L / (2 * Math.sin(th / 2)),
+                  span = (m2 + 1) * th,
+                  h = Rc * Math.cos(span / 2),
+                  ux = (X0.x - X1.x) / dd,
+                  uy = (X0.y - X1.y) / dd,
+                  cx0 = (X0.x + X1.x) / 2,
+                  cy0 = (X0.y + X1.y) / 2,
+                  awx = cx0 - (Q0.x + F1.x) / 2,
+                  awy = cy0 - (Q0.y + F1.y) / 2;
+                let nx = -uy,
+                  ny = ux;
+                if (nx * awx + ny * awy < 0) {
+                  nx = -nx;
+                  ny = -ny;
+                }
+                const C = { x: cx0 - nx * h, y: cy0 - ny * h },
+                  a0 = Math.atan2(X1.y - C.y, X1.x - C.x),
+                  end = t => Math.hypot(C.x + Rc * Math.cos(t) - X0.x, C.y + Rc * Math.sin(t) - X0.y),
+                  dir = end(a0 - span) < end(a0 + span) ? -1 : 1;
+                return mid.map((_, j) => ({
+                  x: C.x + Rc * Math.cos(a0 + dir * th * (j + 1)),
+                  y: C.y + Rc * Math.sin(a0 + dir * th * (j + 1))
+                }));
+              };
+              const angAt = (A, B, C) => {
+                const ax = A.x - B.x,
+                  ay = A.y - B.y,
+                  cx = C.x - B.x,
+                  cy = C.y - B.y;
+                return Math.acos(
+                  Math.max(-1, Math.min(1, (ax * cx + ay * cy) / (Math.hypot(ax, ay) * Math.hypot(cx, cy) || 1)))
+                );
+              };
+              /* the bonds off the two aryls lean out from straight by the angle that spreads the strain most evenly over
+                 the atoms of the bridge (about 20° for the phosphates) */
+              let bestB = null,
+                bestV = Infinity;
+              if (m2 >= 1)
+                for (let deg = -45; deg <= 20; deg++) {
+                  for (const sg of [1, -1]) {
+                    const t = (sg * deg * Math.PI) / 180,
+                      c = Math.cos(t),
+                      sn = Math.sin(t),
+                      dx = d0.x * c - d0.y * sn,
+                      dy = d0.x * sn + d0.y * c,
+                      X0 = { x: Q0.x + L * dx, y: Q0.y + L * dy };
+                    /* leaning out: away from the mirror line, for deg < 0 */
+                    const lean = Math.abs(side(X0)) - Math.abs(side({ x: Q0.x + L * d0.x, y: Q0.y + L * d0.y }));
+                    if (deg !== 0 && (deg < 0 ? lean < 0 : lean > 0)) continue;
+                    const X1 = mir(X0),
+                      M = arc(X1, X0);
+                    if (!M) continue;
+                    const chain = [Q1, Q0, X0, ...M.slice().reverse(), X1],
+                      angs = [];
+                    for (let i = 1; i < chain.length - 1; i++) angs.push(angAt(chain[i - 1], chain[i], chain[i + 1]));
+                    const mean = angs.reduce((u, v) => u + v, 0) / angs.length,
+                      v = angs.reduce((u, w) => u + (w - mean) ** 2, 0);
+                    if (v < bestV) {
+                      bestV = v;
+                      bestB = { X0, X1, M };
+                    }
+                  }
+                }
+              if (bestB) {
+                P.set(seq[0], F0);
+                P.set(seq[1], F1);
+                P.set(seq[2], bestB.X1);
+                P.set(seq[seq.length - 1], bestB.X0);
+                mid.forEach((v, j) => P.set(v, bestB.M[j]));
+                pos.biaryl = true;
+                placedR.add(best);
+                continue;
+              }
+            }
+          }
+        }
         const A = P.get(path[np - 1]),
           B = P.get(path[0]),
           m = free.length,
@@ -7404,6 +7539,127 @@ function kdOf(st) {
       )[0];
     return Math.min(...rings[seed]);
   }
+  /* hexagons that cannot all stand on one grid (two benzene rings on a five-membered ring: carbazole, fluorene): the
+     drawing is turned to the nearest turn where the hexagons lie as mirror images across a vertical or level line, so the
+     tilt is shared evenly between them and the drawing comes out symmetric, instead of one upright and the other leaning
+     the whole misfit. pts: points {x, y} (moved in place); hex: six-membered rings as indices into pts; free: a fresh
+     layout, whose orientation nobody chose (of the symmetric turns, the one with the smaller box, lying rather than
+     standing); biaryl: a ring across a biaryl bond was laid with the second aryl as the mirror image of the first (the
+     BINOL phosphates), every hexagon on the grid: turned by 60° steps so the mirror line stands upright or level. Returns
+     true when the drawing is to keep its mirror line upright or level (Clean Up then turns it by quarter turns only) */
+  function shareHexTilt(pts, hex, free, biaryl) {
+    const ang = [];
+    for (const r of hex)
+      r.forEach((i, k) => {
+        const p = pts[i],
+          q = pts[r[(k + 1) % 6]];
+        if (p && q) ang.push(Math.atan2(q.y - p.y, q.x - p.x));
+      });
+    if (!ang.length) return false;
+    const S60 = Math.PI / 3,
+      PI = Math.PI,
+      gdev = t => {
+        const m = (((t - PI / 2) % S60) + S60) % S60;
+        return Math.min(m, S60 - m);
+      };
+    const onGrid = ang.every(t => gdev(t) <= 0.035 || Math.abs(gdev(t) - PI / 6) <= 0.035);
+    /* every hexagon on the grid (upright or lying): a drawing being cleaned keeps its orientation */
+    if (onGrid && !biaryl) return false;
+    /* how far the hexagons are from their mirror image across a vertical line through their middle, turned by r */
+    const H = [...new Set(hex.flat())].map(i => pts[i]).filter(Boolean),
+      hx = H.reduce((t, a) => t + a.x, 0) / H.length,
+      hy = H.reduce((t, a) => t + a.y, 0) / H.length,
+      cap = (L * 0.5) ** 2,
+      sym = r => {
+        const c = Math.cos(r),
+          sn = Math.sin(r),
+          Q = H.map(a => ({ x: (a.x - hx) * c - (a.y - hy) * sn, y: (a.x - hx) * sn + (a.y - hy) * c }));
+        /* across a vertical line, or a level one */
+        let v = 0,
+          w = 0;
+        for (const q of Q) {
+          let m = cap,
+            n = cap;
+          for (const o of Q) {
+            m = Math.min(m, (o.x + q.x) ** 2 + (o.y - q.y) ** 2);
+            n = Math.min(n, (o.x - q.x) ** 2 + (o.y + q.y) ** 2);
+          }
+          v += m;
+          w += n;
+        }
+        return Math.min(v, w) / (H.length * cap);
+      };
+    const s0 = sym(0),
+      S = [];
+    /* all on the grid (a fresh layout of a biaryl-bridged ring, whose biaryl bond came out on a slant): only the turns that
+       keep the grid, by 60° */
+    if (onGrid) for (let k = -2; k <= 3; k++) S.push([(k * PI) / 3, sym((k * PI) / 3)]);
+    else
+      for (let k = -180; k < 180; k++) {
+        const r = (k / 180) * (PI / 2);
+        S.push([r, sym(r)]);
+      }
+    const best = Math.min(...S.map(x => x[1]));
+    /* already symmetric, or no turn makes it so */
+    if (s0 < best + 0.01 || best > 0.005) return s0 < 0.005;
+    const near = S.filter(x => x[1] < best + 0.003).map(x => x[0]);
+    const P = pts.filter(Boolean);
+    let bestR = near.reduce((m, r) => (Math.abs(r) < Math.abs(m) ? r : m), near[0]);
+    if (free) {
+      const area = r => {
+        const c = Math.cos(r),
+          sn = Math.sin(r);
+        let x0 = 1e9,
+          x1 = -1e9,
+          y0 = 1e9,
+          y1 = -1e9;
+        for (const a of P) {
+          const x = a.x * c - a.y * sn,
+            y = a.x * sn + a.y * c;
+          x0 = Math.min(x0, x);
+          x1 = Math.max(x1, x);
+          y0 = Math.min(y0, y);
+          y1 = Math.max(y1, y);
+        }
+        return (x1 - x0) * (y1 - y0) * (y1 - y0 > x1 - x0 ? 1.05 : 1);
+      };
+      let bA = area(bestR);
+      for (const r of near) {
+        const A = area(r);
+        if (A < bA * 0.98) {
+          bA = A;
+          bestR = r;
+        }
+      }
+    }
+    if (Math.abs(bestR) <= 1e-3) return true;
+    const c = Math.cos(bestR),
+      sn = Math.sin(bestR),
+      mx = P.reduce((t, a) => t + a.x, 0) / P.length,
+      my = P.reduce((t, a) => t + a.y, 0) / P.length;
+    for (const a of P) {
+      const x = a.x - mx,
+        y = a.y - my;
+      a.x = mx + x * c - y * sn;
+      a.y = my + x * sn + y * c;
+    }
+    return true;
+  }
+  /* the same for one component of a graph just laid out (SMILES, names, the preview that follows the pointer) */
+  function shareHexTiltG(g, pos, comp) {
+    const inC = new Set(comp),
+      adj = g.nodes.map(() => []);
+    g.edges.forEach((e, k) => {
+      adj[e.a].push([e.b, k]);
+      adj[e.b].push([e.a, k]);
+    });
+    shareHexTilt(
+      pos.map((p, i) => (inC.has(i) ? p : null)),
+      findRingsG(g.nodes.length, g.edges, adj).filter(r => r.length === 6 && r.every(i => inC.has(i))),
+      true,
+      !!pos.biaryl
+    );
+  }
   function placeGraph(g, anchor) {
     const pos = Array(g.nodes.length).fill(null);
     let ox = 0;
@@ -7412,6 +7668,7 @@ function kdOf(st) {
       pos[st] = { x: 0, y: 0 };
       layoutG(g, pos, st, []);
       fixEZ(g, pos);
+      shareHexTiltG(g, pos, comp);
       let x0 = 1e9,
         x1 = -1e9;
       for (const i of comp) {
@@ -7915,7 +8172,8 @@ function kdOf(st) {
         const B = box.get(labd[j]),
           w = Math.min(A.x1, B.x1) - Math.max(A.x0, B.x0),
           h = Math.min(A.y1, B.y1) - Math.max(A.y0, B.y0);
-        if (w > 0 && h > 0) {
+        /* two bonded atoms whose boxes only touch at a corner (P and its O on a slant bond): the letters stay apart */
+        if (w > 0 && h > 0 && !(w * h < 0.05 * L * L && neighbors(labd[i]).includes(labd[j]))) {
           s += w * h;
           hit(labd[i], labd[j]);
         }
@@ -8530,6 +8788,15 @@ function kdOf(st) {
         cy = fr.reduce((t, a) => t + a.y, 0) / fr.length;
       const px = pos.reduce((t, p) => t + p.x, 0) / fr.length,
         py = pos.reduce((t, p) => t + p.y, 0) / fr.length;
+      /* hexagons that cannot all stand on one grid share the tilt, the drawing turned to be symmetric */
+      const sharedTilt = shareHexTilt(
+        pos,
+        molRings(fr)
+          .filter(r => r.length === 6)
+          .map(r => r.map(x => fr.indexOf(x))),
+        false,
+        !!pos.biaryl
+      );
       const rel = pos.map(p => ({ x: p.x - px, y: p.y - py }));
       let best = null,
         bs = 1e18;
@@ -8537,6 +8804,8 @@ function kdOf(st) {
       const stereo = fb.some(b => b.stereo === 'wedge' || b.stereo === 'hash');
       for (const mir of stereo ? [1] : [1, -1])
         for (let k = 0; k < 12; k++) {
+          /* a symmetric drawing (shared tilt) keeps its mirror line upright or level: quarter turns only */
+          if (sharedTilt && k % 3) continue;
           const t = (k * Math.PI) / 6,
             c = Math.cos(t),
             s = Math.sin(t);
@@ -8556,7 +8825,7 @@ function kdOf(st) {
       });
       /* Clean Up 2D: turned so that most ring bonds stand on the hexagon grid (vertical, or at ±30° to the vertical), the
          smallest turn that does it */
-      if (cleanFlat) {
+      if (cleanFlat && !sharedTilt) {
         const ringB = new Set();
         for (const r of molRings(fr)) r.forEach((x, i) => ringB.add(x.id + ',' + r[(i + 1) % r.length].id));
         const ang = mol.bonds
@@ -18087,6 +18356,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       pos[st] = { x: 0, y: 0 };
       layoutG(g, pos, st, []);
       fixEZ(g, pos);
+      shareHexTiltG(g, pos, comp);
       let x0 = 1e9,
         x1 = -1e9,
         y0 = 1e9,
@@ -21634,6 +21904,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           const r = stepRoleOf(it.cx, it.cy, ar);
           if (!r) return false;
           it.role = r;
+          /* on the arrow's own line (a product far right of a short arrow): kept whatever the gap */
+          it.onLine = Math.abs(arrowGeo(ar, it.cx, it.cy).d) <= 160;
           return true;
         });
         items.length = 0;
@@ -21671,7 +21943,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           grew = false;
           items.forEach((it, i) => {
             if (inc.has(i)) return;
-            if (boxes.some(b => gap(B[i], b) <= NEAR)) {
+            if (it.onLine || boxes.some(b => gap(B[i], b) <= NEAR)) {
               inc.add(i);
               boxes.push(B[i]);
               grew = true;
@@ -31763,6 +32035,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       });
     }
+    const gridSteps = new Set();
     for (const g of grids) {
       const comps = [...g.querySelectorAll(':scope > sgcomponent')].filter(
         c => c.getAttribute('ComponentIsHeader') !== 'yes'
@@ -31774,16 +32047,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const d = c.querySelector(':scope > sgdatum[SGPropertyType="1"]');
         return d ? fN(d.textContent) : '';
       });
+      /* first by the drawn objects the columns point at (a grid of step 2 holds formulas that step 1 has too: Ni(OAc)2,
+         the ligand, the solvent), then by the formulas, and of two steps as good the one no grid has taken yet */
       let ar = null,
         best = -1;
       for (const a of rxnArrows().length > 1 ? rxnArrows() : [null]) {
-        const have = withStep(a && a.id, () => rows.map(r => fN(r.formula)));
-        const sc = want.filter(f => f && have.includes(f)).length;
+        const [have, objs] = withStep(a && a.id, () => [
+          rows.map(r => fN(r.formula)),
+          new Set((S.fmap || []).flatMap(e => e.atoms || []))
+        ]);
+        const byRef = refs.filter(ref => {
+          if (ref == null) return false;
+          const tid = fragText.get(ref);
+          if (tid != null) return objs.has('T' + tid);
+          return (fragAtoms.get(ref) || []).some(i => objs.has(i));
+        }).length;
+        const sc = byRef * 1000 + want.filter(f => f && have.includes(f)).length * 10 + (a && gridSteps.has(a.id) ? 0 : 1);
         if (sc > best) {
           best = sc;
           ar = a;
         }
       }
+      if (ar) gridSteps.add(ar.id);
       const val = (c, ptp) => {
         const d = c.querySelector(`:scope > sgdatum[SGPropertyType="${ptp}"]`);
         return d
@@ -31840,7 +32125,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           }
           if (val(c, 4) && val(c, 4).v === '1') {
             lim = row;
-            if (n(13) > 0) S.base = n(13) * 1000;
+            /* the grid's base is its Limit Moles: a limiting reagent at 1.1 equiv holds 1.1 × base, not the base itself */
+            if (n(5) > 0) S.base = n(5) * 1000;
+            else if (n(13) > 0) S.base = (n(13) * 1000) / (n(6) > 0 ? n(6) : 1);
           }
         } else {
           if (n(17) > 0) row.actual = n(17) * 1000;

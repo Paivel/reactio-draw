@@ -1,3 +1,15 @@
+# Reactio Draw, next release (test branch)
+
+## Changed
+
+- Rings across a biaryl bond (BINOL phosphoric acids, BINOL acetonides and dioxepins, biphenyl phosphates, dibenzoxepines): the second aryl is drawn as the mirror image of the first, both upright, and the bridge between them (the O–P–O) takes up the strain, as these are usually drawn. The structure stands with its mirror line upright or level. Before, the ring was a regular heptagon and one naphthalene leaned.
+- Carbazole, fluorene, fluorenone, dibenzofuran and other fused rings whose benzene rings cannot both stand upright: the tilt is shared between them, so the drawing comes out symmetric (carbazole with its NH at the top).
+
+## Fixed
+
+- A CDX or CDXML scheme with several steps and a stoichiometry grid for each: a grid could go to the wrong step, the product of a step with a short arrow was left out (no Products block), and with the limiting reagent above 1 equiv every amount came out too high.
+- Clean Up turned a phosphoric acid by up to 45° because the labels of P and its O touched at a corner.
+
 # Reactio Draw 1.5
 
 ## What changed since 1.4
