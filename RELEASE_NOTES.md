@@ -1,4 +1,4 @@
-# Reactio Draw, next release (test branch)
+# Reactio Draw 1.5.1
 
 ## Changed
 
