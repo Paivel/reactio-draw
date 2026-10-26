@@ -7,5 +7,5 @@ with sync_playwright() as p:
     pg.goto('file://'+os.path.join(ROOT,'index.html'));pg.wait_for_function('window.__rd',timeout=150000);pg.wait_for_timeout(800)
     pg.click('[data-act=tblIns]');pg.wait_for_timeout(500)
     pg.keyboard.press('Control+0');pg.wait_for_timeout(500)
-    pg.mouse.move(5,5);pg.wait_for_timeout(200)
+    pg.mouse.move(5,5);pg.wait_for_timeout(4500)  # the message over the sheet goes after 4 s
     pg.screenshot(path=os.path.join(ROOT,'docs','overview.png'));b.close()

@@ -1,6 +1,29 @@
-# Reactio Draw 1.4
+# Reactio Draw 1.5
 
-## What changed since 1.3
+## What changed since 1.4
+
+- 3D styles: a new button at the end of the Colors group, and the same menu on a right-click on a structure: Lines (as drawn), Ball and stick, Tubes or Spheres. The look follows xyzrender by Alister S. Goodfellow (MIT): shaded balls with a black outline, double bonds as two lines, an aromatic ring as one solid and one dashed line, η5 and η6 rings with a dot at the centre and a dashed bond to the metal, spheres that cut into each other, fading with depth. Hydrogens on N, O and S and at stereocentres are drawn. A flat structure gets its 3D shape turned to fit the drawing, so only its look changes. The same menu switches the depth fade and adds an atom color legend beside the structure.
+- Crystal structures (CIF), a test version: Open and drag-and-drop take .cif files. Every data block comes in its measured 3D geometry, drawn ball and stick, with the molecules of a salt or solvate grouped as they sit in the crystal. Bond orders and charges (N+, B−, PF6−, the charge of a metal that balances its ions) are worked out from the hydrogens in the file and the usual valences, so check them. A crystal structure keeps its measured shape: moving, turning and flipping move it as a whole, and Clean Up works on a copy put beside it.
+- A 3D Molfile or SD file keeps its z coordinates: it opens in its own 3D geometry.
+- Clean Up:
+  - pressed again on the same structure, not changed since, it gives another layout (a branch turned over, the structure grown from another atom), each with its configuration kept; the message says which of how many it is;
+  - crowded structures: three or four rings on one atom (BArF−, Ph4C) are set out as a cross; labels that cover each other are cleared by turning the structure a little; groups that do not fit are written as labels (CF3, OMe, tBu, iPr, PCy2…), all copies of the group alike, and a ring squashed for lack of room makes the whole structure use labels, so XPhos comes out as it is usually drawn;
+  - an H drawn on N, O or S goes into the label (NH, OH, SH);
+  - cages are drawn from their framework: homoadamantane is new (the Baeyer–Villiger lactone of adamantanone), a cage that came out with crossing bonds is drawn from its 3D shape, and Clean Up 2D keeps adamantane, cubane and bicyclo[2.2.2]octane in perspective;
+  - Settings → Drawing has two new choices: a methoxy drawn as O–CH3 and a methyl drawn as a bond end can be left as drawn (the default) or written as OMe / OCH3 and Me / CH3.
+- Contract Labels also knows iPr, Cy, PCy2 and PtBu2.
+- Messages are shown in a small box over the sheet while the stoichiometry grid under the editor is hidden; before, most of them could not be seen.
+
+## Fixed
+
+- 3D shape built the mirror image of a drawn stereocentre (Clean Up 2D turned it back, so a round trip looked right).
+- The simple 3D builder used when OpenChemLib cannot make a shape could turn stereocentres over; a shape that does not keep the configuration is no longer used.
+- A SMILES with written hydrogens (N([H])…[C@H]…) lost the configuration of its stereocentres.
+- With two reaction steps, deleting the step that was shown left the other step's grid with the deleted step's roles and amounts (a solvent came back as a reactant).
+- A pasted group lost its grouping.
+- A ferrocene drawn with the J key showed valence warnings on its Cp carbons.
+
+## 1.4
 
 - Clean Up 2D, a new button at the end of the Structure group: lays the selected structures out flat. A structure turned in 3D (3D shape, 3D rotate) becomes a flat drawing again, its configuration kept as wedges and hashes. Bridged rings such as norbornane, norbornene or camphor are drawn flat, as a regular hexagon with the bridge inside it, and turned onto the hexagon grid. Clean Up Structure is unchanged and keeps bridged systems in perspective. The local API does it with `clean {flat: true}`.
 - The side panel folds away: the arrow at the left of its tabs hides it to a thin strip at the right edge, so the sheet gets the room, and the arrow on the strip opens it again. Remembered on the computer; a hotkey can be set for it.

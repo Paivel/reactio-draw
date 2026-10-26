@@ -62,7 +62,7 @@ function rd(op, args) {
 | --- | --- | --- |
 | `set` | `{text, format}` | replaces the whole drawing; `format` (smiles, mol, sdf, rxn, cdxml, json) is found from the text when left out |
 | `addSmiles` | `{smiles, x, y}` | draws the structure (R/S from `@`/`@@` become wedges; a CXSMILES part such as `\|&1:1\|` sets stereo groups) |
-| `import` | `{format: "smiles"\|"mol"\|"rxn"\|"sdf"\|"cdxml", text}` | adds the structures from the text |
+| `import` | `{format: "smiles"\|"mol"\|"rxn"\|"sdf"\|"cdxml"\|"cif", text}` | adds the structures from the text (`cif`: crystal structures, a test version) |
 | `export` | `{format: "smiles"\|"mol"\|"sdf"\|"rxn"\|"cdxml"\|"svg"\|"json"}` | the drawing in that format |
 | `image` | `{text, format, output: "svg"\|"png", scale}` | a picture of any structure or reaction, without touching the sheet (PNG as base64) |
 | `picture` | `{scale}` | the sheet as a PNG (base64) |
