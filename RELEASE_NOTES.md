@@ -1,20 +1,24 @@
-# Reactio Draw 1.5.1-xyz (test build)
+# Reactio Draw 1.6
 
 ## New
 
-- XYZ files (issue #1, asked for by Onelightayear): Open and drag-and-drop take .xyz files. Each frame comes in its own 3D geometry, drawn ball and stick; bonds come from the distances (within 1.2 × the sum of the covalent radii, a hydrogen bonded only to its nearest atom), bond orders and charges from the valences, as for a CIF, so check them. A file with more than ten frames (an optimisation, a scan) opens its last frame.
-- Fixed: in the Windows and Mac apps a click on the Check line under Analysis (or on the licence link in Info) opened the browser on an address of the app itself instead of selecting the atoms.
-- The side panel's tabs scroll sideways when they do not all fit (mouse wheel or the thin bar under them), as the document tabs do; the open tab is kept in view and the arrow that folds the panel stays at the left.
-- Analysis → Properties: Show R/S and E/Z on the structures. (R)/(S) beside every stereocentre drawn with a wedge or hash and (E)/(Z) beside every stereogenic double bond, by the CIP rules (OpenChemLib), each where it covers no bond, atom label or text; shown on the sheet and in pictures.
-- Analysis → Properties: cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and Lipinski's rule of five (OpenChemLib).
-- Markush structures: an atom labelled R, R1, R2, R', X… is a variable; its values are written as a text on the sheet (R1 = H, Me, OMe — one per line). Analysis shows how many compounds the series holds, and Enumerate draws every one of them below the drawing, each with its values (H removes the atom; an element or a group label takes its place). Molfiles and SD files keep R1, R2 as R-group atoms (R#, M  RGP) and every variable label as an atom alias, and read them back. The local API has `enumerate`.
-- Collect into Markush (R-group decomposition): draw the common scaffold with R1, R2, X… and select it together with a series of compounds; the scaffold is found in each compound and the lists R1 = Me, Ph, 3-Py… are written on the sheet. Substituents are named as group labels (Me, OMe, CH2CO2Et, morpholino…) where possible, otherwise as SMILES; compounds that do not fit the scaffold are reported. New group labels: 3-Py, 4-Py, 2-furyl, 3-furyl, 2-thienyl, 3-thienyl, c-Bu, c-Pent, morpholino, piperidino, pyrrolidino.
-- Save as XYZ, File → Export as → XYZ, Copy to clipboard → XYZ, `export {format: "xyz"}` in the API and `reactio convert in.cdx -o out.xyz` (contributed by Onelightayear, issue #1): every structure gets its hydrogens and a conformer search (OpenChemLib torsion library, each conformer minimised with MMFF94s+, the lowest of up to 20 kept); the comment line carries the charge, the spin multiplicity and the MMFF energy (`compound 1 C13H18O2 charge=0 mult=1 E(MMFF94s+)=23.790 kcal/mol`), as ORCA, Gaussian and xtb need them; the 3D stereocentres and double bonds are checked against the drawing, and undrawn stereo or elements MMFF94 cannot type are reported. The search runs in the background, with a progress box and Cancel. A structure that already has a 3D shape on the sheet (from a .cif or .xyz file) keeps it. Opening an .xyz file reads the charge of a lone ion (Cl−, Na+) from the comment line.
-- Opening an .xyz or .cif file: every stereocentre gets a wedge or hash from the 3D shape, so the structure keeps its R/S in its SMILES, InChI, name and in Molfile and CDXML exports, and when it is laid flat; after a turn with 3D rotate the wedges are chosen again for the new view.
-- η-rings (Cp, arenes on a metal): the bond from the ring centre stays whole and the ring's circle (or ellipse) and thin edges are interrupted where it crosses them; with the metal behind a ring seen in perspective, the bond goes under the bold front edge instead. A ring drawn with double bonds no longer gets a second circle.
-- Select on the centre of an η-ring moves the ligand alone round its metal, turned to face it (its bold side always the lower one); a bond added to an atom of a tilted Cp goes out in the ring's plane (Cp*).
-- Layout: porphyrins and other large macrocycles take OpenChemLib's layout when it is clearly better than the own one; a cage fused to a ring (benzobicyclo[2.2.2]octane, benzonorbornene) is drawn from the cage template with the ring outside; bicyclo[2.2.2]octane has a new template with even bonds; after Clean Up, where bonds of a cage cross, the farther one is interrupted (the bond running up the page in front when the 3D shape cannot tell). Many molecules in one SMILES are laid out in rows.
-- Speed on big sheets (150 molecules): opening a long SMILES 41 → 6 s, Select All with the analysis 36 → 2 s, Clean Up 43 → 8 s, opening such a CDXML 13 → 5 s; a pinch or wheel zoom only scales the picture while it lasts; a PNG of a very large sheet is scaled to what the browser can hold instead of failing. Dragging a whole selection on a big drawing shifts a picture of it (about 60 → 2 ms a step); a 3D turn redraws only the structure being turned, once a screen frame; a trackpad pinch on a Mac zooms once a frame; a sheet of crystal structures (7 structures, 827 atoms) is drawn in about 75 ms instead of 1–7 s, which had made the app hang when zooming or turning.
+- XYZ files: open, and save with a conformer search (MMFF94s+), charge and multiplicity for quantum chemistry (issue #1; the export by Onelightayear)
+- R/S and E/Z labels on the structures
+- cLogP, TPSA, H-bond donors and acceptors, rule of five
+- Markush structures: R-groups with value lists, Enumerate, and Collect into Markush
+- η-rings (Cp, arenes): proper line breaks where the bond to the metal crosses the ring; drag the ring centre to move the ligand round its metal
+- Structures from .cif and .xyz keep their R/S (wedges from the 3D shape)
+
+## Changed
+
+- Cleaner layouts for porphyrins, fused cages (benzonorbornene) and bicyclo[2.2.2]octanes; crossing bonds get a gap after Clean Up
+- Much faster on big sheets: opening, Select All, Clean Up, dragging, 3D turning and zooming
+- Side panel tabs scroll when they do not fit
+
+## Fixed
+
+- Zooming or turning a sheet of crystal structures could make the app hang
+- In the apps, the Check line and the licence link opened the browser
 
 # Reactio Draw 1.5.1
 
