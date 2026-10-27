@@ -87,6 +87,8 @@ function rd(op, args) {
 | `smilesFromName` | `{name}` | SMILES from a common or systematic name (systematic: desktop apps only) |
 | `addName` | `{name, x, y}` | draws the structure for a name |
 | `name` | `{index}` or `{smiles}` | IUPAC name, with `checkedByOpsin` (desktop apps only) |
+| `enumerate` | `{index}` | draws every compound of a Markush structure; the lists are texts such as `R1 = H, Me, OMe` |
+| `decompose` | `{scaffold, compounds}` | R-group decomposition: finds the scaffold (with R1, X…) in the compounds and writes the lists; `compounds` defaults to all other structures |
 | `addChart` | `{slices: [{label, value, color, showPercent}], x, y, size, hole, start, counterclockwise, labels, gaps, legend, percentages, decimals, textSize}` | draws a product-ratio chart |
 | `addRadar` | `{axes: [{label, value}], x, y, size, min, max, step, shape, zones, color, fill, textSize}` | draws a sensitivity screen |
 | `prefixStyle` | `{mode: "plain"\|"italic"\|"sup"}` | how t, i, s, n of tBu, iPr… are written |

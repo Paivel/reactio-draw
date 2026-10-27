@@ -3599,6 +3599,17 @@ function kdOf(st) {
       TFP: 'C=1C(=C(N=C(F)C1F)F)F',
       iPr2N: 'N(C(C)C)C(C)C',
       '2-Py': 'C1=NC=CC=C1',
+      '3-Py': 'C1=CN=CC=C1',
+      '4-Py': 'C1=CC=NC=C1',
+      '2-furyl': 'C1=CC=CO1',
+      '3-furyl': 'C1=COC=C1',
+      '2-thienyl': 'C1=CC=CS1',
+      '3-thienyl': 'C1=CSC=C1',
+      'c-Bu': 'C1CCC1',
+      'c-Pent': 'C1CCCC1',
+      morpholino: 'N1CCOCC1',
+      piperidino: 'N1CCCCC1',
+      pyrrolidino: 'N1CCCC1',
       OEC: 'OCC#N',
       LevO: 'OC(CCC(C)=O)=O',
       OLev: 'OC(CCC(C)=O)=O',
@@ -12205,7 +12216,13 @@ function kdOf(st) {
       a.chg = 0;
       return true;
     }
-    return setLabel(a, t) ? true : false;
+    if (setLabel(a, t)) return true;
+    /* a substituent read back from a compound as SMILES (its first atom on the bond) */
+    if (/^[A-Za-z[]/.test(t) && !/\s/.test(t) && parseSmiles(t)) {
+      a.grp = t;
+      return true;
+    }
+    return false;
   }
   /* draws every compound of the series below the drawing, each with the values it takes; max compounds drawn: 200 */
   function enumerateMarkush(fr) {
@@ -12285,6 +12302,226 @@ function kdOf(st) {
     return { made: combos.length, unknown: [...bad] };
   }
   /* ===== analysis / properties / info ===== */
+  /* R-group decomposition, the other way round: a drawn scaffold with variable atoms (R1, R2 on one bond each; X, Y inside the
+     scaffold) and a series of compounds; the scaffold is looked for in every compound (OpenChemLib substructure search), what
+     stands in place of each R and X is read, and the lists "R1 = Me, Ph, CF3" are written, so the series becomes one Markush
+     structure. Picks the scaffold and the compounds from the selection (or the whole sheet): null when there is no single
+     scaffold with variable atoms and at least one compound beside it */
+  function markushPick(atoms) {
+    const frs = fragments(),
+      on = atoms && atoms.length ? frs.filter(f => f.some(a => atoms.includes(a))) : frs,
+      sc = on.filter(f => f.some(isVarAtom));
+    if (sc.length !== 1) return null;
+    const members = on.filter(f => f !== sc[0] && f.some(a => !a.label || a.grp));
+    return members.length ? { sc: sc[0], members } : null;
+  }
+  const mkCollectNote = pk =>
+    `<b>Markush scaffold</b> and ${pk.members.length} compound${pk.members.length > 1 ? 's' : ''}: the values of ${esc(
+      [...new Set(pk.sc.filter(isVarAtom).map(a => a.label))].join(', ')
+    )} can be read from the compounds. <button class="btn ghost sm" id="mkCollect">Collect into Markush</button>`;
+  const MK_GROUPS = ['Me', 'Et', 'nPr', 'iPr', 'nBu', 'iBu', 'sBu', 'tBu', 'c-Pr', 'c-Bu', 'c-Pent', 'Cy', 'Ph', 'Bn', 'Tol', 'PMP',
+    'Mes', 'C6F5', '2-Py', '3-Py', '4-Py', '2-furyl', '3-furyl', '2-thienyl', '3-thienyl', '1-naphthyl', '2-naphthyl', 'morpholino',
+    'piperidino', 'pyrrolidino', 'vinyl', 'allyl', 'OMe', 'OEt',
+    'OiPr', 'OtBu', 'OPh', 'OBn', 'OAc', 'OCF3', 'SMe', 'NMe2', 'NHMe', 'NHAc', 'CF3', 'CN', 'NO2', 'CHO', 'Ac', 'CO2H', 'CO2Me',
+    'CO2Et', 'CO2tBu', 'CONH2', 'Bz', 'Boc', 'Cbz', 'Ts', 'Ms', 'Tf', 'TMS', 'Bpin'];
+  function decomposeMarkush(sc, members) {
+    let O;
+    try {
+      O = oclLoad();
+    } catch (e) {
+      return { err: 'The structure library did not load' };
+    }
+    const D = markushDefs(),
+      saved = mol,
+      m = expandedCopy(),
+      plainH = a => a.el === 'H' && !a.label && !a.iso;
+    mol = m;
+    let res;
+    try {
+      const frsM = fragments(),
+        inM = f0 => {
+          const a0 = f0.find(a => !a.label) || f0[0];
+          return frsM.find(f => f.some(a => a.id === a0.id));
+        },
+        S = inM(sc);
+      if (!S) return { err: 'The scaffold was not found' };
+      /* R sites: a variable atom on one bond; the core is everything else, X atoms (two bonds or more) match any atom */
+      const sites = [],
+        core = [];
+      for (const a of S) {
+        if (plainH(a)) continue;
+        const nb = neighbors(a).filter(n => !plainH(n));
+        if (isVarAtom(a) && nb.length === 1) sites.push({ a, on: nb[0] });
+        else if (isVarAtom(a) && nb.length === 0) continue;
+        else core.push(a);
+      }
+      if (!core.length || core.some(a => a.label && !isVarAtom(a)))
+        return { err: 'The scaffold should be drawn with atoms and R-groups only' };
+      const cIdx = new Map(core.map((a, i) => [a.id, i])),
+        qAtoms = core.map(a => (isVarAtom(a) ? { ...a, label: undefined, grp: undefined, el: 'C', chg: 0 } : a)),
+        q = O.Molecule.fromMolfile(molBlock(qAtoms, fragBonds(m, core)));
+      q.setFragment(true);
+      core.forEach((a, i) => {
+        if (isVarAtom(a)) q.setAtomQueryFeature(i, O.Molecule.cAtomQFAny, true);
+      });
+      const keyOf = a => varKey(a.label),
+        vals = new Map(),
+        put = (k, v) => (vals.get(k) || vals.set(k, []).get(k)).includes(v) || vals.get(k).push(v),
+        known = (k, v) => (vals.get(k) || []).includes(v) || (D.get(k) ? D.get(k).values.includes(v) : false);
+      for (const a of S) if (isVarAtom(a) && !vals.has(keyOf(a))) vals.set(keyOf(a), []);
+      /* a substituent as a group label (Me, OMe, Ph …), an element (F, Cl, OH) or, failing that, its SMILES */
+      const ID = new Map(),
+        idOf = smi => {
+          if (ID.has(smi)) return ID.get(smi);
+          let c = null;
+          try {
+            c = O.Molecule.fromSmiles('[Xe]' + smi).getIDCode();
+          } catch (e) {}
+          ID.set(smi, c);
+          return c;
+        };
+      const name = (k, br, a0, bo) => {
+        if (br.length === 1 && bo === 1 && a0.el !== 'C' && !a0.chg && !a0.iso && !a0.rad && a0.el in AW) {
+          const h = implicitH(a0);
+          return a0.el + (h ? 'H' + (h > 1 ? h : '') : '');
+        }
+        const own = fragSmiles(br, a0),
+          id = bo === 1 ? idOf(own) : null;
+        if (!id) return own;
+        const pref = [...(D.get(k) ? D.get(k).values : []), ...MK_GROUPS, ...contractList().map(x => x[0])],
+          same = lab => {
+            const s = resolveLabel(lab);
+            return !!s && !s.includes('.') && idOf(s) === id;
+          },
+          piece = a => a.el + (implicitH(a) ? 'H' + (implicitH(a) > 1 ? implicitH(a) : '') : ''),
+          ownLab = (rem, at) => {
+            if (rem.length === 1 && at.el !== 'C' && !at.chg) return [piece(at)];
+            const i2 = idOf(fragSmiles(rem, at));
+            return pref.filter(lab => {
+              const s = resolveLabel(lab);
+              return !!s && !s.includes('.') && idOf(s) === i2;
+            });
+          };
+        for (const lab of pref) if (same(lab)) return lab;
+        /* a chain written out, CH2CH2OH, or a chain that ends in a group, CH2CO2Et */
+        const inBr = new Set(br.map(a => a.id)),
+          chain = [];
+        let cur = a0;
+        while (cur && chain.length < 8 && !cur.chg && !cur.iso) {
+          chain.push(cur);
+          const pre = chain.map(piece).join(''),
+            nx = neighbors(cur).filter(n => inBr.has(n.id) && !chain.includes(n));
+          if (!nx.length) {
+            if (same(pre)) return pre;
+            break;
+          }
+          if (nx.length !== 1 || (bondBetween(cur, nx[0]) || {}).order !== 1) break;
+          const ids = new Set(chain.map(a => a.id)),
+            rem = br.filter(a => !ids.has(a.id));
+          for (const r of ownLab(rem, nx[0])) if (same(pre + r)) return pre + r;
+          cur = nx[0];
+        }
+        return own;
+      };
+      const found = [],
+        missed = [];
+      members.forEach((f0, mi) => {
+        const F = inM(f0);
+        const heavy = F ? F.filter(a => !plainH(a)) : [];
+        if (!heavy.length || heavy.some(a => a.label)) return missed.push(mi);
+        let ml;
+        try {
+          const om = O.Molecule.fromMolfile(molBlock(heavy, fragBonds(m, heavy))),
+            ss = new O.SSSearcher();
+          ss.setFragment(q);
+          ss.setMolecule(om);
+          ml = ss.findFragmentInMolecule(5, 1) ? ss.getMatchList() : [];
+        } catch (e) {
+          ml = [];
+        }
+        let best = null;
+        for (const mt of (ml || []).slice(0, 48)) {
+          const map = new Map(core.map((a, i) => [a.id, heavy[mt[i]]])),
+            hit = new Set([...map.values()].map(a => a && a.id));
+          if ([...map.values()].some(a => !a)) continue;
+          const out = [];
+          let ok = true;
+          for (const a of core) {
+            const b = map.get(a.id),
+              ext = neighbors(b).filter(n => !plainH(n) && !hit.has(n.id)),
+              rs = sites.filter(s => s.on === a);
+            if (ext.length > rs.length) {
+              ok = false;
+              break;
+            }
+            rs.forEach((s, j) => {
+              const n0 = ext[j];
+              if (!n0) return out.push([keyOf(s.a), 'H']);
+              const br = [n0],
+                seen = new Set([n0.id]);
+              for (let i = 0; i < br.length; i++)
+                for (const n of neighbors(br[i])) {
+                  if (plainH(n) || seen.has(n.id)) continue;
+                  if (hit.has(n.id)) {
+                    if (!(br[i] === n0 && n === b)) ok = false;
+                    continue;
+                  }
+                  seen.add(n.id);
+                  br.push(n);
+                }
+              const bd = bondBetween(b, n0);
+              out.push([keyOf(s.a), name(keyOf(s.a), br, n0, bd ? bd.order : 1)]);
+            });
+            if (isVarAtom(a)) {
+              const h = implicitH(b);
+              out.push([keyOf(a), b.el + (h ? 'H' + (h > 1 ? h : '') : '')]);
+            }
+          }
+          if (!ok) continue;
+          const score = out.filter(([k, v]) => known(k, v)).length;
+          if (!best || score > best.score) best = { out, score };
+        }
+        if (!best) return missed.push(mi);
+        found.push(mi);
+        for (const [k, v] of best.out) put(k, v);
+      });
+      const order = [...vals.keys()].sort((p, q) => p.localeCompare(q, 'en', { numeric: true }));
+      res = { found, missed, vals: new Map(order.map(k => [k, vals.get(k)])) };
+    } finally {
+      mol = saved;
+    }
+    if (res.err || !res.found.length) return res.err ? res : { err: 'The scaffold was not found in any of the compounds', missed: res.missed };
+    /* the lists on the sheet: lines already written are rewritten in place, the others go in a new text under the scaffold */
+    const names = new Map(sc.filter(isVarAtom).map(a => [varKey(a.label), a.label])),
+      todo = new Map([...res.vals].filter(([k, v]) => v.length));
+    snap();
+    for (const t of mol.texts) {
+      const L = tLines(t);
+      let ch = false;
+      const L2 = L.map(line => {
+        const mm = /^\s*([A-Za-z][A-Za-z0-9'′’″⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉_^{}]*)\s*([=:])\s*(.+?)\s*$/.exec(plainText(line));
+        if (!mm || !todo.has(varKey(mm[1]))) return line;
+        const k = varKey(mm[1]),
+          s = mm[1] + ' ' + mm[2] + ' ' + todo.get(k).join(', ');
+        todo.delete(k);
+        ch = true;
+        return s;
+      });
+      if (ch) t.text = L2.join('\n');
+    }
+    if (todo.size) {
+      const bb = fragBox(sc);
+      mol.texts.push({
+        id: mol.next++,
+        x: bb.x0,
+        y: bb.y1 + 44,
+        text: [...todo].map(([k, v]) => (names.get(k) || k) + ' = ' + v.join(', ')).join('\n'),
+        fs: true
+      });
+    }
+    commit();
+    return { found: res.found.length, missed: res.missed, lists: [...res.vals].map(([k, v]) => (names.get(k) || k) + ' = ' + v.join(', ')) };
+  }
   function analysisTarget() {
     const frs = fragments();
     /* formula texts count too (a counter-ion written as text, PF6−): the selected ones, or all of them beside a single structure */
@@ -12563,9 +12800,11 @@ function kdOf(st) {
       /* a Markush structure: how many compounds the series holds, and the button that draws them */
       {
         const box = $('markush'),
-          Mk = markushOf(frs.find(fr => fr.some(a => target.includes(a))) || target);
-        box.hidden = !Mk;
-        if (Mk)
+          Mk = markushOf(frs.find(fr => fr.some(a => target.includes(a))) || target),
+          pk = markushPick(target);
+        box.hidden = !Mk && !pk;
+        if (pk) box.innerHTML = mkCollectNote(pk);
+        else if (Mk)
           box.innerHTML = Mk.miss.length
             ? `<b>Markush structure.</b> Write the values of ${esc(Mk.miss.join(', '))} as a text on the sheet, for example <i>${esc(
                 Mk.miss[0]
@@ -12576,6 +12815,11 @@ function kdOf(st) {
       }
     } else {
       $('scope').textContent = frs.length + ' structures on the sheet. Select one for a full analysis.';
+      {
+        const pk = markushPick(null);
+        $('markush').hidden = !pk;
+        if (pk) $('markush').innerHTML = mkCollectNote(pk);
+      }
       FRAG_ROWS = [];
       $('frags').innerHTML =
         saltGroups()
@@ -24449,6 +24693,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   })();
 
+  document.addEventListener('click', e => {
+    if (!e.target.closest || !e.target.closest('#mkCollect')) return;
+    const { atoms: target } = analysisTarget(),
+      pk = markushPick(target);
+    if (!pk) return;
+    const r = decomposeMarkush(pk.sc, pk.members);
+    if (r.err) toast(r.err, true);
+    else
+      toast(
+        r.lists.join('; ') +
+          (r.missed.length
+            ? ' — the scaffold was not found in ' + r.missed.length + ' compound' + (r.missed.length > 1 ? 's' : '')
+            : ''),
+        !!r.missed.length
+      );
+  });
   document.addEventListener('click', e => {
     if (!e.target.closest || !e.target.closest('#mkEnum')) return;
     const { atoms: target, frs } = analysisTarget();
@@ -41180,6 +41440,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const r = enumerateMarkush(apiAtomsOf((a && a.index) || 0));
       if (r.err) throw new Error(r.err);
       return r;
+    },
+    /* R-group decomposition: scaffold (index of the structure with R1, X …) and compounds (indices; all others if left out):
+       writes the lists "R1 = …" on the sheet */
+    decompose: a => {
+      const frs = fragments(),
+        si = (a && a.scaffold) != null ? a.scaffold : frs.findIndex(f => f.some(isVarAtom)),
+        sc = frs[si];
+      if (!sc || !sc.some(isVarAtom)) throw new Error('No scaffold with R-groups or other variable atoms');
+      const ix = a && Array.isArray(a.compounds) ? a.compounds : frs.map((f, i) => i).filter(i => i !== si && !frs[i].some(isVarAtom));
+      const r = decomposeMarkush(sc, ix.map(i => frs[i]).filter(Boolean));
+      if (r.err) throw new Error(r.err);
+      return { found: r.found, missed: r.missed.map(i => ix[i]), lists: r.lists };
     },
     /* product-ratio chart: slices [{label, value, color}], x, y (top-left), size (diameter), legend 'right'|'below'|'none', hole (0 = pie), percentages, decimals */
     addChart: a => {
