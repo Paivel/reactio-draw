@@ -3013,12 +3013,18 @@ html {
       <div class="pane" data-pane="analysis">
         <details class="agrp" data-agrp="props" open><summary>Properties</summary><div class="agbody">
         <div class="scope" id="scope"></div>
+        <label class="note" style="display:flex;gap:6px;align-items:center;justify-content:flex-start;text-align:left;margin:2px 0 6px" title="(R)/(S) beside each stereocentre drawn with a wedge or hash, (E)/(Z) beside each double bond, by the CIP rules (OpenChemLib); shown on the sheet and in pictures"><input type="checkbox" id="cipShow" style="width:auto;flex:none;margin:0"> <span>Show R/S and E/Z on the structures</span></label>
         <div id="single">
           <div class="formula" id="formula">—</div>
           <dl class="kv" style="margin-top:8px">
             <dt>Mol. Wt.</dt><dd id="mw">—</dd>
             <dt>Exact Mass</dt><dd id="exact">—</dd>
             <dt>m/z [M+H]⁺</dt><dd id="mh">—</dd>
+            <dt title="Calculated octanol–water partition coefficient (OpenChemLib, atom contributions)">cLogP</dt><dd id="clogp">—</dd>
+            <dt title="Topological polar surface area (OpenChemLib)">TPSA, Å²</dt><dd id="tpsa">—</dd>
+            <dt title="Hydrogen-bond donors / acceptors (OpenChemLib)">H-bond donors / acceptors</dt><dd id="hbda">—</dd>
+            <dt title="Rotatable bonds (OpenChemLib)">Rotatable bonds</dt><dd id="rotb">—</dd>
+            <dt title="Lipinski's rule of five: MW ≤ 500, cLogP ≤ 5, H-bond donors ≤ 5, acceptors ≤ 10; one violation is usually allowed">Rule of five</dt><dd id="ro5">—</dd>
           </dl>
           <div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap;margin-top:8px"><span class="tlabel" style="white-space:nowrap" title="Type the m/z of the peak you found: the closest common ion (adduct) of this structure is shown with its calculated m/z and the error in ppm">HRMS found m/z</span><input id="hrmsIn" inputmode="decimal" placeholder="e.g. 203.0318" style="min-width:0;flex:1"><button class="btn ghost sm" id="hrmsCopy" title="Copy the HRMS line for the experimental part">Copy</button></div>
           <div id="hrmsOut" class="note" style="margin-top:2px"></div>
@@ -12062,6 +12068,10 @@ function kdOf(st) {
       }
       if (g) s += '<g class="scr">' + g + '</g>';
     }
+    if ($('cipShow') && $('cipShow').checked && mol.atoms.length)
+      try {
+        s += cipSVG();
+      } catch (e) {}
     if (NMRLAB && $('nmrShow') && $('nmrShow').checked) {
       let g = '';
       for (const [id, t] of NMRLAB) {
@@ -12134,6 +12144,222 @@ function kdOf(st) {
       };
     return { atoms: null, frs };
   }
+  /* cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and the rule of five for the structures the atoms belong to */
+  const DRUG_MEMO = new Map();
+  function drugProps(atoms, mw) {
+    if (!atoms || !atoms.length) return null;
+    let sm = '';
+    try {
+      sm = stereoSmilesList(new Set(atoms.map(a => a.id))).join('.');
+    } catch (e) {
+      return null;
+    }
+    if (!sm) return null;
+    if (DRUG_MEMO.has(sm)) return DRUG_MEMO.get(sm);
+    let r = null;
+    try {
+      const O = oclLoad(),
+        P = new O.MoleculeProperties(O.Molecule.fromSmiles(sm.replace(/\s+\|[^|]*\|\s*$/, '')));
+      r = {
+        logP: P.logP,
+        tpsa: P.polarSurfaceArea,
+        donors: P.donorCount,
+        acceptors: P.acceptorCount,
+        rot: P.rotatableBondCount
+      };
+      r.viol = (mw > 500) + (r.logP > 5) + (r.donors > 5) + (r.acceptors > 10);
+    } catch (e) {
+      r = null;
+    }
+    if (DRUG_MEMO.size > 200) DRUG_MEMO.clear();
+    DRUG_MEMO.set(sm, r);
+    return r;
+  }
+  /* (R)/(S) of the stereocentres and (E)/(Z) of the double bonds, by the CIP rules (OpenChemLib), for the whole sheet:
+     { atoms: Map(atom id → 'R' | 'S'), bonds: Map(bond id → 'E' | 'Z') }; computed again only when the drawing changes */
+  let CIP_MEMO = { key: '', r: null };
+  function cipMarks() {
+    const key = JSON.stringify([
+      mol.atoms.map(a => [a.id, Math.round(a.x), Math.round(a.y), a.el, a.chg || 0, a.label || '']),
+      mol.bonds.map(b => [b.id, b.a, b.b, b.order, b.stereo || ''])
+    ]);
+    if (CIP_MEMO.key === key) return CIP_MEMO.r;
+    const r = { atoms: new Map(), bonds: new Map() };
+    try {
+      const O = oclLoad(),
+        m = expandedCopy(),
+        byId = new Map(m.atoms.map(a => [a.id, a])),
+        adj = new Map(m.atoms.map(a => [a.id, []]));
+      for (const b of m.bonds)
+        if (adj.has(b.a) && adj.has(b.b)) {
+          adj.get(b.a).push(b.b);
+          adj.get(b.b).push(b.a);
+        }
+      const seen = new Set();
+      for (const a0 of m.atoms) {
+        if (seen.has(a0.id)) continue;
+        const f = [],
+          st = [a0.id];
+        seen.add(a0.id);
+        while (st.length) {
+          const id = st.pop();
+          f.push(byId.get(id));
+          for (const n of adj.get(id))
+            if (!seen.has(n)) {
+              seen.add(n);
+              st.push(n);
+            }
+        }
+        if (f.length < 3) continue;
+        /* a structure in 3D (a crystal structure) has no wedges to read the configuration from */
+        if (f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
+        const fb = fragBonds(m, f);
+        if (!fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
+        const mb = molBlock(f, fb, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000');
+        const M = O.Molecule.fromMolfile(mb);
+        M.ensureHelperArrays(O.Molecule.cHelperCIP);
+        const n = Math.min(f.length, M.getAllAtoms());
+        for (let i = 0; i < n; i++) {
+          const c = M.getAtomCIPParity(i);
+          if ((c === 1 || c === 2) && atomById(f[i].id)) r.atoms.set(f[i].id, c === 1 ? 'R' : 'S');
+        }
+        for (let k = 0; k < M.getAllBonds(); k++) {
+          const c = M.getBondCIPParity(k);
+          if (c !== 1 && c !== 2) continue;
+          const A = f[M.getBondAtom(0, k)],
+            B = f[M.getBondAtom(1, k)];
+          if (!A || !B) continue;
+          const b = mol.bonds.find(x => (x.a === A.id && x.b === B.id) || (x.a === B.id && x.b === A.id));
+          if (b) r.bonds.set(b.id, c === 1 ? 'E' : 'Z');
+        }
+      }
+    } catch (e) {
+      /* no labels rather than wrong ones */
+    }
+    CIP_MEMO = { key, r };
+    return r;
+  }
+  /* the labels drawn on the sheet, each where it covers no bond, atom label, text or other label: tried first in the widest
+     gap between the atom's bonds (beside a double bond: on its open side), then turned round the atom and moved out */
+  function cipSVG() {
+    const r = cipMarks(),
+      fs = Math.max(8, L * 0.3),
+      w = fs * 1.75,
+      h = fs * 1.15,
+      out = [],
+      placed = [],
+      segs = mol.bonds
+        .map(b => [atomById(b.a), atomById(b.b)])
+        .filter(([p, q]) => p && q)
+        .map(([p, q]) => [p.x, p.y, q.x, q.y]);
+    for (const ar of mol.arrows)
+      if (!ar.kind && ar.x2 != null) segs.push([ar.x1, ar.y1, ar.x2, ar.y2]);
+    const boxes = [];
+    for (const a of mol.atoms) {
+      if (!a.label && a.el === 'C') continue;
+      const bb = fragBox([a]);
+      boxes.push([bb.x0, bb.y0, bb.x1, bb.y1]);
+    }
+    for (const t of mol.texts) {
+      try {
+        const sz = tSize(t),
+          n = tLines(t).length;
+        boxes.push([t.x - 2, t.y - sz * 0.85, t.x + textW(t) + 2, t.y + (n - 1) * sz * 1.25 + sz * 0.3]);
+      } catch (e) {}
+    }
+    const segHits = (x0, y0, x1, y1, [ax, ay, bx, by]) => {
+      /* a segment meets the box, or passes within 1.5 units of it */
+      const m = 1.5;
+      x0 -= m;
+      y0 -= m;
+      x1 += m;
+      y1 += m;
+      const inside = (x, y) => x >= x0 && x <= x1 && y >= y0 && y <= y1;
+      if (inside(ax, ay) || inside(bx, by)) return true;
+      const cr = (p1x, p1y, p2x, p2y, p3x, p3y, p4x, p4y) => {
+        const d = (p2x - p1x) * (p4y - p3y) - (p2y - p1y) * (p4x - p3x);
+        if (!d) return false;
+        const u = ((p3x - p1x) * (p4y - p3y) - (p3y - p1y) * (p4x - p3x)) / d,
+          v = ((p3x - p1x) * (p2y - p1y) - (p3y - p1y) * (p2x - p1x)) / d;
+        return u >= 0 && u <= 1 && v >= 0 && v <= 1;
+      };
+      return (
+        cr(ax, ay, bx, by, x0, y0, x1, y0) ||
+        cr(ax, ay, bx, by, x1, y0, x1, y1) ||
+        cr(ax, ay, bx, by, x1, y1, x0, y1) ||
+        cr(ax, ay, bx, by, x0, y1, x0, y0)
+      );
+    };
+    const boxHits = (x0, y0, x1, y1, [p0, q0, p1, q1]) => x0 < p1 && x1 > p0 && y0 < q1 && y1 > q0;
+    const cost = (cx, cy) => {
+      const x0 = cx - w / 2,
+        x1 = cx + w / 2,
+        y0 = cy - h / 2,
+        y1 = cy + h / 2;
+      let n = 0;
+      for (const sg of segs) if (segHits(x0, y0, x1, y1, sg)) n++;
+      for (const bx of boxes) if (boxHits(x0, y0, x1, y1, bx)) n += 2;
+      for (const bx of placed) if (boxHits(x0, y0, x1, y1, bx)) n += 3;
+      return n;
+    };
+    const put = (ox, oy, dir0, s) => {
+      let best = null;
+      for (const rad of [0.5, 0.62, 0.75, 0.9, 1.05])
+        for (let k = 0; k <= 12 && !(best && best.c === 0); k++)
+          for (const sg of k ? [1, -1] : [1]) {
+            const d = dir0 + (sg * k * Math.PI) / 12,
+              cx = ox + Math.cos(d) * (L * rad + Math.abs(Math.cos(d)) * (w / 2 - h / 2)),
+              cy = oy + Math.sin(d) * L * rad,
+              c = cost(cx, cy) + rad * 0.01;
+            if (!best || c < best.c) best = { c, cx, cy };
+            if (c < 0.05) break;
+          }
+      if (!best) return;
+      placed.push([best.cx - w / 2, best.cy - h / 2, best.cx + w / 2, best.cy + h / 2]);
+      out.push(
+        `<text x="${best.cx.toFixed(1)}" y="${best.cy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" style="fill:var(--ink);font:italic ${fs.toFixed(1)}px var(--sans)">(${s})</text>`
+      );
+    };
+    for (const [id, s] of r.atoms) {
+      const a = atomById(id);
+      if (!a) continue;
+      /* first choice: the widest gap between its bonds (a stereocentre with three drawn bonds has no free side) */
+      const ang = neighbors(a)
+        .map(o => Math.atan2(o.y - a.y, o.x - a.x))
+        .sort((p, q) => p - q);
+      let dir = -Math.PI / 2;
+      if (ang.length === 1) dir = ang[0] + Math.PI;
+      else if (ang.length > 1) {
+        let best = -1;
+        ang.forEach((p, i) => {
+          const q = i + 1 < ang.length ? ang[i + 1] : ang[0] + 2 * Math.PI;
+          if (q - p > best) {
+            best = q - p;
+            dir = (p + q) / 2;
+          }
+        });
+      }
+      put(a.x, a.y, dir, s);
+    }
+    for (const [id, s] of r.bonds) {
+      const b = mol.bonds.find(x => x.id === id);
+      if (!b) continue;
+      const A = atomById(b.a),
+        B = atomById(b.b),
+        mx = (A.x + B.x) / 2,
+        my = (A.y + B.y) / 2;
+      let nx = -(B.y - A.y),
+        ny = B.x - A.x,
+        sc = 0;
+      for (const o of [...neighbors(A), ...neighbors(B)]) sc += (o.x - mx) * nx + (o.y - my) * ny;
+      if (sc > 0) {
+        nx = -nx;
+        ny = -ny;
+      }
+      put(mx, my, Math.atan2(ny, nx), s);
+    }
+    return out.join('');
+  }
   function updateInfo() {
     const { atoms: target, scope, frs, txts } = analysisTarget();
     $('single').hidden = !target;
@@ -12158,6 +12384,15 @@ function kdOf(st) {
       $('mw').textContent = fmt(mw, 2);
       $('exact').textContent = fmt(ex, 4);
       $('mh').textContent = isFinite(ex) && !f.q ? fmt(ex + 1.007276, 4) : '—';
+      /* drug-likeness from OpenChemLib (the structure as drawn, groups written out) */
+      {
+        const P = drugProps(target, mw);
+        $('clogp').textContent = P ? fmt(P.logP, 2) : '—';
+        $('tpsa').textContent = P ? fmt(P.tpsa, 1) : '—';
+        $('hbda').textContent = P ? P.donors + ' / ' + P.acceptors : '—';
+        $('rotb').textContent = P ? String(P.rot) : '—';
+        $('ro5').textContent = P ? (P.viol ? P.viol + ' violation' + (P.viol > 1 ? 's' : '') : 'passes') : '—';
+      }
       $('comp').innerHTML = hillOrder(f.c)
         .map(k => `<span>${k}, ${fmt(((AW[k] * f.c[k]) / mw) * 100, 2)}</span>`)
         .join('');
@@ -24041,6 +24276,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   })();
 
   $('nmrShow').onchange = () => render();
+  try {
+    $('cipShow').checked = localStorage.getItem('rd-cip') === '1';
+  } catch (e) {}
+  $('cipShow').onchange = () => {
+    try {
+      localStorage.setItem('rd-cip', $('cipShow').checked ? '1' : '0');
+    } catch (e) {}
+    render();
+  };
   $('nmrClear').onclick = () => {
     if (!NMRLAB) {
       toast('No shifts on the structure');
