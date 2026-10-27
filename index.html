@@ -4387,7 +4387,9 @@ function kdOf(st) {
   }
 
   /* ===== chemistry ===== */
-  const atomById = id => mol.atoms.find(a => a.id === id);
+  /* while the sheet is drawn, atoms are looked up in an index made at its start (a big sheet asks thousands of times) */
+  let RIDX = null;
+  const atomById = id => (RIDX && RIDX.get(id)) || mol.atoms.find(a => a.id === id);
   const bondsOf = a => mol.bonds.filter(b => b.a === a.id || b.b === a.id);
   const other = (b, a) => atomById(b.a === a.id ? b.b : b.a);
   const neighbors = a => bondsOf(a).map(b => other(b, a));
@@ -11792,10 +11794,37 @@ function kdOf(st) {
           if (!Fm.has(b)) Fm.set(b, []);
           Fm.get(b).push(u);
         };
-      for (let i = 0; i < bs.length; i++)
-        for (let j = i + 1; j < bs.length; j++) {
-          const a = bs[i],
-            b = bs[j];
+      /* bonds of different molecules are not checked against each other (a sheet of crystal structures would mean
+         every bond against every other); each molecule's bonds are sorted by their left end, so pairs far apart are
+         skipped */
+      const par = new Map(),
+        root = x => {
+          while (par.get(x) !== x) {
+            par.set(x, par.get(par.get(x)));
+            x = par.get(x);
+          }
+          return x;
+        };
+      for (const b of bs) {
+        if (!par.has(b.a)) par.set(b.a, b.a);
+        if (!par.has(b.b)) par.set(b.b, b.b);
+        const ra = root(b.a),
+          rb = root(b.b);
+        if (ra !== rb) par.set(ra, rb);
+      }
+      const groups = new Map();
+      for (const b of bs) {
+        const A1 = atomById(b.a),
+          A2 = atomById(b.b),
+          k = root(b.a);
+        (groups.get(k) || groups.set(k, []).get(k)).push({ b, x0: Math.min(A1.x, A2.x), x1: Math.max(A1.x, A2.x) });
+      }
+      for (const G0 of groups.values()) {
+        G0.sort((p, q) => p.x0 - q.x0);
+        for (let i = 0; i < G0.length; i++)
+          for (let j = i + 1; j < G0.length && G0[j].x0 <= G0[i].x1; j++) {
+          const a = G0[i].b,
+            b = G0[j].b;
           if (a.a === b.a || a.a === b.b || a.b === b.a || a.b === b.b) continue;
           const A1 = atomById(a.a),
             A2 = atomById(a.b),
@@ -11819,6 +11848,7 @@ function kdOf(st) {
             uy: (Q.y - P.y) / l
           });
         }
+      }
       AUTOF = Fm.size ? Fm : null;
     }
   }
@@ -12068,6 +12098,15 @@ function kdOf(st) {
       }
   }
   function render() {
+    const own = !RIDX;
+    if (own) RIDX = new Map(mol.atoms.map(a => [a.id, a]));
+    try {
+      return render0();
+    } finally {
+      if (own) RIDX = null;
+    }
+  }
+  function render0() {
     if (window.__rdSelHook) window.__rdSelHook();
     orbFollow();
     syncHapto();
@@ -12626,6 +12665,10 @@ function kdOf(st) {
         s += `<circle cx="${chgHint.x}" cy="${chgHint.y}" r="10" fill="none" style="stroke:var(--err)" stroke-width="2.4" stroke-dasharray="3 2"/>`;
     }
     s += topShapes + handlesSVG();
+    if (RSINK) {
+      RSINK.out = kdefs() + s;
+      return;
+    }
     layer.innerHTML = kdefs() + s;
     BLURS.clear();
     try {
@@ -15693,6 +15736,53 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         .map(t => [t, t.x, t.y])
     };
   }
+  /* render() into a string instead of the sheet (for the layers of a fast drag or turn) */
+  let RSINK = null;
+  /* a 3D turn on a big sheet: everything else is drawn once; the structures being turned are drawn again each frame
+     into a layer of their own */
+  function fastRotStart(atoms) {
+    if (mol.atoms.length + mol.texts.length + mol.arrows.length < 150) return null;
+    const A = new Set(atoms.map(a => a.id));
+    if (mol.bonds.some(b => A.has(b.a) !== A.has(b.b))) return null;
+    if (mol.atoms.some(a => a.multi && a.multi.some(id => A.has(id)) !== A.has(a.id))) return null;
+    const full = mol,
+      part = mv => ({
+        ...full,
+        atoms: full.atoms.filter(a => A.has(a.id) === mv),
+        bonds: full.bonds.filter(b => A.has(b.a) === mv),
+        arrows: mv ? [] : full.arrows,
+        texts: mv ? [] : full.texts,
+        fills: (full.fills || []).filter(f => f.ids.every(id => A.has(id)) === mv),
+        rings: (full.rings || []).filter(r => A.has(r.ids[0]) === mv)
+      });
+    const still = part(false),
+      moving = part(true);
+    let base = '';
+    try {
+      mol = still;
+      RSINK = {};
+      render();
+      base = RSINK.out;
+    } catch (e) {
+      return null;
+    } finally {
+      RSINK = null;
+      mol = full;
+    }
+    layer.innerHTML = base + '<g id="fastRot"></g>';
+    const g = layer.querySelector('#fastRot');
+    return () => {
+      try {
+        mol = moving;
+        RSINK = {};
+        render();
+        g.innerHTML = RSINK.out;
+      } finally {
+        RSINK = null;
+        mol = full;
+      }
+    };
+  }
   /* the two layers of a fast drag: everything that stays, and (in a group that is only shifted) everything that moves;
      null when the drawing is small (drawing it all again is quick) or the moving part is bonded to a part that stays */
   function fastDragStart(o) {
@@ -17518,7 +17608,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (drag.mode === 'r3d') {
-      if (drag.moved) move3D(drag, p.x - drag.p0.x, p.y - drag.p0.y);
+      /* one turn a screen frame, however often the pointer reports */
+      if (drag.moved) {
+        drag.last = p;
+        if (!drag.raf)
+          drag.raf = requestAnimationFrame(() => {
+            drag.raf = 0;
+            if (drag && drag.mode === 'r3d' && drag.last) move3D(drag, drag.last.x - drag.p0.x, drag.last.y - drag.p0.y);
+          });
+      }
       return;
     }
     if (drag.mode === 'hapmove') {
@@ -18196,15 +18294,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         G = { o, c: selectionCenter(o) };
       } else G = { s0: zoom ? zoom.s : BW / view.w, p: pt(e) };
     });
+    /* the trackpad sends many gesture events a frame: the last one is applied once per frame, and a pinch zoom only
+       scales the picture until it pauses (a big drawing, a crystal structure, stays smooth) */
+    let GE = null,
+      graf = 0;
     svg.addEventListener('gesturechange', e => {
       e.preventDefault();
       if (!G) return;
-      if (G.o) {
-        let d = e.rotation || 0;
-        if (e.shiftKey) d = Math.round(d / 15) * 15;
-        applyXform(G.o, G.c, rotF(d));
-        render();
-      } else if (e.scale) setZoom(G.s0 * e.scale, G.p);
+      GE = { rot: e.rotation || 0, scale: e.scale, shift: e.shiftKey };
+      if (graf) return;
+      graf = requestAnimationFrame(() => {
+        graf = 0;
+        const q = GE;
+        if (!G || !q) return;
+        if (G.o) {
+          let d = q.rot;
+          if (q.shift) d = Math.round(d / 15) * 15;
+          applyXform(G.o, G.c, rotF(d));
+          render();
+        } else if (q.scale) setZoom(G.s0 * q.scale, G.p, true);
+      });
     });
     svg.addEventListener('gestureend', e => {
       e.preventDefault();
@@ -35892,7 +36001,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         B = atomById(b.b);
       b.stereo = B.z >= A.z ? 'wedge' : 'hash';
     }
-    render();
+    if (d.fastR === undefined) d.fastR = fastRotStart(d.atoms);
+    if (d.fastR) d.fastR();
+    else render();
   }
 
   /* ===== every button can take a hotkey ===== */
