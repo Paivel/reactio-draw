@@ -63,7 +63,7 @@ function rd(op, args) {
 | `set` | `{text, format}` | replaces the whole drawing; `format` (smiles, mol, sdf, rxn, cdxml, json) is found from the text when left out |
 | `addSmiles` | `{smiles, x, y}` | draws the structure (R/S from `@`/`@@` become wedges; a CXSMILES part such as `\|&1:1\|` sets stereo groups) |
 | `import` | `{format: "smiles"\|"mol"\|"rxn"\|"sdf"\|"cdxml"\|"cif"\|"xyz", text}` | adds the structures from the text (`cif`: crystal structures, a test version; `xyz`: 3D coordinates) |
-| `export` | `{format: "smiles"\|"mol"\|"sdf"\|"rxn"\|"cdxml"\|"xyz"\|"svg"\|"json"}` | the drawing in that format (`xyz`: every structure in 3D with hydrogens) |
+| `export` | `{format: "smiles"\|"mol"\|"sdf"\|"rxn"\|"cdxml"\|"xyz"\|"svg"\|"json"}` | the drawing in that format; `xyz` gives 3D coordinates for quantum chemistry (below) |
 | `image` | `{text, format, output: "svg"\|"png", scale}` | a picture of any structure or reaction, without touching the sheet (PNG as base64) |
 | `picture` | `{scale}` | the sheet as a PNG (base64) |
 | `readOnly` | `{on: true\|false}` | view only, or editable again |
@@ -94,6 +94,20 @@ function rd(op, args) {
 | `prefixStyle` | `{mode: "plain"\|"italic"\|"sup"}` | how t, i, s, n of tBu, iPr… are written |
 | `help` | — | the list of commands |
 | `version` | — | `{name, version}` of this Reactio Draw |
+
+### 3D coordinates for quantum chemistry
+
+`export {format: "xyz"}` turns every structure on the sheet into 3D coordinates: hydrogens are added, conformers
+are built from OpenChemLib's torsion library, each is minimised with MMFF94s+, and the lowest one is kept. A
+structure that already has a 3D shape on the sheet (opened from a .cif or .xyz file, or turned in 3D) keeps it,
+unless `keep3D: false`. The answer is `{xyz, structures}`: `xyz` is a multi-frame XYZ file, one frame per connected
+structure (the ions of a salt one by one), with the charge and spin multiplicity in each comment line (`compound 1
+C13H18O2 charge=0 mult=1 E(MMFF94s+)=23.790 kcal/mol`). `structures` lists, per structure, `charge`,
+`multiplicity`, `energy`, `conformers`, `geometry` (`conformer search` or `sheet`), `stereoKept` (the 3D
+stereocentres and double bonds match the drawing) and `notes`, or an `error`. `maxConformers` (20 per structure)
+and `maxSeconds` (30, for the whole export, shared out over the structures) limit the search. Elements MMFF94 does
+not know (B, metals) still get a 3D shape, written without minimisation and marked `not minimised`: refine those
+with xtb or DFT. The conformer search was written by Onelightayear.
 
 SMILES in the answers are canonical: the same structure gives the same SMILES however it was drawn,
 and they carry the drawn stereochemistry. Names: the built-in list of about 600 common names and abbreviations (THF, DIPEA, AIBN, aspirin…)

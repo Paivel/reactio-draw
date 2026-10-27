@@ -1189,6 +1189,25 @@ input.tgl:focus-visible {
   color: var(--ink);
   cursor: pointer;
 }
+.askbox.xyzbox {
+  inset: auto 16px 16px auto;
+  background: none;
+}
+.xyzbox .card {
+  width: min(380px, calc(100vw - 32px));
+  box-sizing: border-box;
+}
+.xyzbox .warn {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  color: var(--ink);
+  max-height: 160px;
+  overflow: auto;
+}
+.xyzbox .warn:empty {
+  display: none;
+}
 .askbox button.pri {
   background: var(--accent);
   border-color: var(--accent);
@@ -3117,7 +3136,7 @@ html {
         <p class="note" id="rdVerLine" style="margin-top:6px"></p>
         <span class="tlabel" style="margin-top:6px">Credits and sources</span>
         <ul class="note credits" style="margin:0;padding-left:16px;display:grid;gap:4px">
-          <li>Reactio Draw (© 2026 Pavel Sakharov) is free software under the GNU Affero General Public License v3.0 or later: you may use, share and change it, and anyone who distributes it or a modified version, or runs a modified version for others over a network, must publish the complete source code under the same license. Your drawings and files are yours. Third-party components keep their own licenses (THIRD-PARTY-NOTICES.md and LICENSES/ with the source code).</li>
+          <li>Reactio Draw (© 2026 Pavel Sakharov and contributors) is free software under the GNU Affero General Public License v3.0 or later: you may use, share and change it, and anyone who distributes it or a modified version, or runs a modified version for others over a network, must publish the complete source code under the same license. Your drawings and files are yours. Third-party components keep their own licenses (THIRD-PARTY-NOTICES.md and LICENSES/ with the source code).</li>
           <li>The editor itself (drawing, reading labels, layout, files, the reagent table, NMR prediction) is code written for this project. Parts made by others are listed here with their licenses; their full license texts are under <a href="#" data-licenses>Licenses</a>. <a href="https://github.com/cheminfo/openchemlib-js" target="_blank" rel="noopener">OpenChemLib</a> 9.25.1 (openchemlib-js, the JavaScript build of Thomas Sander's OpenChemLib), included unchanged except for packaging as a plain script, is used for 3D shapes and rotation (a likely conformer from its torsion data, then relaxed with its MMFF94s+ force field, the MMFF94s variant of MMFF94: T. A. Halgren, J. Comput. Chem. 1996, 17, 490; MMFF94s: J. Comput. Chem. 1999, 20, 720), for stereochemistry in SMILES (reading @/@@, writing stereo SMILES) and for comparing structures; licensed BSD-3-Clause.</li>
           <li>The journal drawing styles, the color themes Publication, Presentation, Pastel and Jmol, and the CDX property table are taken from <a href="https://github.com/Ameyanagi/ReShiki" target="_blank" rel="noopener">ReShiki</a> (© 2026 Ameyanagi and ReShiki contributors, MIT OR Apache-2.0, used under MIT; ReShiki takes the CDX table from the published CDX documentation of CambridgeSoft); the Jmol element colors come from <a href="https://jmol.sourceforge.net/jscolors/" target="_blank" rel="noopener">Jmol</a>.</li>
           <li>The look of the 3D styles (Ball and stick, Tubes, Spheres: ball, bond and outline sizes, shading and depth fog) follows the presets of <a href="https://github.com/aligfellow/xyzrender" target="_blank" rel="noopener">xyzrender</a> (© 2026 Alister S. Goodfellow, MIT); only these values were taken, the drawing is this project's own code.</li>
@@ -5641,7 +5660,16 @@ function kdOf(st) {
     const seen = new Set(),
       out = [],
       HL = mol.atoms.some(a => a.multi) ? hapLinks() : null,
-      byId = HL ? new Map(mol.atoms.map(a => [a.id, a])) : null;
+      byId = new Map(mol.atoms.map(a => [a.id, a])),
+      /* the neighbours of every atom, gathered once (a big sheet would otherwise scan every bond for every atom) */
+      adj = new Map();
+    for (const b of mol.bonds) {
+      const A = byId.get(b.a),
+        B = byId.get(b.b);
+      if (!A || !B) continue;
+      (adj.get(A.id) || adj.set(A.id, []).get(A.id)).push(B);
+      (adj.get(B.id) || adj.set(B.id, []).get(B.id)).push(A);
+    }
     for (const a of mol.atoms) {
       if (seen.has(a.id)) continue;
       const st = [a],
@@ -5650,7 +5678,7 @@ function kdOf(st) {
       while (st.length) {
         const x = st.pop();
         fr.push(x);
-        for (const n of neighbors(x))
+        for (const n of adj.get(x.id) || [])
           if (!seen.has(n.id)) {
             seen.add(n.id);
             st.push(n);
@@ -5771,7 +5799,16 @@ function kdOf(st) {
     const vis = new Set(),
       tree = new Set(),
       inFr = new Set(fr.map(a => a.id)),
-      bondsOf0 = a => mol.bonds.filter(b => (b.a === a.id || b.b === a.id) && inFr.has(b.a) && inFr.has(b.b));
+      /* the structure's own bonds and atoms, indexed once (not looked up on the whole sheet for every atom) */
+      byF = new Map(fr.map(a => [a.id, a])),
+      adjF = new Map();
+    for (const b of mol.bonds) {
+      if (!inFr.has(b.a) || !inFr.has(b.b)) continue;
+      (adjF.get(b.a) || adjF.set(b.a, []).get(b.a)).push(b);
+      (adjF.get(b.b) || adjF.set(b.b, []).get(b.b)).push(b);
+    }
+    const bondsOf0 = a => (adjF.get(a.id) || []).slice(),
+      other = (b, a) => byF.get(b.a === a.id ? b.b : b.a);
     /* benzene-type rings (six C or N, each with a double bond in the ring system, or drawn delocalized) are written aromatic, c1ccccc1,
      so the SMILES does not depend on which Kekulé structure was drawn */
     const arA = new Set(),
@@ -6249,15 +6286,16 @@ function kdOf(st) {
         [6, 7],
         [2, 7]
       ],
+      /* as chemists draw it: every bond about one bond length, the bridgeheads one above the other */
       xy: [
-        [-0.168, -0.741],
-        [0.168, -1.367],
-        [0.349, -0.531],
-        [1.22, 0.36],
-        [0.783, 1.023],
-        [-0.349, 0.531],
-        [-1.22, 0.641],
-        [-0.783, 0.085]
+        [-0.267, -0.417],
+        [0.267, -1.383],
+        [0.267, -0.317],
+        [1.233, -0.05],
+        [0.733, 0.817],
+        [-0.267, 0.583],
+        [-1.233, 0.817],
+        [-0.733, -0.05]
       ]
     },
     {
@@ -6435,6 +6473,106 @@ function kdOf(st) {
     }
     return best;
   }
+  function cageFused(sys, rAdj, rings, edges) {
+    const inSys = new Set(sys);
+    for (const R of rings) {
+      if (R.length < 5 || R.length > 6 || !R.every(u => inSys.has(u))) continue;
+      /* the ring's own atoms (in no other ring of the system) and the two it shares */
+      const own = R.filter(u => rAdj[u].every(v => R.includes(v)));
+      if (own.length !== R.length - 2) continue;
+      const shared = R.filter(u => !own.includes(u));
+      if (!rAdj[shared[0]].includes(shared[1])) continue;
+      const core = sys.filter(u => !own.includes(u)),
+        cs = new Set(core),
+        cAdj = new Map(core.map(u => [u, rAdj[u].filter(v => cs.has(v))])),
+        ne = core.reduce((t, u) => t + cAdj.get(u).length, 0) / 2;
+      for (const T of CAGES) {
+        if (T.xy.length !== core.length || T.e.length !== ne) continue;
+        const tAdj = T.xy.map(() => []);
+        T.e.forEach(([a, b]) => {
+          tAdj[a].push(b);
+          tAdj[b].push(a);
+        });
+        const m = new Map(),
+          used = new Set(),
+          maps = [];
+        (function go(i) {
+          if (maps.length >= 64) return;
+          if (i === core.length) {
+            maps.push(new Map(m));
+            return;
+          }
+          const u = core[i];
+          for (let t = 0; t < T.xy.length; t++) {
+            if (used.has(t) || tAdj[t].length !== cAdj.get(u).length) continue;
+            if (cAdj.get(u).some(v => m.has(v) && !tAdj[t].includes(m.get(v)))) continue;
+            m.set(u, t);
+            used.add(t);
+            go(i + 1);
+            m.delete(u);
+            used.delete(t);
+          }
+        })(0);
+        if (!maps.length) continue;
+        const cx = T.xy.reduce((t, p) => t + p[0], 0) / T.xy.length,
+          cy = T.xy.reduce((t, p) => t + p[1], 0) / T.xy.length;
+        /* the mapping whose fused bond sits farthest out, at the lower left (the fused ring then needs the most room) */
+        let best = null,
+          bs = -1e9;
+        for (const mp of maps) {
+          const a = T.xy[mp.get(shared[0])],
+            b = T.xy[mp.get(shared[1])],
+            sc = Math.hypot((a[0] + b[0]) / 2 - cx, (a[1] + b[1]) / 2 - cy) - ((a[0] + b[0]) / 2) * 0.01;
+          if (sc > bs) {
+            bs = sc;
+            best = mp;
+          }
+        }
+        const xy = new Map(core.map(u => [u, T.xy[best.get(u)].slice()])),
+          A = xy.get(shared[0]),
+          B = xy.get(shared[1]),
+          mx = (A[0] + B[0]) / 2,
+          my = (A[1] + B[1]) / 2,
+          d = Math.hypot(B[0] - A[0], B[1] - A[1]) || 1;
+        /* the polygon on A–B, on the side away from the cage */
+        let nx = -(B[1] - A[1]) / d,
+          ny = (B[0] - A[0]) / d;
+        if (nx * (mx - cx) + ny * (my - cy) < 0) {
+          nx = -nx;
+          ny = -ny;
+        }
+        const k = R.length,
+          rr = 1 / (2 * Math.sin(Math.PI / k)),
+          ap = rr * Math.cos(Math.PI / k),
+          C = [mx + nx * ap, my + ny * ap];
+        /* walk the ring from A round to B through its own atoms */
+        const order = [];
+        {
+          let prev = shared[1],
+            cur = shared[0];
+          for (let i = 0; i < k; i++) {
+            order.push(cur);
+            const nxt = R.find(v => v !== prev && rAdj[cur].includes(v) && R.includes(v) && !order.includes(v));
+            prev = cur;
+            cur = nxt;
+            if (cur === undefined) break;
+          }
+        }
+        if (order.length !== k) continue;
+        const a0 = Math.atan2(A[1] - C[1], A[0] - C[0]),
+          a1 = Math.atan2(B[1] - C[1], B[0] - C[0]);
+        let step = (2 * Math.PI) / k;
+        /* go round the side that does not pass between A and B directly */
+        const dir = ((a1 - a0 + 4 * Math.PI) % (2 * Math.PI)) < Math.PI ? -1 : 1;
+        for (let i = 1; i < k - 1; i++) {
+          const t = a0 + dir * step * i;
+          xy.set(order[i], [C[0] + rr * Math.cos(t), C[1] + rr * Math.sin(t)]);
+        }
+        return { k: T.k + '+fused', xy };
+      }
+    }
+    return null;
+  }
   function cageSystems(n, edges, rings, nodes) {
     const inRing = new Set();
     rings.forEach(r => {
@@ -6539,6 +6677,12 @@ function kdOf(st) {
         }
         out.push({ k: T.k, atoms: sys, xy: sys.map(u => T.xy[best.get(u)]) });
         break;
+      }
+      /* a cage with a ring fused on one of its bonds (a benzo-bicyclo[2.2.2]octane, a benzonorbornene): the cage from its
+         template, drawn as the usual perspective, and the fused ring as a regular polygon on that bond, outside the cage */
+      if (!out.length || out[out.length - 1].atoms !== sys) {
+        const fused = cageFused(sys, rAdj, rings, edges);
+        if (fused) out.push({ k: fused.k, atoms: sys, xy: sys.map(u => fused.xy.get(u)) });
       }
       /* no template: a bridged system (two of its rings share three atoms or more) gets one from its 3D shape */
       if (!out.length || out[out.length - 1].atoms !== sys) {
@@ -7706,15 +7850,122 @@ function kdOf(st) {
       !!pos.biaryl
     );
   }
+  /* how good a 2D layout is: the worst bond length off the standard one (share of it) and the closest two atoms that
+     are not bonded (share of a bond) */
+  function layoutQuality(g, pos, comp) {
+    let dev = 0,
+      close = 1e9;
+    const inC = new Set(comp),
+      bonded = new Set();
+    for (const e of g.edges) {
+      if (!inC.has(e.a) || !inC.has(e.b)) continue;
+      bonded.add(e.a + ',' + e.b).add(e.b + ',' + e.a);
+      dev = Math.max(dev, Math.abs(Math.hypot(pos[e.a].x - pos[e.b].x, pos[e.a].y - pos[e.b].y) / L - 1));
+    }
+    if (comp.length <= 400)
+      for (let i = 0; i < comp.length; i++)
+        for (let j = i + 1; j < comp.length; j++) {
+          const a = comp[i],
+            b = comp[j];
+          if (bonded.has(a + ',' + b)) continue;
+          close = Math.min(close, Math.hypot(pos[a].x - pos[b].x, pos[a].y - pos[b].y) / L);
+        }
+    /* small rings (5, 6) should be regular polygons: the worst angle off, in radians */
+    let irr = 0,
+      macro = false;
+    const n = g.nodes.length,
+      adj = Array.from({ length: n }, () => []);
+    g.edges.forEach((e, i) => {
+      if (!inC.has(e.a) || !inC.has(e.b)) return;
+      adj[e.a].push([e.b, i]);
+      adj[e.b].push([e.a, i]);
+    });
+    for (const r of findRingsG(n, g.edges, adj)) {
+      if (!r.every(v => inC.has(v))) continue;
+      if (r.length >= 12) macro = true;
+      if (r.length !== 5 && r.length !== 6) continue;
+      const want = Math.PI - (2 * Math.PI) / r.length;
+      for (let i = 0; i < r.length; i++) {
+        const A = pos[r[(i + r.length - 1) % r.length]],
+          B = pos[r[i]],
+          C = pos[r[(i + 1) % r.length]];
+        const a1 = Math.atan2(A.y - B.y, A.x - B.x),
+          a2 = Math.atan2(C.y - B.y, C.x - B.x);
+        let d = Math.abs(a1 - a2);
+        if (d > Math.PI) d = 2 * Math.PI - d;
+        irr = Math.max(irr, Math.abs(d - want));
+      }
+    }
+    const score = dev + irr + (close < 0.6 ? 0.6 - close : 0) * 2;
+    return { dev, close, irr, macro, score, bad: dev > 0.2 || close < 0.45 || irr > 0.35 };
+  }
+  function oclLayoutIfBetter(g, pos, comp) {
+    if (comp.length < 12 || comp.length > 600) return false;
+    const q0 = layoutQuality(g, pos, comp);
+    if (!q0.bad && !q0.macro) return false;
+    const O = oclLoad(),
+      ix = new Map(comp.map((v, i) => [v, i])),
+      m = new O.Molecule(comp.length, g.edges.length);
+    for (const v of comp) {
+      const nd = g.nodes[v],
+        z = ZOF(nd.el);
+      const i = m.addAtom(z > 0 ? z : 6);
+      if (nd.chg) m.setAtomCharge(i, nd.chg);
+    }
+    for (const e of g.edges) if (ix.has(e.a) && ix.has(e.b)) m.addBond(ix.get(e.a), ix.get(e.b), Math.min(e.order || 1, 3));
+    m.inventCoordinates();
+    let sum = 0,
+      nb = 0;
+    for (let b = 0; b < m.getAllBonds(); b++) {
+      const a = m.getBondAtom(0, b),
+        c = m.getBondAtom(1, b);
+      sum += Math.hypot(m.getAtomX(a) - m.getAtomX(c), m.getAtomY(a) - m.getAtomY(c));
+      nb++;
+    }
+    const k = nb ? L / (sum / nb) : 1,
+      p2 = pos.slice();
+    comp.forEach((v, i) => (p2[v] = { x: m.getAtomX(i) * k, y: m.getAtomY(i) * k }));
+    const q1 = layoutQuality(g, p2, comp);
+    /* never trade a stretched bond for atoms nearly on top of each other (bridged rings drawn flat) */
+    if (q1.close < 0.6 && q1.close < q0.close) return false;
+    if (!(q1.score < q0.score * 0.7)) return false;
+    for (const v of comp) pos[v] = p2[v];
+    return true;
+  }
+  /* one connected piece of a parsed graph as a graph of its own (its node indices from 0), so laying it out does
+     not look at the pieces already placed: many molecules in one SMILES are laid out in linear time, not cubic */
+  function subGraph(g, comp) {
+    const ix = new Map(comp.map((v, i) => [v, i]));
+    return {
+      g: {
+        nodes: comp.map(v => g.nodes[v]),
+        edges: g.edges.filter(e => ix.has(e.a) && ix.has(e.b)).map(e => ({ ...e, a: ix.get(e.a), b: ix.get(e.b) }))
+      },
+      ix
+    };
+  }
   function placeGraph(g, anchor) {
     const pos = Array(g.nodes.length).fill(null);
-    let ox = 0;
+    let ox = 0,
+      rowY = 0,
+      rowH = 0;
     for (const comp of compsG(g)) {
-      const st = layoutStart(g, comp) ?? comp.reduce((m, i) => (i < m ? i : m), comp[0]);
-      pos[st] = { x: 0, y: 0 };
-      layoutG(g, pos, st, []);
-      fixEZ(g, pos);
-      shareHexTiltG(g, pos, comp);
+      {
+        const { g: sg, ix } = subGraph(g, comp),
+          sc = comp.map((v, i) => i),
+          sp = Array(comp.length).fill(null),
+          st = layoutStart(sg, sc) ?? 0;
+        sp[st] = { x: 0, y: 0 };
+        layoutG(sg, sp, st, []);
+        /* a ring system the own layout cannot draw well (porphyrins and other large macrocycles): OpenChemLib's
+           layout is taken when it is clearly better */
+        try {
+          oclLayoutIfBetter(sg, sp, sc);
+        } catch (e) {}
+        fixEZ(sg, sp);
+        shareHexTiltG(sg, sp, sc);
+        for (const v of comp) pos[v] = sp[ix.get(v)];
+      }
       let x0 = 1e9,
         x1 = -1e9;
       for (const i of comp) {
@@ -7727,7 +7978,14 @@ function kdOf(st) {
         y0 = Math.min(y0, pos[i].y);
         y1 = Math.max(y1, pos[i].y);
       }
-      for (const i of comp) pos[i] = { x: pos[i].x - x0 + ox, y: pos[i].y - (y0 + y1) / 2 };
+      /* many molecules in one SMILES: rows about a page wide, not one endless line */
+      if (ox > 0 && ox + (x1 - x0) > 1600) {
+        ox = 0;
+        rowY += rowH + 80;
+        rowH = 0;
+      }
+      rowH = Math.max(rowH, y1 - y0);
+      for (const i of comp) pos[i] = { x: pos[i].x - x0 + ox, y: pos[i].y - (y0 + y1) / 2 + rowY };
       ox += x1 - x0 + (comp.some(i => g.nodes[i].chg) ? 45 : 70);
     }
     let bx0 = 1e9,
@@ -8067,9 +8325,26 @@ function kdOf(st) {
   function stereoSig(ids) {
     const out = new Map();
     try {
+      /* only the structures asked about are copied and opened up, not the whole sheet */
+      const idS = new Set(ids),
+        saved = mol;
+      let ex;
+      mol = {
+        ...saved,
+        atoms: saved.atoms.filter(a => idS.has(a.id)),
+        bonds: saved.bonds.filter(b => idS.has(b.a) && idS.has(b.b)),
+        arrows: [],
+        texts: [],
+        fills: [],
+        rings: (saved.rings || []).filter(r => r.ids.every(id => idS.has(id)))
+      };
+      try {
+        ex = expandedCopy();
+      } finally {
+        mol = saved;
+      }
       const O = oclLoad(),
         M = O.Molecule,
-        ex = expandedCopy(),
         byId = new Map(ex.atoms.map(a => [a.id, a])),
         adj = new Map(ex.atoms.map(a => [a.id, []]));
       const realA = new Set(mol.atoms.map(a => a.id)),
@@ -8349,6 +8624,9 @@ function kdOf(st) {
         }
       }
       sk += skHere ? 1 : 0;
+      try {
+        autoFront(fr);
+      } catch (e) {}
       if (cleanFragments.post) cleanFragments.post(fr);
       let kept = false;
       stereo: {
@@ -10665,7 +10943,91 @@ function kdOf(st) {
     mol.atoms = mol.atoms.filter(x => x !== a);
     sel.delete(a.id);
   }
+  /* an atom of a turned η-ring (a Cp on a metal, drawn in perspective): a new bond goes out in the ring's own plane,
+     straight away from the ring centre, with its depth */
+  function hapSpot(a) {
+    if (!a.hap || a.z === undefined) return null;
+    const m = mol.atoms.find(q => q.multi && q.multi.includes(a.id));
+    if (!m) return null;
+    const R = m.multi.map(atomById).filter(Boolean);
+    if (R.some(q => q.z === undefined)) return null;
+    const c = [R.reduce((t, q) => t + q.x, 0) / R.length, R.reduce((t, q) => t + q.y, 0) / R.length, R.reduce((t, q) => t + q.z, 0) / R.length],
+      v = [a.x - c[0], a.y - c[1], a.z - c[2]],
+      l = Math.hypot(...v);
+    if (!(l > 1e-6)) return null;
+    return { x: a.x + (v[0] / l) * L, y: a.y + (v[1] / l) * L, z: a.z + (v[2] / l) * L };
+  }
+  /* the η-ligand of a ring centre m: the ring with what hangs on it (Cp*: its methyls), and the metal it is bonded to */
+  function hapDragStart(m, p) {
+    const ring = new Set(m.multi),
+      M = neighbors(m).filter(q => !ring.has(q.id));
+    if (M.length !== 1) return null;
+    const metal = M[0],
+      lig = new Set([m.id, ...ring]),
+      st = [...ring];
+    while (st.length) {
+      const id = st.pop();
+      for (const q of neighbors(atomById(id))) {
+        if (lig.has(q.id) || q === metal) continue;
+        lig.add(q.id);
+        st.push(q.id);
+      }
+    }
+    if (lig.size > 60) return null;
+    const atoms = [...lig].map(atomById).filter(Boolean);
+    return {
+      mode: 'hapmove',
+      p0: p,
+      moved: false,
+      m,
+      metal,
+      c0: { x: m.x, y: m.y },
+      orig: atoms.map(a => [a, a.x, a.y, a.z])
+    };
+  }
+  function hapDragMove(d, p) {
+    if (!d.moved) {
+      if (dist(p, d.p0) < 2) return;
+      d.moved = true;
+      snap();
+    }
+    /* the ligand keeps its distance from the metal: it swings round it toward the pointer */
+    const R0 = Math.hypot(d.c0.x - d.metal.x, d.c0.y - d.metal.y),
+      q = { x: d.c0.x + p.x - d.p0.x, y: d.c0.y + p.y - d.p0.y },
+      g = Math.atan2(q.y - d.metal.y, q.x - d.metal.x),
+      P = { x: d.metal.x + R0 * Math.cos(g), y: d.metal.y + R0 * Math.sin(g) },
+      th = Math.atan2(P.y - d.metal.y, P.x - d.metal.x) - Math.atan2(d.c0.y - d.metal.y, d.c0.x - d.metal.x),
+      cs = Math.cos(th),
+      sn = Math.sin(th);
+    for (const [a, x, y] of d.orig) {
+      const dx = x - d.c0.x,
+        dy = y - d.c0.y;
+      a.x = P.x + dx * cs - dy * sn;
+      a.y = P.y + dx * sn + dy * cs;
+      if (a.zx !== undefined) {
+        a.zx = a.x;
+        a.zy = a.y;
+      }
+    }
+    /* the ring is seen from a little above, as such drawings show it: its near (bold) side is the lower one on the page.
+       With the metal below the ring the bond goes behind that side; with the metal above, it lies in front */
+    const zs = d.orig.filter(([a, , , z]) => z !== undefined);
+    if (zs.length) {
+      const ring = new Set(d.m.multi),
+        rz = zs.filter(([a]) => ring.has(a.id)),
+        cz = rz.reduce((t, [, , , z]) => t + z, 0) / (rz.length || 1);
+      let fy = 0;
+      for (const [a, , , z] of rz) fy += (z - cz) * (a.y - P.y);
+      const flip = fy < 0;
+      for (const [a, , , z] of zs) a.z = flip ? 2 * cz - z : z;
+    }
+    render();
+  }
   function freeSpot(a) {
+    {
+      const h = hapSpot(a);
+      if (h) return h;
+    }
     const nb = neighbors(a).map(n => Math.atan2(n.y - a.y, n.x - a.x));
     let cands;
     if (!nb.length) cands = [-Math.PI / 6];
@@ -10702,7 +11064,15 @@ function kdOf(st) {
   }
   function addChainAtom(a) {
     const p = freeSpot(a);
-    const t = findAtom(p, 10, a) || newAtom(p.x, p.y, 'C');
+    let t = findAtom(p, 10, a);
+    if (!t) {
+      t = newAtom(p.x, p.y, 'C');
+      if (p.z !== undefined) {
+        t.z = p.z;
+        t.zx = t.x;
+        t.zy = t.y;
+      }
+    }
     addBond(a, t);
     return t;
   }
@@ -10962,7 +11332,7 @@ function kdOf(st) {
     gr.setAttribute('height', view.h);
     $('zoomv').textContent = Math.round(((svg.clientWidth || BW) / view.w / PX1) * 100) + '%';
   }
-  function setZoom(s, anchor) {
+  function setZoom(s, anchor, quick) {
     if (!zoom) zoom = { cx: view.x + view.w / 2, cy: view.y + view.h / 2, s: BW / view.w };
     s = Math.max(0.25, Math.min(16, s));
     const p = anchor || { x: zoom.cx, y: zoom.cy };
@@ -10974,6 +11344,16 @@ function kdOf(st) {
       h = w / vr;
     zoom = { s, cx: p.x - fx * w + w / 2, cy: p.y - fy * h + h / 2 };
     fitView();
+    /* a pinch or a wheel on a big drawing: the picture is only scaled (the view box), and drawn again once the gesture
+       pauses, so zooming stays smooth however many atoms there are */
+    clearTimeout(setZoom.t);
+    if (quick && mol.atoms.length > 250) {
+      setZoom.t = setTimeout(() => {
+        render();
+        refreshHover();
+      }, 140);
+      return;
+    }
     render();
     refreshHover();
   }
@@ -11204,6 +11584,132 @@ function kdOf(st) {
     AUTOF = null;
     autoDepth0();
     frontGaps();
+    hapGaps();
+  }
+  /* a bond from the centre of a flat η-ring (Cp–M drawn in the plane) stays whole and on top: the ring's edge and its
+     circle are interrupted where the bond crosses them */
+  let HAPCUT = [];
+  /* an η-ring gets its own circle only when its bonds are drawn plain: a ring drawn with double bonds (as many files have
+     it) or with a ring circle of its own already shows its π system */
+  function hapOwnCircle(m, R) {
+    if (m.noRing) return false;
+    const ids = new Set(R.map(q => q.id));
+    if ((mol.rings || []).some(r => r.ids.every(id => ids.has(id)))) return false;
+    return !mol.bonds.some(b => ids.has(b.a) && ids.has(b.b) && (b.order > 1 || b.stereo === 'deloc'));
+  }
+  /* the ellipse drawn inside an η-ring, in the ring's own plane (a circle when the ring lies flat): 48 points on the page */
+  function hapEllipse(m, R) {
+    const z = q => (q.z === undefined ? 0 : q.z),
+      C = [m.x, m.y, R.reduce((t, q) => t + z(q), 0) / R.length],
+      v0 = [R[0].x - C[0], R[0].y - C[1], z(R[0]) - C[2]],
+      v1 = [R[1].x - C[0], R[1].y - C[1], z(R[1]) - C[2]];
+    const nrm = v => {
+        const l = Math.hypot(...v) || 1;
+        return v.map(x => x / l);
+      },
+      cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+    const e1 = nrm(v0),
+      e2 = nrm(cr(cr(v0, v1), v0)),
+      rad = (R.reduce((t, q) => t + Math.hypot(q.x - C[0], q.y - C[1], z(q) - C[2]), 0) / R.length) * 0.6,
+      pts = [];
+    for (let i = 0; i < 48; i++) {
+      const t = (2 * Math.PI * i) / 48;
+      pts.push({
+        x: C[0] + rad * (Math.cos(t) * e1[0] + Math.sin(t) * e2[0]),
+        y: C[1] + rad * (Math.cos(t) * e1[1] + Math.sin(t) * e2[1])
+      });
+    }
+    return pts;
+  }
+  /* a ring's circle cut where a bond from the ring centre leaves it (the cut is a mask: nothing white is painted) */
+  function hapCircle(m, svg) {
+    const C = m ? HAPCUT.filter(c => c.m === m) : [];
+    if (!C.length) return svg;
+    const id = 'hc' + m.id,
+      x0 = m.x - 200,
+      y0 = m.y - 200;
+    MASKS +=
+      `<mask id="${id}" maskUnits="userSpaceOnUse" x="${x0}" y="${y0}" width="400" height="400"><rect x="${x0}" y="${y0}" width="400" height="400" fill="white"/>` +
+      C.map(
+        c =>
+          `<line x1="${c.x - c.ux * 5}" y1="${c.y - c.uy * 5}" x2="${c.x + c.ux * 5}" y2="${c.y + c.uy * 5}" stroke="black" stroke-width="${c.w}"/>`
+      ).join('') +
+      '</mask>';
+    return `<g mask="url(#${id})">${svg}</g>`;
+  }
+  function hapGaps() {
+    HAPCUT = [];
+    const Fm = AUTOF || new Map(),
+      put = (b, c) => (Fm.get(b) || Fm.set(b, []).get(b)).push(c);
+    for (const m of mol.atoms) {
+      if (!m.multi) continue;
+      const R = m.multi.map(atomById).filter(Boolean);
+      if (R.length < 3) continue;
+      const ids = new Set(R.map(q => q.id)),
+        edges = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
+      /* the circle drawn in the ring: the η-ring's own, or a ring circle (benzene-type) */
+      const cr = (mol.rings || []).find(r => r.ids.length === R.length && r.ids.every(id => ids.has(id)));
+      let rad = 0;
+      if (cr) {
+        let ap = 1e9;
+        for (const e of edges) {
+          const A = atomById(e.a),
+            B = atomById(e.b);
+          ap = Math.min(ap, segDist({ x: m.x, y: m.y }, A.x, A.y, B.x, B.y));
+        }
+        rad = ap * 0.62;
+      }
+      for (const f of mol.bonds) {
+        if (f.a !== m.id && f.b !== m.id) continue;
+        const Q = atomById(f.a === m.id ? f.b : f.a);
+        if (!Q || ids.has(Q.id)) continue;
+        const l = Math.hypot(Q.x - m.x, Q.y - m.y) || 1,
+          ux = (Q.x - m.x) / l,
+          uy = (Q.y - m.y) / l;
+        /* where it crosses the ring's edges and its circle (or, seen in perspective, its ellipse) */
+        const xs = [];
+        for (const e of edges) {
+          const A = atomById(e.a),
+            B = atomById(e.b),
+            d = ux * (B.y - A.y) - uy * (B.x - A.x);
+          if (Math.abs(d) < 1e-9) continue;
+          const t = ((A.x - m.x) * (B.y - A.y) - (A.y - m.y) * (B.x - A.x)) / d,
+            v = ((A.x - m.x) * uy - (A.y - m.y) * ux) / d;
+          if (!(t > 0 && t < l && v > 0.05 && v < 0.95)) continue;
+          const el = Math.hypot(B.x - A.x, B.y - A.y) || 1;
+          xs.push({ e, t, tx: (B.x - A.x) / el, ty: (B.y - A.y) / el, bold: !!(e.hapFront || e.stereo === 'bold') });
+        }
+        const circ = [];
+        if (hapOwnCircle(m, R)) {
+          const E = hapEllipse(m, R);
+          for (let i = 0; i < E.length; i++) {
+            const A = E[i],
+              B = E[(i + 1) % E.length],
+              d = ux * (B.y - A.y) - uy * (B.x - A.x);
+            if (Math.abs(d) < 1e-9) continue;
+            const t = ((A.x - m.x) * (B.y - A.y) - (A.y - m.y) * (B.x - A.x)) / d,
+              v = ((A.x - m.x) * uy - (A.y - m.y) * ux) / d;
+            const el = Math.hypot(B.x - A.x, B.y - A.y) || 1;
+            if (t > 0.5 && t < l && v >= 0 && v < 1) circ.push({ t, tx: (B.x - A.x) / el, ty: (B.y - A.y) / el });
+          }
+        } else if (cr && rad > 0 && rad < l) circ.push({ t: rad, tx: -uy, ty: ux });
+        /* the metal behind the ring (the bond passes under a bold front edge): the ring is drawn whole and the bond is
+           interrupted where it goes under its lines; otherwise the bond lies on top and the ring's lines are cut */
+        const behind = xs.some(x => x.bold),
+          wb = lwOf(f) * 2.5 + 3;
+        for (const x of xs) {
+          const c = { x: m.x + ux * x.t, y: m.y + uy * x.t };
+          if (behind || x.bold) put(f, { ...c, ux: x.tx, uy: x.ty, w: lwOf(x.e) * 3 + 4, len: 6 });
+          else put(x.e, { ...c, ux, uy, w: wb, len: 5 });
+        }
+        for (const x of circ) {
+          const c = { x: m.x + ux * x.t, y: m.y + uy * x.t };
+          if (behind) put(f, { ...c, ux: x.tx, uy: x.ty, w: wb, len: 6 });
+          else HAPCUT.push({ m, ...c, ux, uy, w: wb });
+        }
+      }
+    }
+    AUTOF = Fm.size ? Fm : null;
   }
   /* a bond set in front at a crossing (F over a bond): every bond it crosses is interrupted there, as the nearer bond of a 3D drawing does it — the line is cut, nothing white is painted */
   function frontGaps() {
@@ -11230,12 +11736,22 @@ function kdOf(st) {
         const r = X(P, Q, B1, B2);
         if (!r) continue;
         if (!Fm.has(b)) Fm.set(b, []);
-        Fm.get(b).push({
-          x: P.x + (Q.x - P.x) * r[0],
-          y: P.y + (Q.y - P.y) * r[0],
-          ux: (Q.x - P.x) / l,
-          uy: (Q.y - P.y) / l
-        });
+        const cx0 = P.x + (Q.x - P.x) * r[0],
+          cy0 = P.y + (Q.y - P.y) * r[0];
+        Fm.get(b).push({ x: cx0, y: cy0, ux: (Q.x - P.x) / l, uy: (Q.y - P.y) / l });
+        /* a crossing close to a labelled end (N, O…): the short piece left between the gap and the label goes too */
+        for (const E of [B1, B2])
+          if (labeled(E) && Math.hypot(E.x - cx0, E.y - cy0) < L * 0.75) {
+            const bl = Math.hypot(B2.x - B1.x, B2.y - B1.y) || 1;
+            Fm.get(b).push({
+              x: (cx0 + E.x) / 2,
+              y: (cy0 + E.y) / 2,
+              ux: (B2.x - B1.x) / bl,
+              uy: (B2.y - B1.y) / bl,
+              len: Math.hypot(E.x - cx0, E.y - cy0) / 2,
+              w: lwOf(b) * 3 + 2
+            });
+          }
       }
     }
     AUTOF = Fm.size ? Fm : null;
@@ -11302,6 +11818,10 @@ function kdOf(st) {
             r = X(A1, A2, B1, B2);
           if (!r) continue;
           /* the farther bond gets the gap; the cut runs along the nearer bond */
+          /* a bond to the centre of an η-ring always stays whole: the ring's lines are cut instead (hapGaps) */
+          const hapA = A1.multi || A2.multi,
+            hapB = B1.multi || B2.multi;
+          if (hapA || hapB) continue;
           const za = A1.z + (A2.z - A1.z) * r[0],
             zb = B1.z + (B2.z - B1.z) * r[1],
             [fb, P, Q, u] = za >= zb ? [b, A1, A2, r[0]] : [a, B1, B2, r[1]];
@@ -11842,7 +12362,7 @@ function kdOf(st) {
           AUTOF.get(b)
             .map(
               c =>
-                `<line x1="${c.x - c.ux * 20}" y1="${c.y - c.uy * 20}" x2="${c.x + c.ux * 20}" y2="${c.y + c.uy * 20}" stroke="black" stroke-width="${gw}"/>`
+                `<line x1="${c.x - c.ux * (c.len || 20)}" y1="${c.y - c.uy * (c.len || 20)}" x2="${c.x + c.ux * (c.len || 20)}" y2="${c.y + c.uy * (c.len || 20)}" stroke="black" stroke-width="${c.w || gw}"/>`
             )
             .join('') +
           '</mask>';
@@ -12052,7 +12572,8 @@ function kdOf(st) {
         }
         const rad = ap * 0.62,
           col = R[0].col || 'var(--ink)';
-        s += `<circle cx="${cx}" cy="${cy}" r="${rad.toFixed(2)}" fill="none" style="stroke:${col}" stroke-width="${docLW()}"/>`;
+        const hm = mol.atoms.find(q => q.multi && q.multi.length === r.ids.length && r.ids.every(id => q.multi.includes(id)));
+        s += hapCircle(hm, `<circle cx="${cx}" cy="${cy}" r="${rad.toFixed(2)}" fill="none" style="stroke:${col}" stroke-width="${docLW()}"/>`);
         if (r.q)
           s += `<text x="${cx}" y="${cy + rad * 0.36}" text-anchor="middle" style="fill:${col};font:400 ${(rad * 1.05).toFixed(1)}px var(--sans)">${Math.abs(r.q) > 1 ? Math.abs(r.q) : ''}${r.q > 0 ? '+' : '−'}</text>`;
       }
@@ -12061,27 +12582,9 @@ function kdOf(st) {
     for (const m of mol.atoms) {
       if (!m.multi || m.noRing || (V3S && V3S.ids.has(m.id))) continue;
       const R = m.multi.map(id => atomById(id)).filter(Boolean);
-      if (R.length < 3) continue;
-      const z = q => (q.z === undefined ? 0 : q.z),
-        C = [m.x, m.y, R.reduce((t, q) => t + z(q), 0) / R.length],
-        v0 = [R[0].x - C[0], R[0].y - C[1], z(R[0]) - C[2]],
-        v1 = [R[1].x - C[0], R[1].y - C[1], z(R[1]) - C[2]];
-      const nrm = v => {
-          const l = Math.hypot(...v) || 1;
-          return v.map(x => x / l);
-        },
-        cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
-      const e1 = nrm(v0),
-        e2 = nrm(cr(cr(v0, v1), v0)),
-        rad = (R.reduce((t, q) => t + Math.hypot(q.x - C[0], q.y - C[1], z(q) - C[2]), 0) / R.length) * 0.6,
-        pts = [];
-      for (let i = 0; i < 48; i++) {
-        const t = (2 * Math.PI * i) / 48;
-        pts.push(
-          `${(C[0] + rad * (Math.cos(t) * e1[0] + Math.sin(t) * e2[0])).toFixed(2)},${(C[1] + rad * (Math.cos(t) * e1[1] + Math.sin(t) * e2[1])).toFixed(2)}`
-        );
-      }
-      s += `<polygon points="${pts.join(' ')}" fill="none" style="stroke:${R[0].col || 'var(--ink)'}" stroke-width="${docLW()}"/>`;
+      if (R.length < 3 || !hapOwnCircle(m, R)) continue;
+      const pts = hapEllipse(m, R).map(q => `${q.x.toFixed(2)},${q.y.toFixed(2)}`);
+      s += hapCircle(m, `<polygon points="${pts.join(' ')}" fill="none" style="stroke:${R[0].col || 'var(--ink)'}" stroke-width="${docLW()}"/>`);
     }
     if (NMRLAB && NMRSIG !== molSig()) NMRLAB = null;
     /* predicted shifts next to the atoms: screen only, never exported */
@@ -12543,14 +13046,15 @@ function kdOf(st) {
   /* cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and the rule of five for the structures the atoms belong to */
   const DRUG_MEMO = new Map();
   function drugProps(atoms, mw) {
-    if (!atoms || !atoms.length) return null;
+    /* drug-likeness is for one compound (or a salt), not for a whole sheet of structures */
+    if (!atoms || !atoms.length || atoms.length > 400) return null;
     let sm = '';
     try {
       sm = stereoSmilesList(new Set(atoms.map(a => a.id))).join('.');
     } catch (e) {
       return null;
     }
-    if (!sm) return null;
+    if (!sm || sm.split('.').length > 6) return null;
     if (DRUG_MEMO.has(sm)) return DRUG_MEMO.get(sm);
     let r = null;
     try {
@@ -13506,11 +14010,14 @@ function kdOf(st) {
   }
 
   /* SMILES of a structure with abbreviations: written from the structure with its labels opened up, so NMe as one label and N–Me give the same SMILES */
+  /* while one SMILES of the whole sheet is written, the copy with the labels opened up is made once, not per structure */
+  let EXPM = null;
+  const expandedShared = () => (EXPM ? EXPM.m || (EXPM.m = expandedCopy()) : expandedCopy());
   function fragSmilesX(fr) {
     if (!fr.some(a => a.label && a.grp)) return fragSmiles(fr);
     let m;
     try {
-      m = expandedCopy();
+      m = expandedShared();
     } catch (e) {
       return fragSmiles(fr);
     }
@@ -13560,12 +14067,21 @@ function kdOf(st) {
       const ss = stereoSmilesList(ids, cx);
       if (ss && ss.length === 1 && /[@\/\\]/.test(ss[0])) out = ss[0];
     } catch (e) {}
-    if (SSMI.size > 200) SSMI.clear();
+    if (SSMI.size > 3000) SSMI.clear();
     SSMI.set(key, out);
     return out;
   }
   /* cx: with stereo groups written as CXSMILES (|&1:3,5|); without it plain SMILES, for the name and InChI look-ups */
   function currentSmiles(onlySel, cx) {
+    if (EXPM) return currentSmiles0(onlySel, cx);
+    EXPM = { m: null };
+    try {
+      return currentSmiles0(onlySel, cx);
+    } finally {
+      EXPM = null;
+    }
+  }
+  function currentSmiles0(onlySel, cx) {
     const S1 = f => fragSmilesS(f, cx),
       J = (l, sep) => (cx ? cxJoin(l, sep) : l.join(sep));
     const frs = fragments();
@@ -16143,6 +16659,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     const p = pt(e),
       h = hitAt(p);
+    /* Select on the centre of an η-ring (a Cp on a metal): the ligand alone moves round the metal, turning so it keeps
+       facing it; the metal and the rest stay */
+    const hc = isSelTool() ? mol.atoms.find(a => a.multi && dist(p, a) < 9) : null;
+    if (hc && !sel.has(hc.id)) {
+      const hd = hapDragStart(hc, p);
+      if (hd) {
+        e.preventDefault();
+        drag = hd;
+        svg.setPointerCapture(e.pointerId);
+        return;
+      }
+    }
     /* the sheet table: a click on a cell edits it with any drawing tool; with Select a press-and-drag still moves the table */
     {
       const tc = tblCellAt(p);
@@ -16956,6 +17484,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (drag.moved) move3D(drag, p.x - drag.p0.x, p.y - drag.p0.y);
       return;
     }
+    if (drag.mode === 'hapmove') {
+      hapDragMove(drag, p);
+      return;
+    }
     if (drag.mode === 'move') {
       if (drag.copy && !drag.copied) {
         drag.copied = true;
@@ -17201,7 +17733,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       render();
       return;
     }
+    if (d.mode === 'hapmove') {
+      if (d.moved) commit();
+      else render();
+      return;
+    }
     if (d.mode === 'r3d') {
+      /* an opened 3D structure (.xyz, .cif): its wedges chosen again for the new view, so they keep its R/S */
+      if (d.moved)
+        try {
+          const ids = new Set(d.atoms.map(a => a.id));
+          for (const f of fragments()) if (f.some(a => ids.has(a.id)) && f.every(a => a.xray)) wedges3D(f, true);
+        } catch (e) {}
       if (d.moved) commit();
       else render();
       return;
@@ -17552,7 +18095,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } catch (e) {}
     });
   }
-  const panAcc = { x: 0, y: 0, raf: 0 };
+  const panAcc = { x: 0, y: 0, raf: 0 },
+    zoomAcc = { k: 1, p: null, raf: 0 };
   svg.addEventListener(
     'wheel',
     e => {
@@ -17561,7 +18105,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         e.preventDefault();
         const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY,
           k = Math.exp(-Math.max(-60, Math.min(60, d)) * 0.0018 * zoomSpeed);
-        setZoom((zoom ? zoom.s : BW / view.w) * k, pt(e));
+        /* the steps of one screen frame are gathered and applied once */
+        zoomAcc.k *= k;
+        zoomAcc.p = pt(e);
+        if (!zoomAcc.raf)
+          zoomAcc.raf = requestAnimationFrame(() => {
+            const kk = zoomAcc.k;
+            zoomAcc.k = 1;
+            zoomAcc.raf = 0;
+            setZoom((zoom ? zoom.s : BW / view.w) * kk, zoomAcc.p, true);
+          });
         return;
       }
       /* two-finger scrolling pans the sheet; the steps are gathered and drawn once per screen frame, so it glides */
@@ -19022,6 +19575,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const st = layoutStart(g, comp) ?? comp.reduce((m, i) => (i < m ? i : m), comp[0]);
       pos[st] = { x: 0, y: 0 };
       layoutG(g, pos, st, []);
+      /* a ring system the own layout cannot draw well (porphyrins and other large macrocycles): OpenChemLib's
+         layout is taken when it is clearly better */
+      try {
+        oclLayoutIfBetter(g, pos, comp);
+      } catch (e) {}
       fixEZ(g, pos);
       shareHexTiltG(g, pos, comp);
       let x0 = 1e9,
@@ -19097,6 +19655,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (map && cxs.groups.length)
       for (const [lab, ix] of cxs.groups) for (const i of ix) if (map[i]) map[i].esr = lab;
     if (!/@/.test(smi) || !map || !map.length) return;
+    /* many molecules in one SMILES: each piece is read on its own (the library slows down a lot on one long line) */
+    if (smi.includes('.')) {
+      const parts = smi.split('.'),
+        subs = [];
+      let off = 0;
+      for (const pc of parts) {
+        const g = parseSmiles(pc);
+        if (!g) {
+          subs.length = 0;
+          break;
+        }
+        subs.push([pc, off, g.nodes.length]);
+        off += g.nodes.length;
+      }
+      if (subs.length > 1 && off === map.length) {
+        for (const [pc, o, n] of subs) if (/@/.test(pc)) applySmilesStereo(pc, map.slice(o, o + n));
+        return;
+      }
+    }
     try {
       const O = oclLoad(),
         M = O.Molecule,
@@ -24172,7 +24749,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* SMILES with stereochemistry (R/S from wedges and hashes, E/Z from the drawing) for naming: the drawing goes to OpenChemLib as a molfile */
   function stereoSmilesList(only, cx) {
     const O = oclLoad();
-    const m = expandedCopy(),
+    const m = expandedShared(),
       byId = new Map(m.atoms.map(a => [a.id, a])),
       adj = new Map(m.atoms.map(a => [a.id, []]));
     for (const b of m.bonds) {
@@ -26221,11 +26798,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const m = /width="(\d+)" height="(\d+)"/.exec(s);
       const W = +m[1],
         H = +m[2];
+      /* a very large sheet: the scale comes down to what a browser canvas can hold (16 000 px a side, 120 Mpx) */
+      scale = Math.min(scale, 16000 / Math.max(W, H, 1), Math.sqrt(1.2e8 / Math.max(1, W * H)));
       const img = new Image();
       img.onload = () => {
         const c = document.createElement('canvas');
-        c.width = W * scale;
-        c.height = H * scale;
+        c.width = Math.max(1, Math.round(W * scale));
+        c.height = Math.max(1, Math.round(H * scale));
         const g = c.getContext('2d');
         g.scale(scale, scale);
         g.drawImage(img, 0, 0, W, H);
@@ -30217,6 +30796,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['png', 'Image (.png, 3×)'],
     ['eps', 'Vector image for journals (.eps)'],
     ['tif', 'Image for journals (.tiff, 600 dpi)'],
+    ['f-xyz', 'XYZ, 3D coordinates for quantum chemistry (.xyz): conformer search, charge and multiplicity'],
     ['h', 'Copy to clipboard'],
     ['c-cdxml', 'CDXML'],
     ['c-mol', 'Molfile'],
@@ -30230,6 +30810,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         ? 'Reactio Draw object for Word / PowerPoint (Ctrl+Shift+D)'
         : 'Embedded object for Word / PowerPoint (Ctrl+Shift+D)'
     ],
+    ['c-xyz', 'XYZ, 3D coordinates'],
     ['h', 'Settings, labels and templates'],
     ['setx', 'Export hotkeys, button layout, my labels and templates (.json)'],
     ['seti', 'Import hotkeys, button layout, my labels and templates…'],
@@ -30350,6 +30931,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (k === 'docx') {
       saveDocx();
+      return;
+    }
+    if (k === 'f-xyz' || k === 'c-xyz') {
+      xyzBox(k);
       return;
     }
     if (k === 'ord') {
@@ -31611,7 +32196,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       made = 0,
       warn = 0;
     const k = L / 1.5,
-      W = 1400;
+      W = 1400,
+      made3D = new Set();
     for (const blk of items) {
       const r = blk.r;
       if (!r) continue;
@@ -31684,6 +32270,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a.gid = gid;
         if (r.chg[i]) a.chg = r.chg[i];
         map.set(i, a);
+        made3D.add(a.id);
       });
       /* a salt's metal complex has no charge of its own in the file: the charge that balances the anions goes on its
          metal atoms (shared equally, as whole charges) */
@@ -31737,10 +32324,101 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       rowH = Math.max(rowH, bh + 50);
       made++;
     }
+    /* the stereocentres get their wedges from the 3D shape */
+    try {
+      for (const f of fragments()) if (f.some(a => made3D.has(a.id))) wedges3D(f);
+    } catch (e) {}
     zoom = null;
     commit();
     done(made, warn);
   }
+  /* wedges for a structure with a 3D shape (opened from an .xyz or a .cif file): OpenChemLib finds its stereocentres
+     from the coordinates, and one bond of each becomes a wedge or a hash by its depth, so the drawing carries its R/S,
+     and keeps it when it is turned (3D rotate) or laid flat (Clean Up) */
+  function wedges3D(f, again) {
+    if (f.length < 4 || f.length > 2000 || f.some(a => a.z === undefined || (a.label && !a.grp))) return 0;
+    const O = oclLoad(),
+      k = L / 1.5,
+      heavy = f.filter(a => a.el !== 'H'),
+      idx = new Map(heavy.map((a, i) => [a.id, i])),
+      bs = mol.bonds.filter(b => idx.has(b.a) && idx.has(b.b));
+    if (again) for (const b of mol.bonds) if ((idx.has(b.a) || idx.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash')) b.stereo = null;
+    /* the parities: from the 3D coordinates, and from the drawing as it is (its 2D positions and wedges) */
+    const par = flat => {
+      const m = new O.Molecule(heavy.length, bs.length);
+      for (const a of heavy) {
+        const i = m.addAtom(ZOF(a.el));
+        if (a.chg) m.setAtomCharge(i, a.chg);
+        m.setAtomX(i, a.x / k);
+        /* OpenChemLib keeps 2D drawings with y down (its Molfiles flip it), 3D shapes as they are */
+        m.setAtomY(i, flat ? a.y / k : -a.y / k);
+        if (!flat) m.setAtomZ(i, a.z / k);
+      }
+      for (const b of bs) {
+        const i = m.addBond(idx.get(b.a), idx.get(b.b), 1);
+        m.setBondOrder(i, Math.min(b.order || 1, 3));
+        if (flat && (b.stereo === 'wedge' || b.stereo === 'hash'))
+          m.setBondType(i, b.stereo === 'wedge' ? O.Molecule.cBondTypeUp : O.Molecule.cBondTypeDown);
+      }
+      const m2 = O.Molecule.fromMolfile(m.toMolfile());
+      m2.ensureHelperArrays(O.Molecule.cHelperParities);
+      return heavy.map((a, i) => m2.getAtomParity(i));
+    };
+    const want = par(false),
+      centres = heavy.filter((a, i) => want[i] === 1 || want[i] === 2);
+    if (!centres.length) return 0;
+    /* each centre: its single bonds, the deepest first, other centres last; one becomes a wedge (toward the viewer) or a
+       hash; when the drawing does not give the 3D configuration, the next bond (or the other kind) is tried */
+    const opts = new Map(
+      centres.map(c => [
+        c.id,
+        mol.bonds
+          .filter(b => (b.a === c.id || b.b === c.id) && (b.order || 1) === 1)
+          .map(b => {
+            const o = atomById(b.a === c.id ? b.b : b.a);
+            return { b, o, s: Math.abs(o.z - c.z) + (centres.includes(o) ? 0 : 1000) + (o.el === 'H' ? 0 : 500) };
+          })
+          .sort((p, q) => q.s - p.s)
+      ])
+    );
+    const put = (c, t, flip) => {
+      const { b, o } = opts.get(c.id)[t];
+      if (b.a !== c.id) [b.a, b.b] = [b.b, b.a];
+      b.stereo = (o.z >= c.z) !== !!flip ? 'wedge' : 'hash';
+    };
+    const used = new Set();
+    for (const c of centres) {
+      const L2 = opts.get(c.id),
+        t = L2.findIndex(x => !x.b.stereo && !used.has(x.b.id));
+      if (t < 0) continue;
+      put(c, t);
+      used.add(L2[t].b.id);
+    }
+    for (let pass = 0; pass < 3; pass++) {
+      const got = par(true),
+        bad = centres.filter(c => got[idx.get(c.id)] !== want[idx.get(c.id)]);
+      if (!bad.length) break;
+      for (const c of bad) {
+        const L2 = opts.get(c.id),
+          mine = L2.filter(x => x.b.a === c.id && (x.b.stereo === 'wedge' || x.b.stereo === 'hash'));
+        for (const x of mine) x.b.stereo = null;
+        let ok = false;
+        for (let t = 0; t < L2.length && !ok; t++) {
+          if (L2[t].b.stereo) continue;
+          for (const flip of [false, true]) {
+            put(c, t, flip);
+            if (par(true)[idx.get(c.id)] === want[idx.get(c.id)]) {
+              ok = true;
+              break;
+            }
+            L2[t].b.stereo = null;
+          }
+        }
+      }
+    }
+    return centres.length;
+  }
+
   /* XYZ files (issue #1, asked for by Onelightayear): Cartesian coordinates in Å, one frame or several. Open: bonds from
      the distances (covalent radii, as xyzgraph does), then bond orders and charges as for a CIF; Save: every structure
      on the sheet as one frame, in its 3D shape (built when it has none) with all its hydrogens */
@@ -31821,7 +32499,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       frames.map((f, k) => ({
         name: f.title && f.title.length <= 60 && !/^[-+\d.eE\s]+$/.test(f.title) ? f.title : frames.length > 1 ? base + ' ' + (k + 1) : base,
         get r() {
-          return f.nodes.length > 3000 ? null : perceive3D(f.nodes, xyzBonds(f.nodes));
+          if (f.nodes.length > 3000) return null;
+          const r = perceive3D(f.nodes, xyzBonds(f.nodes)),
+            q = /\bcharge=([+-]?\d+)\b/.exec(f.title);
+          /* a lone ion (Cl−, Na+) takes the charge written in the comment line, as Reactio Draw and many QC tools write it */
+          if (q && f.nodes.length === 1) r.chg[0] = +q[1];
+          return r;
         }
       })),
       made =>
@@ -31891,70 +32574,453 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return D.slice(0, nH);
   }
   const XH_LEN = { C: 1.09, N: 1.01, O: 0.96, S: 1.34, P: 1.42, B: 1.19, Si: 1.48, Se: 1.46 };
-  /* every structure on the sheet as XYZ frames (Å; x right, y up, z toward the viewer) */
-  function xyzOf() {
-    const saved = mol,
-      m = expandedCopy();
-    mol = m;
-    try {
-      const k = L / 1.5,
-        out = [];
-      for (const f0 of fragments()) {
-        const f = f0.filter(a => ZOF(a.el) > 0 && !a.label);
-        if (!f.length || f.length !== f0.length) continue;
-        if (!f.every(a => a.z !== undefined)) embedBest(f);
-        const P = new Map(f.map(a => [a.id, [a.x / k, -a.y / k, (a.z || 0) / k]])),
-          lines = [],
-          nb = a => neighbors(a).filter(o => P.has(o.id));
-        for (const a of f) {
-          const p = P.get(a.id);
-          lines.push([a.el === 'D' ? 'H' : a.el, p]);
-          const nH = a.el === 'H' ? 0 : implicitH(a);
-          if (!nH) continue;
-          const bs = mol.bonds.filter(b => b.a === a.id || b.b === a.id),
-            hyb = bs.some(b => b.order === 3) || bs.filter(b => b.order === 2).length > 1
-              ? 'sp'
-              : bs.some(b => b.order === 2 || b.stereo === 'deloc')
-                ? 'sp2'
-                : 'sp3',
-            N = nb(a),
-            U = N.map(o => {
-              const q = P.get(o.id),
-                v = [q[0] - p[0], q[1] - p[1], q[2] - p[2]],
-                l = Math.hypot(...v) || 1;
-              return v.map(x => x / l);
-            });
-          let ref = null;
-          if (N.length === 1) {
-            const o2 = nb(N[0]).find(x => x.id !== a.id);
-            if (o2) {
-              const q = P.get(o2.id),
-                q1 = P.get(N[0].id);
-              ref = [q[0] - q1[0], q[1] - q1[1], q[2] - q1[2]];
-            }
-          }
-          const len = XH_LEN[a.el] || 1.1;
-          for (const dv of hDirs3D(U, nH, hyb, ref)) lines.push(['H', p.map((v, t) => v + dv[t] * len)]);
+  /* ===== 3D coordinates (.xyz) for quantum chemistry =====
+     The conformer search, the charge and multiplicity line and the progress box are by Onelightayear (issue #1, branch
+     xyz-export), ported to this version. One structure (a molfile from the drawing, abbreviations expanded) → hydrogens
+     added → conformers from OpenChemLib's torsion library → each minimised with MMFF94s+ → the lowest kept. The drawn
+     stereocentres and E/Z bonds are checked against the 3D result; charge and spin multiplicity go in the comment line,
+     as ORCA, Gaussian and xtb need them. A structure that already has a 3D shape on the sheet (from a .cif, an .xyz or
+     the 3D styles) keeps it. xyz3D runs in a worker too, so it uses nothing from outside. */
+  function xyz3D(O, mb, o, prog) {
+    o = o || {};
+    const M = O.Molecule,
+      maxConfs = o.maxConfs || 20,
+      maxMs = o.maxMs || 8000,
+      t0 = Date.now();
+    const m = M.fromMolfile(mb);
+    m.ensureHelperArrays(M.cHelperParities);
+    const nh = m.getAllAtoms();
+    for (let i = 0; i < nh; i++) m.setAtomMapNo(i, i + 1, false);
+    /* stereo as drawn: parity 1/2 is defined, 3 is unknown (the 3D shape then picks one) */
+    const aPar = [],
+      bPar = [];
+    let unspec = 0;
+    for (let i = 0; i < m.getAtoms(); i++) {
+      const p = m.getAtomParity(i);
+      aPar.push(p);
+      if (p === 3) unspec++;
+    }
+    for (let i = 0; i < m.getBonds(); i++) {
+      const p = m.getBondParity(i);
+      bPar.push(p);
+      if (p === 3) unspec++;
+    }
+    const cg = new O.ConformerGenerator(7);
+    cg.initializeConformers(m, {});
+    let best = null,
+      n = 0,
+      ffOk = true,
+      ffErr = '';
+    for (let c; n < maxConfs && (n === 0 || Date.now() - t0 < maxMs) && (c = cg.getNextConformerAsMolecule(null)) !== null; ) {
+      n++;
+      let e = null;
+      if (ffOk)
+        try {
+          const ff = new O.ForceFieldMMFF94(c, 'MMFF94s+');
+          ff.minimise({ maxIts: 4000 });
+          e = ff.getTotalEnergy();
+        } catch (err) {
+          ffOk = false;
+          ffErr = String((err && err.message) || err).replace(/^[^:]*:\s*/, '');
         }
-        const fm = (() => {
-          try {
-            return formulaText(countsOf(f0)).replace(/\u2212/g, '-');
-          } catch (e) {
-            return '';
-          }
-        })();
-        out.push(
-          lines.length +
-            '\n' +
-            (fm || 'Reactio Draw structure ' + (out.length + 1)) +
-            '\n' +
-            lines.map(([el, q]) => el.padEnd(2) + q.map(v => v.toFixed(6).padStart(14)).join('')).join('\n')
-        );
+      if (!best || (e != null && (best.e == null || e < best.e))) best = { e, c: c.getCompactCopy() };
+      if (prog) prog(n, maxConfs);
+      if (!ffOk && best) break;
+    }
+    if (!best) throw new Error('no 3D shape could be built');
+    const c = best.c,
+      atoms = [];
+    let q = 0,
+      unp = 0,
+      elec = 0;
+    for (let i = 0; i < c.getAllAtoms(); i++) {
+      const z = c.getAtomicNo(i);
+      atoms.push({ el: z === 1 ? 'H' : c.getAtomLabel(i), x: c.getAtomX(i), y: c.getAtomY(i), z: c.getAtomZ(i) });
+      q += c.getAtomCharge(i);
+      elec += z;
+      const r = c.getAtomRadical(i);
+      unp += r === M.cAtomRadicalStateD ? 1 : r === M.cAtomRadicalStateT ? 2 : 0;
+    }
+    elec -= q;
+    const notes = [];
+    if ((elec - unp) % 2) {
+      unp++;
+      notes.push('odd number of electrons: taken as a doublet');
+    }
+    /* the 3D shape read back: its stereo comes from the coordinates */
+    const b = M.fromMolfile(c.toMolfile());
+    b.ensureHelperArrays(M.cHelperParities);
+    let ok = true;
+    const at = new Map();
+    for (let i = 0; i < b.getAllAtoms(); i++) {
+      const k = b.getAtomMapNo(i);
+      if (k) at.set(k - 1, i);
+    }
+    if (at.size !== nh) ok = null;
+    else {
+      for (let i = 0; i < aPar.length; i++)
+        if ((aPar[i] === 1 || aPar[i] === 2) && b.getAtomParity(at.get(i)) !== aPar[i]) ok = false;
+      for (let i = 0; i < bPar.length; i++) {
+        if (!(bPar[i] === 1 || bPar[i] === 2)) continue;
+        const k = b.getBond(at.get(m.getBondAtom(0, i)), at.get(m.getBondAtom(1, i)));
+        if (k < 0 || b.getBondParity(k) !== bPar[i]) ok = false;
       }
-      return out.length ? out.join('\n') + '\n' : null;
+    }
+    if (unspec) notes.push(unspec + ' stereo element' + (unspec > 1 ? 's' : '') + ' not drawn: one was picked');
+    if (!ffOk) {
+      const el = (ffErr.match(/\(([A-Z][a-z]?)\)\s*$/) || [])[1];
+      notes.push(
+        'not minimised: MMFF94 has no parameters for ' +
+          (el || 'this structure') +
+          ', so the shape is a rough guess; refine it with xtb or DFT'
+      );
+    }
+    /* atoms closer than 0.7 Å: the shape is broken */
+    let close = 1e9;
+    for (let i = 0; i < atoms.length; i++)
+      for (let j = i + 1; j < atoms.length; j++) {
+        const A = atoms[i],
+          B = atoms[j];
+        close = Math.min(close, Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z));
+      }
+    if (close < 0.7) notes.push('atoms closer than 0.7 Å');
+    return {
+      atoms,
+      charge: q,
+      multiplicity: unp + 1,
+      energy: best.e,
+      forceField: ffOk ? 'MMFF94s+' : null,
+      conformers: n,
+      stereoKept: ok,
+      notes
+    };
+  }
+  function xyzFrame(r, title) {
+    const f = v => v.toFixed(6).padStart(14);
+    const head = [
+      title,
+      'charge=' + r.charge,
+      'mult=' + r.multiplicity,
+      r.energy != null
+        ? 'E(' + r.forceField + ')=' + r.energy.toFixed(3) + ' kcal/mol'
+        : r.sheet
+          ? 'geometry as on the sheet'
+          : 'not minimised'
+    ]
+      .filter(Boolean)
+      .join(' ');
+    return r.atoms.length + '\n' + head + '\n' + r.atoms.map(a => a.el.padEnd(3) + f(a.x) + f(a.y) + f(a.z)).join('\n') + '\n';
+  }
+  /* a structure that has a 3D shape on the sheet: its atoms in Å (x right, y up, z toward the viewer) with every hydrogen */
+  function xyzSheet(f) {
+    const k = L / 1.5,
+      P = new Map(f.map(a => [a.id, [a.x / k, -a.y / k, (a.z || 0) / k]])),
+      atoms = [],
+      nb = a => neighbors(a).filter(o => P.has(o.id));
+    let q = 0,
+      elec = 0,
+      unp = 0;
+    const put = (el, p) => {
+      atoms.push({ el, x: p[0], y: p[1], z: p[2] });
+      elec += ZOF(el);
+    };
+    for (const a of f) {
+      const p = P.get(a.id);
+      put(a.el === 'D' ? 'H' : a.el, p);
+      q += a.chg || 0;
+      unp += a.rad === 2 ? 2 : a.rad ? 1 : 0;
+      const nH = a.el === 'H' ? 0 : implicitH(a);
+      if (!nH) continue;
+      const bs = mol.bonds.filter(b => b.a === a.id || b.b === a.id),
+        hyb =
+          bs.some(b => b.order === 3) || bs.filter(b => b.order === 2).length > 1
+            ? 'sp'
+            : bs.some(b => b.order === 2 || b.stereo === 'deloc')
+              ? 'sp2'
+              : 'sp3',
+        N = nb(a),
+        U = N.map(o => {
+          const w = P.get(o.id),
+            v = [w[0] - p[0], w[1] - p[1], w[2] - p[2]],
+            l = Math.hypot(...v) || 1;
+          return v.map(x => x / l);
+        });
+      let ref = null;
+      if (N.length === 1) {
+        const o2 = nb(N[0]).find(x => x.id !== a.id);
+        if (o2) {
+          const w = P.get(o2.id),
+            w1 = P.get(N[0].id);
+          ref = [w[0] - w1[0], w[1] - w1[1], w[2] - w1[2]];
+        }
+      }
+      const len = XH_LEN[a.el] || 1.1;
+      for (const dv of hDirs3D(U, nH, hyb, ref)) put('H', p.map((v, t) => v + dv[t] * len));
+    }
+    elec -= q;
+    const notes = [];
+    if ((elec - unp) % 2) {
+      unp++;
+      notes.push('odd number of electrons: taken as a doublet');
+    }
+    return { atoms, charge: q, multiplicity: unp + 1, energy: null, forceField: null, conformers: 0, stereoKept: null, notes, sheet: true };
+  }
+  /* the 3D work runs in a worker made from the same OpenChemLib text, so the page stays responsive; where a worker
+     cannot start (a sandboxed view), it runs in the page */
+  let XYZW = null,
+    xyzSeq = 0;
+  const xyzWait = new Map();
+  function xyzWorker() {
+    if (XYZW !== null) return XYZW;
+    XYZW = false;
+    try {
+      const src = document.getElementById('oclLib'),
+        res = document.getElementById('oclRes');
+      if (!src || !res || typeof Worker === 'undefined') return XYZW;
+      const code =
+        'self.window=self;\n' +
+        src.textContent +
+        '\n;OCL.Resources.register(' +
+        JSON.stringify(res.textContent) +
+        ');\n' +
+        xyz3D.toString() +
+        '\n' +
+        'onmessage=e=>{const d=e.data;try{postMessage({id:d.id,ok:true,r:xyz3D(OCL,d.mb,d.o,(n,of)=>postMessage({id:d.id,progress:n,of}))});}catch(err){postMessage({id:d.id,ok:false,error:String(err&&err.message||err)});}};';
+      const w = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+      w.onmessage = e => {
+        const d = e.data,
+          p = xyzWait.get(d.id);
+        if (!p) return;
+        if (d.progress != null) {
+          if (p.prog) p.prog(d.progress, d.of);
+          return;
+        }
+        xyzWait.delete(d.id);
+        if (d.ok) p.ok(d.r);
+        else p.no(new Error(d.error));
+      };
+      w.onerror = e => {
+        if (e.preventDefault) e.preventDefault();
+        XYZW = false;
+        for (const p of xyzWait.values()) p.no(null);
+        xyzWait.clear();
+      };
+      XYZW = w;
+    } catch (e) {
+      XYZW = false;
+    }
+    return XYZW;
+  }
+  function xyzRun(mb, o, prog) {
+    const w = xyzWorker(),
+      inPage = () => xyz3D(oclLoad(), mb, o, prog);
+    if (!w) return Promise.resolve().then(inPage);
+    return new Promise((ok, no) => {
+      const id = ++xyzSeq;
+      xyzWait.set(id, { ok, prog, no: e => (e ? no(e) : ok(inPage())) });
+      w.postMessage({ id, mb, o });
+    });
+  }
+  /* Cancel: the worker is stopped (a new one starts on the next export) */
+  function xyzStop() {
+    if (XYZW) {
+      XYZW.terminate();
+      XYZW = null;
+    }
+    const e = new Error('cancelled');
+    e.cancelled = true;
+    for (const p of xyzWait.values()) p.no(e);
+    xyzWait.clear();
+  }
+  /* every structure (or the selected ones) as one multi-frame .xyz; structures that cannot be done are listed with the
+     reason. maxConformers (20), maxSeconds for the whole export (30), keep3D (true): a 3D shape on the sheet is kept */
+  async function xyzExport(a) {
+    a = a || {};
+    const saved = mol,
+      m = expandedCopy(),
+      jobs = [];
+    mol = m;
+    /* one frame per connected piece: the ions of a salt come out one by one */
+    try {
+      let frs = fragments().filter(f => f.length);
+      if (a.selected && sel.size) {
+        const f2 = frs.filter(f => f.some(q => sel.has(q.id)));
+        if (f2.length) frs = f2;
+      }
+      frs.forEach((fr, i) => {
+        const lab = fr.find(q => q.label && !q.grp),
+          j = {
+            n: i + 1,
+            formula: formulaText(countsOf(fr)).replace(/−/g, '-'),
+            smiles: fragSmilesS(fr),
+            err: lab ? 'the label ' + lab.label + ' is not a known group' : null
+          };
+        if (!lab && a.keep3D !== false && fr.every(q => q.z !== undefined)) j.sheet = xyzSheet(fr);
+        else if (!lab) j.mb = molBlock(fr, fragBonds(m, fr), '');
+        jobs.push(j);
+      });
     } finally {
       mol = saved;
     }
+    if (!jobs.length) throw new Error('Nothing to convert: draw a structure first');
+    /* maxSeconds is for the whole export: each structure gets an equal share of what is left (at least 2 s) */
+    const maxConfs = Math.max(1, Math.min(200, +a.maxConformers || 20)),
+      budget = Math.max(1000, +a.maxSeconds * 1000 || 30000),
+      t0 = Date.now(),
+      frames = [],
+      out = [],
+      todo = jobs.filter(j => j.mb).length;
+    let k = 0;
+    for (const j of jobs) {
+      const it = { index: j.n - 1, formula: j.formula, smiles: j.smiles };
+      if (j.err) it.error = j.err;
+      else {
+        let r = j.sheet;
+        if (!r) {
+          k++;
+          const o = { maxConfs, maxMs: Math.max(2000, (budget - (Date.now() - t0)) / (todo - k + 1)) },
+            rep = (c, of) =>
+              a.onProgress &&
+              a.onProgress({ structure: k, of: todo, formula: j.formula, conformer: c, maxConformers: of || maxConfs });
+          rep(0);
+          try {
+            r = await xyzRun(j.mb, o, rep);
+          } catch (e) {
+            if (e && e.cancelled) throw e;
+            it.error = String((e && e.message) || e);
+          }
+        }
+        if (r) {
+          frames.push(xyzFrame(r, 'compound ' + j.n + ' ' + j.formula));
+          Object.assign(it, {
+            atoms: r.atoms.length,
+            charge: r.charge,
+            multiplicity: r.multiplicity,
+            energy: r.energy != null ? +r.energy.toFixed(3) : null,
+            forceField: r.forceField,
+            conformers: r.conformers,
+            geometry: r.sheet ? 'sheet' : 'conformer search',
+            stereoKept: r.stereoKept,
+            notes: r.notes
+          });
+        }
+      }
+      out.push(it);
+    }
+    if (!frames.length) throw new Error(out.map(x => 'compound ' + (x.index + 1) + ': ' + x.error).join('; '));
+    return { xyz: frames.join(''), structures: out };
+  }
+  /* File menu: a box at the bottom right shows which structure and conformer is being worked on, with Cancel; when it
+     is done, Save and Copy are buttons in it. The browser shows a Save dialog only right after a click, and a conformer
+     search can take longer than that, so the file is saved from a click on the box. With a file already chosen (Save
+     as XYZ), the box only shows the progress and the file is written when the search is done. */
+  let XYZBOX = null;
+  function xyzBox(k, write, all) {
+    if (XYZBOX) {
+      XYZBOX.box.querySelector('.card').animate([{ transform: 'scale(1.04)' }, { transform: 'none' }], 250);
+      return Promise.resolve(null);
+    }
+    const box = document.createElement('div');
+    box.className = 'askbox xyzbox';
+    box.setAttribute('role', 'status');
+    box.innerHTML = '<div class="card"><b>3D coordinates (XYZ)</b><div class="tx"></div><ul class="warn"></ul><div class="row"></div></div>';
+    document.body.appendChild(box);
+    const tx = box.querySelector('.tx'),
+      ul = box.querySelector('.warn'),
+      row = box.querySelector('.row'),
+      t0 = Date.now();
+    let last = null,
+      timer = null;
+    const btn = (l, pri, f) => {
+      const b = document.createElement('button');
+      b.textContent = l;
+      if (pri) b.className = 'pri';
+      b.onclick = f;
+      row.appendChild(b);
+      return b;
+    };
+    const close = () => {
+      clearInterval(timer);
+      box.remove();
+      XYZBOX = null;
+    };
+    const show = () => {
+      const s = Math.round((Date.now() - t0) / 1000) + ' s';
+      if (!last) {
+        tx.textContent = 'Starting… ' + s;
+        return;
+      }
+      tx.textContent =
+        'Structure ' +
+        last.structure +
+        ' of ' +
+        last.of +
+        ' (' +
+        last.formula +
+        '): ' +
+        (last.conformer ? 'conformer ' + last.conformer + ' of up to ' + last.maxConformers + ' minimised' : 'building conformers') +
+        ' · ' +
+        s;
+    };
+    XYZBOX = { box };
+    show();
+    timer = setInterval(show, 1000);
+    btn('Cancel', false, () => {
+      xyzStop();
+      close();
+      toast('XYZ export cancelled');
+    });
+    return xyzExport({
+      selected: !write && !all,
+      onProgress: p => {
+        last = p;
+        show();
+      }
+    })
+      .then(r => {
+        clearInterval(timer);
+        const S2 = r.structures,
+          done = S2.filter(x => !x.error);
+        const warn = [
+          ...S2.filter(x => x.error).map(x => 'compound ' + (x.index + 1) + ' skipped: ' + x.error),
+          ...done.filter(x => x.stereoKept === false).map(x => 'compound ' + (x.index + 1) + ': the 3D stereo does not match the drawing'),
+          ...done.flatMap(x => x.notes.map(t => 'compound ' + (x.index + 1) + ': ' + t))
+        ];
+        if (write) {
+          if (warn.length) toast(warn.join('; '), true, 8000);
+          close();
+          return r;
+        }
+        tx.textContent =
+          'Ready: ' + done.length + ' structure' + (done.length > 1 ? 's' : '') + ' in ' + Math.round((Date.now() - t0) / 1000) + ' s.';
+        ul.innerHTML = '';
+        for (const w of warn) {
+          const li = document.createElement('li');
+          li.textContent = w;
+          ul.appendChild(li);
+        }
+        row.innerHTML = '';
+        btn('Close', false, close);
+        btn('Copy', k === 'c-xyz', () => {
+          copyText(r.xyz, 'XYZ copied');
+          close();
+        });
+        btn('Save .xyz', k !== 'c-xyz', () => {
+          const name = docName() + '.xyz';
+          if (window.rdDesktop || !window.claude) offerFile(name, r.xyz);
+          else offerFile(name + '.zip', zipOf([[name, r.xyz]]));
+          close();
+        });
+        const p = row.querySelector('.pri');
+        if (p) p.focus();
+        return r;
+      })
+      .catch(e => {
+        if (e && e.cancelled) return null;
+        close();
+        toast('Could not make the XYZ: ' + ((e && e.message) || e), true);
+        return null;
+      });
   }
   function importText(name, text) {
     if (/\.cif$/i.test(name) || /^\s*(#.*\n\s*)*data_/i.test(text)) {
@@ -38115,6 +39181,94 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     return true;
   }
+  /* bonds that cross in a flat drawing of a bridged structure (a bicyclo[2.2.2]octane in perspective): the one nearer the
+     viewer in the real 3D shape is set in front, so the other is drawn interrupted where they cross. The 3D shape comes
+     from OpenChemLib and is fitted to the drawing (and to its mirror image: the better fit is taken) */
+  function autoFront(fr) {
+    if (fr.length < 5 || fr.length > 150 || fr.some(a => a.z !== undefined || a.multi || (a.label && !a.grp))) return 0;
+    const ids = new Set(fr.map(a => a.id)),
+      bs = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
+      byId = new Map(fr.map(a => [a.id, a])),
+      X = [];
+    for (let i = 0; i < bs.length; i++)
+      for (let j = i + 1; j < bs.length; j++) {
+        const a = bs[i],
+          b = bs[j];
+        if (a.front || b.front || a.a === b.a || a.a === b.b || a.b === b.a || a.b === b.b) continue;
+        const P = byId.get(a.a),
+          Q = byId.get(a.b),
+          R = byId.get(b.a),
+          T = byId.get(b.b),
+          d = (Q.x - P.x) * (T.y - R.y) - (Q.y - P.y) * (T.x - R.x);
+        if (Math.abs(d) < 1e-9) continue;
+        const u = ((R.x - P.x) * (T.y - R.y) - (R.y - P.y) * (T.x - R.x)) / d,
+          v = ((R.x - P.x) * (Q.y - P.y) - (R.y - P.y) * (Q.x - P.x)) / d;
+        if (!(u > 0.08 && u < 0.92 && v > 0.08 && v < 0.92)) continue;
+        /* right by an atom label (N, O…) the label's own gap already parts the lines */
+        const cxp = P.x + (Q.x - P.x) * u,
+          cyp = P.y + (Q.y - P.y) * u;
+        if ([P, Q, R, T].some(o => (o.label || o.el !== 'C') && Math.hypot(o.x - cxp, o.y - cyp) < L * 0.3)) continue;
+        X.push([a, b, u, v]);
+      }
+    if (!X.length) return 0;
+    let O;
+    try {
+      O = oclLoad();
+    } catch (e) {
+      return 0;
+    }
+    const keep = fr.map(a => [a, a.x, a.y]),
+      put = () => keep.forEach(([a, x, y]) => {
+        a.x = x;
+        a.y = y;
+        delete a.z;
+        delete a.zx;
+        delete a.zy;
+      });
+    /* the drawing and its mirror image: whichever the 3D shape fits better */
+    const runs = [];
+    for (const mir of [1, -1]) {
+      try {
+        keep.forEach(([a, x, y]) => {
+          a.x = mir * x;
+          a.y = y;
+        });
+        if (embedOCL(O, fr)) {
+          let err = 0;
+          keep.forEach(([a, x, y]) => (err += Math.hypot(a.x - mir * x, a.y - y)));
+          runs.push({ err, z: new Map(fr.map(a => [a.id, a.z])) });
+        }
+      } catch (e) {}
+      put();
+    }
+    if (!runs.length) return 0;
+    runs.sort((p, q) => p.err - q.err);
+    const Z = runs[0].z,
+      z = (b, t) => Z.get(b.a) + (Z.get(b.b) - Z.get(b.a)) * t,
+      /* the drawing fits the shape and its mirror image about as well (a symmetric cage): then, as cages are drawn,
+         the bond running up the page is the one in front */
+      unsure = runs.length > 1 && runs[1].err < runs[0].err * 1.15,
+      upness = b => {
+        const A = byId.get(b.a),
+          B = byId.get(b.b);
+        return Math.abs(B.y - A.y) / (Math.hypot(B.x - A.x, B.y - A.y) || 1);
+      };
+    let n = 0;
+    for (const [a, b, u, v] of X) {
+      if (a.front || b.front) continue;
+      if (unsure && Math.abs(upness(a) - upness(b)) > 0.2) {
+        (upness(a) > upness(b) ? a : b).front = true;
+        n++;
+        continue;
+      }
+      const za = z(a, u),
+        zb = z(b, v);
+      if (Math.abs(za - zb) < L * 0.05) continue;
+      (za > zb ? a : b).front = true;
+      n++;
+    }
+    return n;
+  }
   /* a 3D shape for one structure: OpenChemLib (likely conformer + MMFF94s+); the built-in force field if that fails */
   function embedBest(f) {
     try {
@@ -41202,7 +42356,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const bg = document.createElement('div');
     bg.className = 'licbg';
     bg.innerHTML =
-      '<div class="licbox" role="dialog" aria-label="Licenses"><button type="button" class="btn ghost sm" data-x>Close</button><h3>Licenses</h3><p class="note">Reactio Draw © 2026 Pavel Sakharov, GNU Affero General Public License v3.0 or later (LICENSE beside the program, or gnu.org/licenses/agpl-3.0). Parts by others inside this page:</p>' +
+      '<div class="licbox" role="dialog" aria-label="Licenses"><button type="button" class="btn ghost sm" data-x>Close</button><h3>Licenses</h3><p class="note">Reactio Draw © 2026 Pavel Sakharov and contributors, GNU Affero General Public License v3.0 or later (LICENSE beside the program, or gnu.org/licenses/agpl-3.0). Parts by others inside this page:</p>' +
       Object.keys(d)
         .map(k => `<h4>${esc(k)}</h4><pre>${esc(d[k])}</pre>`)
         .join('') +
@@ -41571,13 +42725,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     export: a => {
       const f = String((a && a.format) || 'smiles').toLowerCase();
       if (f === 'svg') return { svg: svgFileOf() };
+      if (f === 'xyz') return xyzExport(a);
       if (f === 'json' || f === 'reactio') return { json: JSON.stringify({ rd: 1, state: S }) };
       const F = exportFormats();
-      if (f === 'xyz') {
-        const x = xyzOf();
-        if (x == null) throw new Error('No structure to write as XYZ');
-        return { xyz: x };
-      }
       const v = { mol: F.mol, sdf: F.sdf, rxn: F.rxn, cdxml: F.cdxml, smiles: F.smi }[f];
       if (v == null) throw new Error('Formats: smiles, mol, sdf, rxn, cdxml, xyz, svg, json');
       return { [f]: v };
@@ -42200,8 +43350,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const CLI_HELP = `Reactio Draw command line
 
   reactio render  <input…> -o <out.svg|.png|.eps|.tiff | folder>   a picture of the drawing
-  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.json|.svg|.png|.eps|.tiff | folder>
+  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.xyz|.json|.svg|.png|.eps|.tiff | folder>
   reactio convert <input>  --format smi                             (no -o: text formats go to the screen)
+  reactio convert molecule.cdx -o molecule.xyz             (3D coordinates for quantum chemistry: lowest MMFF94s+ conformer)
   reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis of every structure
   reactio nmr     <input>  [--nucleus 1H|13C|19F|31P]                predicted shifts (13C by default)
   reactio inchi   <input…>     InChI and InChIKey
@@ -42236,6 +43387,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     'smi',
     'cdxml',
     'cdx',
+    'xyz',
     'reactio',
     'json',
     'svg',
@@ -42391,6 +43543,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             );
           else if (fmt === 'eps') body = await epsOf();
           else if (fmt === 'tiff') body = (await tiffExport(+opt.dpi || 600)).bytes;
+          else if (fmt === 'xyz') body = (await xyzExport({})).xyz;
           else body = fileBody(fmt);
           if (body == null || body === '')
             throw new Error(
@@ -43908,7 +45061,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const F = exportFormats();
     if (ext === 'cdxml') return withRd(F.cdxml);
     if (ext === 'cdx') return cdxOfCdxml(withRdTag(F.cdxml));
-    if (ext === 'xyz') return xyzOf();
     return { mol: F.mol, sdf: F.sdf, rxn: F.rxn, smi: F.smi && F.smi + '\n' }[ext] || null;
   }
   const NATIVE_FILES = () =>
@@ -44101,7 +45253,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       path = path && path + '.reactio';
       ext = 'reactio';
     }
-    const body = fileBody(ext);
+    let body;
+    if (ext === 'xyz') {
+      /* no file chosen yet (a browser without a Save dialog of its own): the box offers Save after the search, because a
+         download needs a fresh click */
+      if (!path && !fh) {
+        xyzBox('f-xyz', false, true);
+        return false;
+      }
+      const r = await xyzBox(null, true);
+      if (!r) return false;
+      body = r.xyz;
+    } else body = fileBody(ext);
     if (!body) {
       toast(ext === 'rxn' ? 'Draw a reaction arrow to save an RXN.' : 'Nothing to save', true);
       return false;
@@ -44466,7 +45629,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['sdf', 'SDF (.sdf)', 'structures only, one record per compound'],
     ['rxn', 'Reaction (.rxn)', 'the reaction only'],
     ['smi', 'SMILES (.smi)', 'structures only, as text'],
-    ['xyz', 'XYZ (.xyz)', 'structures only, in 3D with hydrogens, one frame each']
+    ['xyz', 'XYZ (.xyz)', 'structures only, in 3D with hydrogens: the lowest of up to 20 MMFF94s+ conformers, with charge and multiplicity']
   ];
   function askFormat() {
     return new Promise(res => {
@@ -45306,6 +46469,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   window.__rd = {
     stereoSig,
+    wedges3D,
     get cleanStereoKept() {
       return cleanStereoKept;
     },

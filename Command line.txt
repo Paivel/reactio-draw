@@ -11,8 +11,9 @@ Where it is:
            It needs WebKitGTK and a desktop session (on a server: xvfb-run reactio …).
 
   reactio render  <input…> -o <out.svg|.png|.eps|.tiff | folder>   a picture of the drawing
-  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.json|.svg|.png|.eps|.tiff | folder>
+  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.xyz|.json|.svg|.png|.eps|.tiff | folder>
   reactio convert <input>  --format smi                             (no -o: text formats go to the screen)
+  reactio convert molecule.cdx -o molecule.xyz             (3D coordinates for quantum chemistry: lowest MMFF94s+ conformer)
   reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis of every structure
   reactio nmr     <input>  [--nucleus 1H|13C|19F|31P]                predicted shifts (13C by default)
   reactio inchi   <input…>     InChI and InChIKey
