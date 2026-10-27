@@ -3309,7 +3309,10 @@ function kdOf(st) {
     'click',
     e => {
       const l = e.target.closest && e.target.closest('a[href]');
-      if (!l || !/^https?:\/\//i.test(l.href)) return;
+      /* links inside the page (href="#…": the Check line, the stoichiometry grid) are the page's own, not web sites; in
+         the Windows app the page itself is served from an https address, so they would look like one */
+      if (!l || !/^https?:\/\//i.test(l.href) || /^#/.test(l.getAttribute('href') || '') || l.origin === location.origin)
+        return;
       e.preventDefault();
       call('link', { url: l.href });
     },
