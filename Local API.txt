@@ -26,7 +26,7 @@ Useful commands
                                                          checkedByOpsin = the name reads back as the same structure
   nmr             {"nucleus": "13C", "index": 0}  or  {"nucleus": "1H", "smiles": "..."}
                                                          predicted shifts (1H, 13C, 19F, 31P) with typical errors (offline)
-  list, properties {"index": 0}, scheme, table, export {"format": "smiles|mol|sdf|rxn|cdxml|svg|json"}
+  list, properties {"index": 0}, scheme, table, export {"format": "smiles|mol|sdf|rxn|cdxml|xyz|svg|json"}
                                                          the structures, their properties, the scheme, the reagent table, a file
   inchi           {"index": 0}  or  {"smiles": "..."}    InChI and InChIKey (InChI library, built in)
   prefixStyle     {"mode": "plain|italic|sup"}         t, i, s, n of tBu, iPr… plain, italic or italic superscript

@@ -226,7 +226,7 @@ func fileDialog(save bool, name, accept string) string {
 	if save && accept == "drawings" {
 		ext := strings.ToLower(strings.TrimPrefix(filepath.Ext(name), "."))
 		kinds := [][3]string{{"reactio", "Reactio Draw document", "*.reactio"}, {"json", "Reactio Draw document, older name", "*.json"}, {"cdxml", "CDXML drawing", "*.cdxml"}, {"cdx", "CDX drawing", "*.cdx"},
-			{"mol", "Molfile (structures only)", "*.mol"}, {"sdf", "SDF (structures only)", "*.sdf"}, {"rxn", "Reaction (RXN)", "*.rxn"}, {"smi", "SMILES", "*.smi"}}
+			{"mol", "Molfile (structures only)", "*.mol"}, {"sdf", "SDF (structures only)", "*.sdf"}, {"rxn", "Reaction (RXN)", "*.rxn"}, {"smi", "SMILES", "*.smi"}, {"xyz", "XYZ (3D, structures only)", "*.xyz"}}
 		var parts []string
 		idx := 1
 		for i, k := range kinds {

@@ -3952,11 +3952,11 @@ function kdOf(st) {
     ANG = 1.54 / L;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.5.1';
+  const RD_VERSION = '1.5.1-xyz';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
-      e.innerHTML = `<b>Reactio Draw ${RD_VERSION}</b> · <a href="https://github.com/Paivel/reactio-draw/releases/tag/v${RD_VERSION}" target="_blank" rel="noopener">what is new in this version</a>`;
+      e.innerHTML = `<b>Reactio Draw ${RD_VERSION}</b> · <a href="https://github.com/Paivel/reactio-draw/releases/tag/v${RD_VERSION.replace(/-.*/, '')}" target="_blank" rel="noopener">what is new in this version</a>`;
   }
   const svg = $('mol'),
     layer = $('layer'),
@@ -29502,7 +29502,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['h', 'Insert'],
     [
       'open',
-      'Open file… (.reactio, .json, .cdxml, .cdx, .mol, .sdf, .rxn, .smi, .cif (test version), or a Reactio Draw .zip)'
+      'Open file… (.reactio, .json, .cdxml, .cdx, .mol, .sdf, .rxn, .smi, .xyz, .cif (test version), or a Reactio Draw .zip)'
     ],
     ['pic', 'Insert picture… (or paste / drop one onto the sheet)'],
     ['h', 'Word files'],
@@ -29530,7 +29530,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   const fileIn = document.createElement('input');
   fileIn.type = 'file';
-  fileIn.accept = '.reactio,.json,.docx,.zip,.mol,.sdf,.sd,.rxn,.cdxml,.smi,.smiles,.txt,.cdx,.cif';
+  fileIn.accept = '.reactio,.json,.docx,.zip,.mol,.sdf,.sd,.rxn,.cdxml,.smi,.smiles,.txt,.cdx,.cif,.xyz';
   fileIn.hidden = true;
   document.body.appendChild(fileIn);
   const wordIn = document.createElement('input');
@@ -30665,9 +30665,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       if (best >= 0) edges.add(i < best ? i + ',' + best : best + ',' + i);
     }
-    const E = [...edges]
-      .map(s => s.split(',').map(Number))
-      .filter(([i, j]) => d(nodes[i].p, nodes[j].p) > 0.3);
+    return perceive3D(
+      nodes,
+      [...edges].map(s => s.split(',').map(Number))
+    );
+  }
+  /* bonds of a 3D structure (atoms {el, p: [x, y, z] Å}, bonded pairs) → bond orders and charges; used for CIF and XYZ */
+  function perceive3D(nodes, E0) {
+    const d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    const E = E0.filter(([i, j]) => d(nodes[i].p, nodes[j].p) > 0.3);
     /* bond orders: from each atom's free valence (normal valence − its neighbours, hydrogens included; bonds to metals
        count for carbon only), double bonds matched shortest first, then the leftovers become charges */
     const metal = el => !(el in CIF_VAL);
@@ -30817,6 +30823,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast('No crystal structure found in that CIF', true);
       return;
     }
+    place3D(
+      blocks.map(b => ({ name: b.name, get r() {
+        return cifStructure(b);
+      } })),
+      (made, warn) =>
+        toast(
+          made
+            ? 'CIF reading is a test version, not fully checked yet. Opened ' +
+                made +
+                ' crystal structure' +
+                (made > 1 ? 's' : '') +
+                ' from ' +
+                name +
+                '; bond orders come from the hydrogens and valences, so check them' +
+                (warn ? '; some were cut at 3000 atoms' : '')
+            : 'No crystal structure could be read from that CIF',
+          !made,
+          /* the test-version note stays long enough to be read */
+          15000
+        )
+    );
+  }
+  /* 3D structures (from a CIF or an XYZ file) put on the sheet in their own geometry, side by side: items [{name, r}],
+     r = { nodes, E, order, chg } */
+  function place3D(items, done) {
     snap();
     const bb = contentBox();
     let ox = bb ? bb.x1 + 80 : 120,
@@ -30826,8 +30857,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       warn = 0;
     const k = L / 1.5,
       W = 1400;
-    for (const blk of blocks) {
-      const r = cifStructure(blk);
+    for (const blk of items) {
+      const r = blk.r;
       if (!r) continue;
       /* hydrogens on carbon stay implicit; those on N, O and others are drawn */
       const keep = r.nodes.map(
@@ -30953,25 +30984,230 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     zoom = null;
     commit();
-    toast(
-      made
-        ? 'CIF reading is a test version, not fully checked yet. Opened ' +
-            made +
-            ' crystal structure' +
-            (made > 1 ? 's' : '') +
-            ' from ' +
-            name +
-            '; bond orders come from the hydrogens and valences, so check them' +
-            (warn ? '; some were cut at 3000 atoms' : '')
-        : 'No crystal structure could be read from that CIF',
-      !made,
-      /* the test-version note stays long enough to be read */
-      15000
+    done(made, warn);
+  }
+  /* XYZ files (issue #1, asked for by Onelightayear): Cartesian coordinates in Å, one frame or several. Open: bonds from
+     the distances (covalent radii, as xyzgraph does), then bond orders and charges as for a CIF; Save: every structure
+     on the sheet as one frame, in its 3D shape (built when it has none) with all its hydrogens */
+  const XYZ_COV = {
+    H: 0.31, Li: 1.28, Be: 0.96, B: 0.84, C: 0.76, N: 0.71, O: 0.66, F: 0.57, Na: 1.66, Mg: 1.41, Al: 1.21, Si: 1.11,
+    P: 1.07, S: 1.05, Cl: 1.02, K: 2.03, Ca: 1.76, Sc: 1.7, Ti: 1.6, V: 1.53, Cr: 1.39, Mn: 1.39, Fe: 1.32, Co: 1.26,
+    Ni: 1.24, Cu: 1.32, Zn: 1.22, Ga: 1.22, Ge: 1.2, As: 1.19, Se: 1.2, Br: 1.2, Rb: 2.2, Sr: 1.95, Y: 1.9, Zr: 1.75,
+    Nb: 1.64, Mo: 1.54, Ru: 1.46, Rh: 1.42, Pd: 1.39, Ag: 1.45, Cd: 1.44, In: 1.42, Sn: 1.39, Sb: 1.39, Te: 1.38,
+    I: 1.39, Cs: 2.44, Ba: 2.15, La: 2.07, Hf: 1.75, Ta: 1.7, W: 1.62, Re: 1.51, Os: 1.44, Ir: 1.41, Pt: 1.36,
+    Au: 1.36, Hg: 1.32, Tl: 1.45, Pb: 1.46, Bi: 1.48
+  };
+  function xyzFrames(text) {
+    const Ls = String(text).replace(/\r/g, '').split('\n'),
+      frames = [];
+    let i = 0;
+    while (i < Ls.length) {
+      if (!Ls[i].trim()) {
+        i++;
+        continue;
+      }
+      const n = +Ls[i].trim().split(/\s+/)[0];
+      if (!Number.isInteger(n) || n < 1 || i + 1 + n >= Ls.length + 1) break;
+      const nodes = [];
+      for (let k = 0; k < n; k++) {
+        const t = (Ls[i + 2 + k] || '').trim().split(/\s+/);
+        if (t.length < 4) return frames;
+        let el = t[0];
+        if (/^\d+$/.test(el)) el = SYMS[+el - 1];
+        else el = el.replace(/[^A-Za-z].*$/, '');
+        el = el && el.charAt(0).toUpperCase() + el.slice(1, 2).toLowerCase();
+        if (el === 'D' || el === 'T') el = 'H';
+        const p = [+t[1], +t[2], +t[3]];
+        if (!el || !ZOF(el) || p.some(v => !isFinite(v))) return frames;
+        nodes.push({ el, p });
+      }
+      frames.push({ title: (Ls[i + 1] || '').trim(), nodes });
+      i += n + 2;
+    }
+    return frames;
+  }
+  /* bonded pairs from the distances: within 1.2 × the sum of the covalent radii; a hydrogen takes only its nearest atom */
+  function xyzBonds(nodes) {
+    const E = [],
+      R = el => XYZ_COV[el] || CIF_COV[el] || 1.5,
+      d = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+    nodes.forEach((a, i) => {
+      if (a.el !== 'H') return;
+      let best = -1,
+        bd = Infinity;
+      nodes.forEach((b, j) => {
+        if (j === i || b.el === 'H') return;
+        const dd = d(a.p, b.p);
+        if (dd < 1.2 * (R('H') + R(b.el)) && dd < bd) {
+          bd = dd;
+          best = j;
+        }
+      });
+      if (best >= 0) E.push([Math.min(i, best), Math.max(i, best)]);
+    });
+    for (let i = 0; i < nodes.length; i++)
+      for (let j = i + 1; j < nodes.length; j++) {
+        if (nodes[i].el === 'H' || nodes[j].el === 'H') continue;
+        if (d(nodes[i].p, nodes[j].p) < 1.2 * (R(nodes[i].el) + R(nodes[j].el))) E.push([i, j]);
+      }
+    return E;
+  }
+  function importXyz(text, name) {
+    let frames = xyzFrames(text);
+    if (!frames.length) {
+      toast('No coordinates found in that XYZ file', true);
+      return;
+    }
+    /* a trajectory (an optimisation, a scan): its last frame, the final geometry */
+    const traj = frames.length > 10;
+    if (traj) frames = [frames[frames.length - 1]];
+    const base = String(name || 'XYZ').replace(/\.[^.]*$/, '');
+    place3D(
+      frames.map((f, k) => ({
+        name: f.title && f.title.length <= 60 && !/^[-+\d.eE\s]+$/.test(f.title) ? f.title : frames.length > 1 ? base + ' ' + (k + 1) : base,
+        get r() {
+          return f.nodes.length > 3000 ? null : perceive3D(f.nodes, xyzBonds(f.nodes));
+        }
+      })),
+      made =>
+        toast(
+          made
+            ? 'Opened ' +
+                made +
+                ' structure' +
+                (made > 1 ? 's' : '') +
+                ' from ' +
+                name +
+                (traj ? ' (the last frame of ' + xyzFrames(text).length + ')' : '') +
+                '; bonds and bond orders come from the distances and valences, so check them'
+            : 'No structure could be read from that XYZ file',
+          !made,
+          10000
+        )
     );
+  }
+  /* hydrogens of an atom in 3D: c its position, U the unit vectors to its neighbours, ref a vector that sets the turn
+     (toward a neighbour's neighbour), hyb 'sp' | 'sp2' | 'sp3' */
+  function hDirs3D(U, nH, hyb, ref) {
+    const add = (a, b) => a.map((v, i) => v + b[i]),
+      sc = (a, k) => a.map(v => v * k),
+      cr = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+      nz = a => {
+        const l = Math.hypot(...a) || 1;
+        return a.map(v => v / l);
+      },
+      perp = v => nz(cr(v, Math.abs(v[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0]));
+    const TET = (109.47 * Math.PI) / 180;
+    let D = [];
+    if (!U.length) {
+      D =
+        hyb === 'sp'
+          ? [[1, 0, 0], [-1, 0, 0]]
+          : hyb === 'sp2'
+            ? [[1, 0, 0], [-0.5, 0.866, 0], [-0.5, -0.866, 0]]
+            : [[1, 1, 1], [1, -1, -1], [-1, 1, -1], [-1, -1, 1]].map(nz);
+    } else if (U.length === 1) {
+      const u = U[0];
+      let p = ref ? nz(add(ref, sc(u, -(ref[0] * u[0] + ref[1] * u[1] + ref[2] * u[2])))) : null;
+      if (!p || !p.every(isFinite) || Math.hypot(...p) < 0.5) p = perp(u);
+      const q = cr(u, p),
+        ang = hyb === 'sp' ? Math.PI : hyb === 'sp2' ? (2 * Math.PI) / 3 : TET,
+        k = hyb === 'sp' ? 1 : hyb === 'sp2' ? 2 : 3,
+        /* sp3: staggered against the neighbour's other bond; sp2: in its plane */
+        off = hyb === 'sp3' ? Math.PI / 3 : 0;
+      for (let j = 0; j < k; j++) {
+        const ph = off + (2 * Math.PI * j) / k;
+        D.push(nz(add(sc(u, Math.cos(ang)), sc(add(sc(p, Math.cos(ph)), sc(q, Math.sin(ph))), Math.sin(ang)))));
+      }
+    } else if (U.length === 2) {
+      const s = add(U[0], U[1]),
+        b = Math.hypot(...s) < 0.1 ? perp(U[0]) : nz(sc(s, -1)),
+        n = nz(cr(U[0], U[1]));
+      if (hyb === 'sp2' || Math.hypot(...n) < 0.5) D = [b];
+      else {
+        const t = (54.74 * Math.PI) / 180;
+        D = [nz(add(sc(b, Math.cos(t)), sc(n, Math.sin(t)))), nz(add(sc(b, Math.cos(t)), sc(n, -Math.sin(t))))];
+      }
+    } else {
+      const s = U.reduce((t, u) => add(t, u), [0, 0, 0]);
+      D = [Math.hypot(...s) < 0.1 ? perp(U[0]) : nz(sc(s, -1))];
+    }
+    while (D.length < nH) D.push(D.length ? nz(sc(D[0], -1)) : [1, 0, 0]);
+    return D.slice(0, nH);
+  }
+  const XH_LEN = { C: 1.09, N: 1.01, O: 0.96, S: 1.34, P: 1.42, B: 1.19, Si: 1.48, Se: 1.46 };
+  /* every structure on the sheet as XYZ frames (Å; x right, y up, z toward the viewer) */
+  function xyzOf() {
+    const saved = mol,
+      m = expandedCopy();
+    mol = m;
+    try {
+      const k = L / 1.5,
+        out = [];
+      for (const f0 of fragments()) {
+        const f = f0.filter(a => ZOF(a.el) > 0 && !a.label);
+        if (!f.length || f.length !== f0.length) continue;
+        if (!f.every(a => a.z !== undefined)) embedBest(f);
+        const P = new Map(f.map(a => [a.id, [a.x / k, -a.y / k, (a.z || 0) / k]])),
+          lines = [],
+          nb = a => neighbors(a).filter(o => P.has(o.id));
+        for (const a of f) {
+          const p = P.get(a.id);
+          lines.push([a.el === 'D' ? 'H' : a.el, p]);
+          const nH = a.el === 'H' ? 0 : implicitH(a);
+          if (!nH) continue;
+          const bs = mol.bonds.filter(b => b.a === a.id || b.b === a.id),
+            hyb = bs.some(b => b.order === 3) || bs.filter(b => b.order === 2).length > 1
+              ? 'sp'
+              : bs.some(b => b.order === 2 || b.stereo === 'deloc')
+                ? 'sp2'
+                : 'sp3',
+            N = nb(a),
+            U = N.map(o => {
+              const q = P.get(o.id),
+                v = [q[0] - p[0], q[1] - p[1], q[2] - p[2]],
+                l = Math.hypot(...v) || 1;
+              return v.map(x => x / l);
+            });
+          let ref = null;
+          if (N.length === 1) {
+            const o2 = nb(N[0]).find(x => x.id !== a.id);
+            if (o2) {
+              const q = P.get(o2.id),
+                q1 = P.get(N[0].id);
+              ref = [q[0] - q1[0], q[1] - q1[1], q[2] - q1[2]];
+            }
+          }
+          const len = XH_LEN[a.el] || 1.1;
+          for (const dv of hDirs3D(U, nH, hyb, ref)) lines.push(['H', p.map((v, t) => v + dv[t] * len)]);
+        }
+        const fm = (() => {
+          try {
+            return formulaText(countsOf(f0)).replace(/\u2212/g, '-');
+          } catch (e) {
+            return '';
+          }
+        })();
+        out.push(
+          lines.length +
+            '\n' +
+            (fm || 'Reactio Draw structure ' + (out.length + 1)) +
+            '\n' +
+            lines.map(([el, q]) => el.padEnd(2) + q.map(v => v.toFixed(6).padStart(14)).join('')).join('\n')
+        );
+      }
+      return out.length ? out.join('\n') + '\n' : null;
+    } finally {
+      mol = saved;
+    }
   }
   function importText(name, text) {
     if (/\.cif$/i.test(name) || /^\s*(#.*\n\s*)*data_/i.test(text)) {
       importCif(text, name);
+      return;
+    }
+    if (/\.xyz$/i.test(name)) {
+      importXyz(text, name);
       return;
     }
     const ext = (name.split('.').pop() || '').toLowerCase();
@@ -40564,8 +40800,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (f === 'svg') return { svg: svgFileOf() };
       if (f === 'json' || f === 'reactio') return { json: JSON.stringify({ rd: 1, state: S }) };
       const F = exportFormats();
+      if (f === 'xyz') {
+        const x = xyzOf();
+        if (x == null) throw new Error('No structure to write as XYZ');
+        return { xyz: x };
+      }
       const v = { mol: F.mol, sdf: F.sdf, rxn: F.rxn, cdxml: F.cdxml, smiles: F.smi }[f];
-      if (v == null) throw new Error('Formats: smiles, mol, sdf, rxn, cdxml, svg, json');
+      if (v == null) throw new Error('Formats: smiles, mol, sdf, rxn, cdxml, xyz, svg, json');
       return { [f]: v };
     },
     table: () => apiTable(),
@@ -42869,12 +43110,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     saveTabs();
     renderTabs();
   }
-  const SAVE_EXT = ['reactio', 'json', 'cdxml', 'cdx', 'mol', 'sdf', 'rxn', 'smi'];
+  const SAVE_EXT = ['reactio', 'json', 'cdxml', 'cdx', 'mol', 'sdf', 'rxn', 'smi', 'xyz'];
   function fileBody(ext) {
     if (ext === 'json' || ext === 'reactio') return JSON.stringify({ rd: 1, state: S }, null, 1);
     const F = exportFormats();
     if (ext === 'cdxml') return withRd(F.cdxml);
     if (ext === 'cdx') return cdxOfCdxml(withRdTag(F.cdxml));
+    if (ext === 'xyz') return xyzOf();
     return { mol: F.mol, sdf: F.sdf, rxn: F.rxn, smi: F.smi && F.smi + '\n' }[ext] || null;
   }
   const NATIVE_FILES = () =>
@@ -43431,7 +43673,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['mol', 'Molfile (.mol)', 'structures only'],
     ['sdf', 'SDF (.sdf)', 'structures only, one record per compound'],
     ['rxn', 'Reaction (.rxn)', 'the reaction only'],
-    ['smi', 'SMILES (.smi)', 'structures only, as text']
+    ['smi', 'SMILES (.smi)', 'structures only, as text'],
+    ['xyz', 'XYZ (.xyz)', 'structures only, in 3D with hydrogens, one frame each']
   ];
   function askFormat() {
     return new Promise(res => {

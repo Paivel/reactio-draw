@@ -5,7 +5,7 @@ import os,re
 APP=sys.argv[1]
 # the version comes from the page (const RD_VERSION = '1.3' in index.html, next to the app or in the repository root)
 _pg=next(p for p in (os.path.join(APP,'index.html'),os.path.join(APP,'..','index.html')) if os.path.exists(p))
-_v=[int(x) for x in re.search(r"const RD_VERSION\s*=\s*'([0-9.]+)'",open(_pg,encoding='utf-8').read()).group(1).split('.')]+[0,0,0]
+_v=[int(x) for x in re.search(r"const RD_VERSION\s*=\s*'([0-9.]+)[^']*'",open(_pg,encoding='utf-8').read()).group(1).split('.')]+[0,0,0]
 VER=(_v[0],_v[1],_v[2],int(sys.argv[2]) if len(sys.argv)>2 else 0)
 ico=open(APP+'/reactiodraw.ico','rb').read();_,_,n=struct.unpack('<HHH',ico[:6]);blobs=[]
 for i in range(n):
