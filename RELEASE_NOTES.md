@@ -7,6 +7,7 @@
 - The side panel's tabs scroll sideways when they do not all fit (mouse wheel or the thin bar under them), as the document tabs do; the open tab is kept in view and the arrow that folds the panel stays at the left.
 - Analysis → Properties: Show R/S and E/Z on the structures. (R)/(S) beside every stereocentre drawn with a wedge or hash and (E)/(Z) beside every stereogenic double bond, by the CIP rules (OpenChemLib), each where it covers no bond, atom label or text; shown on the sheet and in pictures.
 - Analysis → Properties: cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and Lipinski's rule of five (OpenChemLib).
+- Markush structures: an atom labelled R, R1, R2, R', X… is a variable; its values are written as a text on the sheet (R1 = H, Me, OMe — one per line). Analysis shows how many compounds the series holds, and Enumerate draws every one of them below the drawing, each with its values (H removes the atom; an element or a group label takes its place). Molfiles and SD files keep R1, R2 as R-group atoms (R#, M  RGP) and every variable label as an atom alias, and read them back. The local API has `enumerate`.
 - Save as XYZ: every structure on the sheet as one frame, in Å, with all its hydrogens; a structure drawn flat gets its 3D shape first (OpenChemLib, MMFF94s+). The local API exports and imports `xyz` too.
 
 # Reactio Draw 1.5.1

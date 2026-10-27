@@ -3048,6 +3048,7 @@ html {
           <svg id="iso" viewBox="0 0 260 90" style="width:100%;max-width:300px;height:auto;display:block" role="img" aria-label="Isotope pattern"></svg>
           <div class="comp" id="isoList"></div>
         </div>
+        <div class="note" id="markush" hidden style="margin-top:6px"></div>
         <div class="frags" id="frags" hidden></div>
         <div class="note chksum" id="chkSum" hidden></div>
         <div>
@@ -12139,6 +12140,150 @@ function kdOf(st) {
     return String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
   }
 
+  /* ===== Markush structures: R-groups and other variable atoms ===== */
+  /* a variable atom is one whose label is no group or element (R, R1, R', X, Ar…); its list of values is written as a text
+     on the sheet, "R1 = H, Me, OMe" (one per line, = or :, values by commas), and Enumerate draws every compound of the
+     series: H removes the atom, an element or a group label takes its place */
+  const SUPDIG = { '⁰': '0', '¹': '1', '²': '2', '³': '3', '⁴': '4', '⁵': '5', '⁶': '6', '⁷': '7', '⁸': '8', '⁹': '9' },
+    SUBDIG = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+  const varKey = t =>
+    String(t || '')
+      .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => SUPDIG[c])
+      .replace(/[₀₁₂₃₄₅₆₇₈₉]/g, c => SUBDIG[c])
+      .replace(/[_^{}\s]/g, '')
+      .replace(/[′’]/g, "'")
+      .replace(/″/g, "''");
+  const isVarAtom = a => !!(a && a.label && !a.grp && !(a.label in AW));
+  /* the lists written on the sheet: Map(key → { name, values: [..], text id }) */
+  function markushDefs() {
+    const D = new Map();
+    for (const t of mol.texts)
+      for (const line of tLines(t)) {
+        const m = /^\s*([A-Za-z][A-Za-z0-9'′’″⁰¹²³⁴⁵⁶⁷⁸⁹₀₁₂₃₄₅₆₇₈₉_^{}]*)\s*[=:]\s*(.+?)\s*$/.exec(plainText(line));
+        if (!m) continue;
+        const vals = m[2]
+          .split(/\s*(?:,|;|\bor\b)\s*/)
+          .map(v => v.trim().replace(/\.$/, ''))
+          .filter(Boolean);
+        if (vals.length) D.set(varKey(m[1]), { name: m[1], values: vals, tid: t.id });
+      }
+    return D;
+  }
+  /* the series of one structure: its variable atoms with their lists, or why it cannot be enumerated */
+  function markushOf(fr) {
+    const vars = fr.filter(isVarAtom);
+    if (!vars.length) return null;
+    const D = markushDefs(),
+      miss = [],
+      groups = new Map();
+    for (const a of vars) {
+      const k = varKey(a.label),
+        d = D.get(k);
+      if (!d) {
+        if (!miss.includes(a.label)) miss.push(a.label);
+        continue;
+      }
+      (groups.get(k) || groups.set(k, { name: a.label, values: d.values, atoms: [] }).get(k)).atoms.push(a);
+    }
+    /* R1, R2 … before X, Y, in natural order */
+    const G = [...groups.values()].sort((p, q) =>
+      varKey(p.name).localeCompare(varKey(q.name), 'en', { numeric: true })
+    );
+    const count = G.reduce((t, g) => t * g.values.length, 1);
+    return { G, miss, count };
+  }
+  /* one value put on a copied variable atom; false when the value is not understood */
+  function markushApply(a, v) {
+    const t = v.replace(/^[–—-]$/, 'H');
+    if (t === 'H') return 'del';
+    const eh = /^([A-Z][a-z]?)(H\d*)?$/.exec(t);
+    if (eh && eh[1] in AW) {
+      delete a.label;
+      delete a.grp;
+      delete a.lsty;
+      a.el = eh[1];
+      a.chg = 0;
+      return true;
+    }
+    return setLabel(a, t) ? true : false;
+  }
+  /* draws every compound of the series below the drawing, each with the values it takes; max compounds drawn: 200 */
+  function enumerateMarkush(fr) {
+    const M = markushOf(fr);
+    if (!M) return { err: 'This structure has no R-groups or other variable atoms' };
+    if (M.miss.length)
+      return {
+        err:
+          'No list for ' +
+          M.miss.join(', ') +
+          ': write a text on the sheet, for example ' +
+          M.miss[0] +
+          ' = H, Me, OMe'
+      };
+    const MAX = 200;
+    if (M.count > MAX) return { err: 'The series has ' + M.count + ' compounds; at most ' + MAX + ' are drawn at once' };
+    const ids = new Set(fr.map(a => a.id)),
+      bonds = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
+      bb = fragBox(fr),
+      W = bb.x1 - bb.x0 + 70,
+      H = bb.y1 - bb.y0 + 100,
+      cb = contentBox(),
+      x0 = bb.x0,
+      y0 = (cb ? cb.y1 : bb.y1) + 80,
+      cols = Math.max(1, Math.min(5, Math.floor(1400 / W) || 1));
+    /* every combination, the first group varying slowest */
+    const combos = [[]];
+    for (const g of M.G) {
+      const next = [];
+      for (const c of combos) for (const v of g.values) next.push([...c, v]);
+      combos.length = 0;
+      combos.push(...next);
+    }
+    const bad = new Set();
+    snap();
+    combos.forEach((combo, n) => {
+      const dx = x0 - bb.x0 + (n % cols) * W,
+        dy = y0 - bb.y0 + Math.floor(n / cols) * H,
+        map = new Map();
+      for (const a of fr) {
+        const c = JSON.parse(JSON.stringify(a));
+        c.id = mol.next++;
+        c.x += dx;
+        c.y += dy;
+        if (c.zx != null) c.zx += dx;
+        if (c.zy != null) c.zy += dy;
+        delete c.gid;
+        map.set(a.id, c);
+      }
+      const drop = new Set();
+      M.G.forEach((g, gi) => {
+        for (const a of g.atoms) {
+          const r = markushApply(map.get(a.id), combo[gi]);
+          if (r === 'del') drop.add(a.id);
+          else if (!r) bad.add(combo[gi]);
+        }
+      });
+      for (const [id, c] of map) if (!drop.has(id)) mol.atoms.push(c);
+      for (const b of bonds) {
+        if (drop.has(b.a) || drop.has(b.b)) continue;
+        const nb = JSON.parse(JSON.stringify(b));
+        nb.id = mol.next++;
+        nb.a = map.get(b.a).id;
+        nb.b = map.get(b.b).id;
+        mol.bonds.push(nb);
+      }
+      mol.texts.push({
+        id: mol.next++,
+        x: bb.x0 + dx,
+        y: bb.y1 + dy + 42,
+        text: M.G.map((g, gi) => g.name + ' = ' + combo[gi]).join(', '),
+        size: Math.round(textDef.size * 0.85),
+        fs: true
+      });
+    });
+    commit();
+    return { made: combos.length, unknown: [...bad] };
+  }
   /* ===== analysis / properties / info ===== */
   function analysisTarget() {
     const frs = fragments();
@@ -12377,6 +12522,7 @@ function kdOf(st) {
   function updateInfo() {
     const { atoms: target, scope, frs, txts } = analysisTarget();
     $('single').hidden = !target;
+    if (!target && $('markush')) $('markush').hidden = true;
     $('frags').hidden = !!target || !frs.length;
     if (!frs.length) {
       $('scope').textContent = 'The sheet is empty. Start drawing or paste a SMILES.';
@@ -12414,6 +12560,20 @@ function kdOf(st) {
       try {
         hrmsUpdate();
       } catch (e) {}
+      /* a Markush structure: how many compounds the series holds, and the button that draws them */
+      {
+        const box = $('markush'),
+          Mk = markushOf(frs.find(fr => fr.some(a => target.includes(a))) || target);
+        box.hidden = !Mk;
+        if (Mk)
+          box.innerHTML = Mk.miss.length
+            ? `<b>Markush structure.</b> Write the values of ${esc(Mk.miss.join(', '))} as a text on the sheet, for example <i>${esc(
+                Mk.miss[0]
+              )} = H, Me, OMe</i>.`
+            : `<b>Markush structure:</b> ${Mk.count} compound${Mk.count > 1 ? 's' : ''} (${Mk.G.map(
+                g => esc(g.name) + ' ' + g.values.length
+              ).join(' × ')}). <button class="btn ghost sm" id="mkEnum">Enumerate</button>`;
+      }
     } else {
       $('scope').textContent = frs.length + ' structures on the sheet. Select one for a full analysis.';
       FRAG_ROWS = [];
@@ -24289,6 +24449,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   })();
 
+  document.addEventListener('click', e => {
+    if (!e.target.closest || !e.target.closest('#mkEnum')) return;
+    const { atoms: target, frs } = analysisTarget();
+    if (!target) return;
+    const fr = frs.find(f => f.some(a => target.includes(a))) || target,
+      r = enumerateMarkush(fr);
+    if (r.err) toast(r.err, true);
+    else
+      toast(
+        'Drew ' +
+          r.made +
+          ' compound' +
+          (r.made > 1 ? 's' : '') +
+          ' of the series below the drawing' +
+          (r.unknown.length ? '; not understood (left as labels): ' + r.unknown.join(', ') : '')
+      );
+  });
   $('nmrShow').onchange = () => render();
   try {
     $('cipShow').checked = localStorage.getItem('rd-cip') === '1';
@@ -24487,8 +24664,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       mol = saved;
     }
   }
+  /* variable atoms in an exported Molfile: R1, R2 … as R-group atoms (R# and M  RGP), every label kept as an atom alias */
+  function molRgroups(text, atoms) {
+    const V = atoms.map((a, i) => [a, i + 1]).filter(([a]) => isVarAtom(a));
+    if (!V.length || !/V2000/.test(text)) return text;
+    const Ls = text.split('\n'),
+      c = Ls.findIndex(l => /V2000/.test(l));
+    const rg = [];
+    for (const [a, i] of V) {
+      const m = /^R(\d+)$/.exec(varKey(a.label));
+      if (m) {
+        const k = c + i;
+        Ls[k] = Ls[k].slice(0, 31) + 'R# ' + Ls[k].slice(34);
+        rg.push([i, +m[1]]);
+      }
+    }
+    const extra = [];
+    for (let i = 0; i < rg.length; i += 8) {
+      const g = rg.slice(i, i + 8);
+      extra.push('M  RGP' + String(g.length).padStart(3) + g.map(([ai, n]) => String(ai).padStart(4) + String(n).padStart(4)).join(''));
+    }
+    const e = Ls.findIndex(l => l.startsWith('M  END')),
+      alias = V.flatMap(([a, i]) => ['A  ' + String(i).padStart(3), varKey(a.label)]);
+    Ls.splice(e, 0, ...alias, ...extra);
+    return Ls.join('\n');
+  }
   function molBlockE(atoms, bonds, title) {
-    if (!atoms.some(a => esrOk(a.esr))) return molBlock(atoms, bonds, title);
+    if (!atoms.some(a => esrOk(a.esr))) return molRgroups(molBlock(atoms, bonds, title), atoms);
     [atoms, bonds] = hLast(atoms, bonds);
     const base = molBlock(atoms, bonds, title);
     try {
@@ -29995,9 +30197,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         y = parseFloat(l.slice(10, 20)),
         z = parseFloat(l.slice(20, 30)) || 0;
       let el = l.slice(31, 34).trim();
-      const cc = parseInt(l.slice(36, 39)) || 0;
+      const cc = parseInt(l.slice(36, 39)) || 0,
+        /* an R-group (R#) or a pseudo-atom (R, A, Q, X…): kept as a label */
+        lab = el === 'R#' ? 'R' : !(el in AW) && el !== 'D' && /^[A-Z][a-z]?$/.test(el) ? el : '';
       if (!(el in AW) && el !== 'D') el = 'C';
-      atoms.push({ el, x: x / ANG, y: -y / ANG, z: z / ANG, chg: cc ? 4 - cc : 0 });
+      atoms.push({ el, x: x / ANG, y: -y / ANG, z: z / ANG, chg: cc ? 4 - cc : 0, ...(lab ? { label: lab } : {}) });
     }
     for (let i = 0; i < nb; i++) {
       const l = lines[start + 4 + na + i];
@@ -30016,6 +30220,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (; j < lines.length; j++) {
       const l = lines[j];
       if (l.startsWith('M  END')) break;
+      /* atom alias: the label written on the next line (R1, X, Ar) */
+      if (/^A  \s*\d+/.test(l)) {
+        const ai = parseInt(l.slice(3)) - 1,
+          t = (lines[j + 1] || '').trim();
+        if (atoms[ai] && t && !(t in AW)) atoms[ai].label = t;
+        j++;
+        continue;
+      }
+      /* R-group numbers: R# atoms become R1, R2 … */
+      if (l.startsWith('M  RGP')) {
+        const n = parseInt(l.slice(6, 9));
+        for (let k = 0; k < n; k++) {
+          const ai = parseInt(l.slice(10 + k * 8, 13 + k * 8)) - 1,
+            v = parseInt(l.slice(14 + k * 8, 17 + k * 8));
+          if (atoms[ai] && v > 0 && (!atoms[ai].label || atoms[ai].label === 'R')) atoms[ai].label = 'R' + v;
+        }
+        continue;
+      }
       if (l.startsWith('M  CHG') || l.startsWith('M  RAD')) {
         const n = parseInt(l.slice(6, 9));
         atoms.forEach((a, k) => {
@@ -30069,6 +30291,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         na.chg = a.chg || 0;
         if (a.rad) na.rad = a.rad;
+        if (a.label) setLabel(na, a.label);
         if (esrOk(a.esr)) na.esr = a.esr;
         return na;
       });
@@ -40952,6 +41175,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return apiDescribe(fragments()[i], i);
     },
     addReaction: a => apiAddReaction(a || {}),
+    /* a Markush structure (index): draws every compound of the series; its lists are texts such as "R1 = H, Me, OMe" */
+    enumerate: a => {
+      const r = enumerateMarkush(apiAtomsOf((a && a.index) || 0));
+      if (r.err) throw new Error(r.err);
+      return r;
+    },
     /* product-ratio chart: slices [{label, value, color}], x, y (top-left), size (diameter), legend 'right'|'below'|'none', hole (0 = pie), percentages, decimals */
     addChart: a => {
       const sl = (a.slices || []).map((s, i) => ({
