@@ -8,7 +8,7 @@ and PowerPoint or to and from other chemistry editors as CDXML and CDX files. It
 | :---: | :---: | :---: |
 | nothing to install | work fully offline | every function and button explained |
 
-![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview.png)
+![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview-1.5.1.png)
 
 https://github.com/user-attachments/assets/1637fe6d-b6d1-4ec5-9d68-9a41d62ef0c8
 
@@ -62,7 +62,7 @@ NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; th
 | `data/nmr/` | how the NMR shift tables were built from nmrshiftdb2 |
 | `word-addin/` | the Reactio Draw tab for Word (`Reactio Draw.dotm`) and the script and macros it is built from |
 | `examples/` | `embed.html`: Reactio Draw embedded in another page (see EMBEDDING.md) |
-| `docs/` | the guide `Reactio Draw - Getting started.pdf`, the hotkey chart `Reactio Draw - Hotkeys.reactio` the README picture `overview.png` and the hotkey chart as a picture |
+| `docs/` | the guide `Reactio Draw - Getting started.pdf`, the hotkey chart `Reactio Draw - Hotkeys.reactio` the README picture `overview-1.5.1.png` and the hotkey chart as a picture |
 | `tools/` | scripts that make the web version, the InChI WebAssembly build, the README picture, the hotkey chart and the Windows resources |
 | `LICENSES/` | the licences of the third-party parts (see THIRD-PARTY-NOTICES.md) |
 
