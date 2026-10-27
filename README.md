@@ -120,8 +120,6 @@ of the License, or (at your option) any later version. See `LICENSE`.
 
 Anyone who distributes Reactio Draw or a modified version, or offers a modified version to others
 over a network, must make its complete source code available under the same licence.
-If you would like to use Reactio Draw code in a project under another licence, such as MIT, open an issue:
-as the author, I can grant a separate licence.
 Drawings, files and schemes you make with the program are yours; the licence does not cover them.
 
 Third-party components and their licences: `THIRD-PARTY-NOTICES.md` and the `LICENSES/` folder.
