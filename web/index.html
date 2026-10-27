@@ -1396,7 +1396,9 @@ svg#mol.pan {
   gap: 2px;
   align-items: flex-end;
   overflow-x: auto;
-  scrollbar-width: none;
+  /* tabs that do not fit scroll sideways, as the document tabs do: a thin bar under them, the mouse wheel, and the open
+     tab brought into view */
+  scrollbar-width: thin;
   margin: -12px -14px 0;
   padding: 8px 6px 0;
   border-bottom: 1px solid var(--line);
@@ -1407,7 +1409,11 @@ svg#mol.pan {
   flex: none;
 }
 .tabs::-webkit-scrollbar {
-  display: none;
+  height: 4px;
+}
+.tabs::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 2px;
 }
 .tab {
   border: 1px solid var(--line);
@@ -1438,6 +1444,11 @@ svg#mol.pan {
 .sidefold {
   flex: none;
   order: -1;
+  /* stays at the left edge while the tabs scroll under it */
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: -6px 0 0 var(--bg);
   margin: 0 2px 4px 0;
   width: 22px;
   height: 22px;
@@ -1446,7 +1457,7 @@ svg#mol.pan {
   place-items: center;
   border: 1px solid transparent;
   border-radius: 6px;
-  background: transparent;
+  background: var(--bg);
   color: var(--muted);
   cursor: pointer;
 }
@@ -43038,7 +43049,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (t) switchTab(t.dataset.tab);
   });
   /* closing a tab with a drawing asks once in place: a second click on × within 3 s confirms */
-  /* the mouse wheel scrolls the row of tabs sideways when they do not all fit */
+  /* the mouse wheel scrolls the row of tabs sideways when they do not all fit (the side panel's tabs too), and the open
+     side-panel tab is kept in view */
+  document.querySelectorAll('.tabs').forEach(box => {
+    box.addEventListener(
+      'wheel',
+      e => {
+        if (box.scrollWidth <= box.clientWidth + 1) return;
+        const d = Math.abs(e.deltaY) > Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+        if (!d) return;
+        e.preventDefault();
+        e.stopPropagation();
+        box.scrollLeft += d * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? box.clientWidth : 1);
+      },
+      { passive: false }
+    );
+    box.addEventListener('click', e => {
+      const t = e.target.closest('.tab');
+      if (t) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+  });
   $('docTabs').addEventListener(
     'wheel',
     e => {

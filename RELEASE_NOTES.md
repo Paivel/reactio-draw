@@ -4,6 +4,7 @@
 
 - XYZ files (issue #1, asked for by Onelightayear): Open and drag-and-drop take .xyz files. Each frame comes in its own 3D geometry, drawn ball and stick; bonds come from the distances (within 1.2 × the sum of the covalent radii, a hydrogen bonded only to its nearest atom), bond orders and charges from the valences, as for a CIF, so check them. A file with more than ten frames (an optimisation, a scan) opens its last frame.
 - Fixed: in the Windows and Mac apps a click on the Check line under Analysis (or on the licence link in Info) opened the browser on an address of the app itself instead of selecting the atoms.
+- The side panel's tabs scroll sideways when they do not all fit (mouse wheel or the thin bar under them), as the document tabs do; the open tab is kept in view and the arrow that folds the panel stays at the left.
 - Save as XYZ: every structure on the sheet as one frame, in Å, with all its hydrogens; a structure drawn flat gets its 3D shape first (OpenChemLib, MMFF94s+). The local API exports and imports `xyz` too.
 
 # Reactio Draw 1.5.1
