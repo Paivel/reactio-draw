@@ -15707,6 +15707,57 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         .map(t => [t, t.x, t.y])
     };
   }
+  /* the two layers of a fast drag: everything that stays, and (in a group that is only shifted) everything that moves;
+     null when the drawing is small (drawing it all again is quick) or the moving part is bonded to a part that stays */
+  function fastDragStart(o) {
+    if (mol.atoms.length + mol.texts.length + mol.arrows.length < 120) return null;
+    const A = new Set(o.atoms.map(([a]) => a.id)),
+      R = new Set(o.arrows.map(([r]) => r.id)),
+      T = new Set(o.texts.map(([t]) => t.id));
+    if (!A.size && !R.size && !T.size) return null;
+    if (mol.bonds.some(b => A.has(b.a) !== A.has(b.b))) return null;
+    if (mol.atoms.some(a => a.multi && a.multi.some(id => A.has(id)) !== A.has(a.id))) return null;
+    const full = mol,
+      ss = [new Set(sel), new Set(selArr), new Set(selTxt)],
+      part = mv => ({
+        ...full,
+        atoms: full.atoms.filter(a => A.has(a.id) === mv),
+        bonds: full.bonds.filter(b => A.has(b.a) === mv),
+        arrows: full.arrows.filter(r => R.has(r.id) === mv),
+        texts: full.texts.filter(t => T.has(t.id) === mv),
+        fills: (full.fills || []).filter(f => f.ids.every(id => A.has(id)) === mv),
+        rings: (full.rings || []).filter(r => A.has(r.ids[0]) === mv)
+      });
+    let still = '',
+      moving = '';
+    try {
+      mol = part(false);
+      sel.clear();
+      selArr.clear();
+      selTxt.clear();
+      render();
+      still = layer.innerHTML;
+      mol = part(true);
+      ss[0].forEach(i => sel.add(i));
+      ss[1].forEach(i => selArr.add(i));
+      ss[2].forEach(i => selTxt.add(i));
+      render();
+      moving = layer.innerHTML;
+    } catch (e) {
+      mol = full;
+      return null;
+    } finally {
+      mol = full;
+      sel.clear();
+      selArr.clear();
+      selTxt.clear();
+      ss[0].forEach(i => sel.add(i));
+      ss[1].forEach(i => selArr.add(i));
+      ss[2].forEach(i => selTxt.add(i));
+    }
+    layer.innerHTML = still + '<g id="fastDrag">' + moving + '</g>';
+    return layer.querySelector('#fastDrag');
+  }
   function applyMove(o, dx, dy) {
     for (const [a, x, y] of o.atoms) {
       a.x = x + dx;
@@ -17505,8 +17556,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         dx += g.ddx;
         dy += g.ddy;
       }
+      /* a big drawing: what moves is drawn once into a layer of its own and that layer is shifted; the whole sheet is
+         drawn again when the pointer is let go */
+      if (drag.fast === undefined) drag.fast = fastDragStart(drag.orig);
       applyMove(drag.orig, dx, dy);
-      render();
+      if (drag.fast) drag.fast.setAttribute('transform', `translate(${dx} ${dy})`);
+      else render();
       drawGuides(g && g.lines);
       setHover(null);
     } else if (drag.mode === 'lasso') {
