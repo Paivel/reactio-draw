@@ -1,5 +1,6 @@
--- Reactio Draw tab in Word on a Mac. Word's macros may run other programs only through a script in
--- ~/Library/Application Scripts/com.microsoft.Word; "Install Word tab.command" puts this one there.
+-- Reactio Draw tabs in Word and Excel on a Mac. Their macros may run other programs only through a script in
+-- ~/Library/Application Scripts/com.microsoft.Word (or .Excel); "Install Word tab.command" and "Install Excel tab.command"
+-- put this one there.
 -- Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
 property appPath : "__APP__"
 -- the handler is written |rd| because rd alone is AppleScript's ordinal suffix (3rd); Word calls it as "rd"
@@ -28,6 +29,11 @@ on |rd|(p)
 				return "There are no Reactio Draw drawings in this document."
 			end try
 			do shell script "open -a 'Microsoft Word' " & quoted form of out
+		else if cmd is "table" then
+			-- Excel's tab: src the SMILES table, out the folder for the pictures and properties, then the options
+			set opts to ""
+			if (count of parts) > 3 then set opts to item 4 of parts
+			do shell script quoted form of cli & " table " & quoted form of src & " -o " & quoted form of out & " " & opts
 		else if cmd is "cdxml" then
 			do shell script quoted form of cli & " convert " & quoted form of src & " -o " & quoted form of out
 		else if cmd is "edit" then

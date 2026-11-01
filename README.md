@@ -34,11 +34,12 @@ https://github.com/user-attachments/assets/1637fe6d-b6d1-4ec5-9d68-9a41d62ef0c8
 | | |
 | --- | --- |
 | **Browser** | the link above, or `index.html` from this repository: open it in Chrome, Edge, Safari or Firefox |
-| **Windows 11** | `ReactioDraw-Windows-x64.zip` (or `-ARM.zip`): unzip, run `ReactioDraw.exe` |
+| **Windows 11** | `ReactioDraw-Windows-x64.zip` (or `-ARM.zip`): unzip, double-click `Install Reactio Draw.cmd` |
 | **Mac** | `ReactioDraw-Mac.zip`: double-click `Install Reactio Draw.command` (builds the app on your Mac) |
 | **Linux** | `ReactioDraw-Linux-x64.tar.gz` (or `-ARM`): unpack, run `./install.sh`; needs WebKitGTK |
+| **AI assistants** | only if you want Claude, Codex or another MCP client (or your scripts) to draw in Reactio Draw: the add-on `…-AI-assistants` for your system, installed after the program ([Install with AI assistants.txt](Install%20with%20AI%20assistants.txt)) |
 
-The apps add naming (OPSIN, openclatura), Word and PowerPoint objects (Windows), the Reactio Draw tab in Word (Windows and Mac), a local API for scripts and the `reactio` command line.
+The apps add naming (OPSIN, openclatura), Word and PowerPoint objects (Windows), the Reactio Draw tab in Word (Windows and Mac) and the `reactio` command line; the add-on adds the local API for scripts and MCP for AI assistants, which read and write files only in the folders you allow in the app (the command line is not limited).
 
 **On your own site:** Reactio Draw can be embedded in any web page (an ELN, a course page, a search form) and driven from its JavaScript: see [EMBEDDING.md](EMBEDDING.md) and the working example in `examples/embed.html`.
 
@@ -46,7 +47,7 @@ The apps add naming (OPSIN, openclatura), Word and PowerPoint objects (Windows),
 
 ## Privacy
 
-Reactio Draw makes no network requests of its own: no accounts, no tracking, no analytics, no fonts or scripts from other sites. Drawings, settings, labels and templates stay in your browser or on your computer. The only downloads are these: the web version is loaded from its site like any web page, and there the NMR tables are downloaded only when you agree, on the first Predict, and kept in the browser (clearing the site's data removes them); a link you click (GitHub, a DOI) opens in your browser. The apps download nothing.
+Reactio Draw makes no network requests of its own: no accounts, no tracking, no analytics, no fonts or scripts from other sites. Drawings, settings, labels and templates stay in your browser or on your computer. The only downloads are these: the web version is loaded from its site like any web page, and there the NMR tables are downloaded only when you agree, on the first Predict, and kept in the browser (clearing the site's data removes them); a link you click (GitHub, a DOI) opens in your browser; Check for updates (Info) asks GitHub for the newest release, only when you press it. The apps download nothing else.
 
 NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; the copied text says where the data come from, as the nmrshiftdb2 Database License asks.
 

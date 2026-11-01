@@ -175,6 +175,17 @@ func evalJS(js string) {
 	}
 }
 
+/* a folder dialog (Settings → Folders for AI assistants); "" when cancelled */
+func folderDialog(title string) string {
+	d := gtk_file_chooser_native_new(title, app.win, 2, "_Select", "_Cancel") // GTK_FILE_CHOOSER_ACTION_SELECT_FOLDER
+	path := ""
+	if gtk_native_dialog_run(d) == -3 {
+		path = goString(gtk_file_chooser_get_filename(d), true)
+	}
+	g_object_unref(d)
+	return path
+}
+
 /* a file dialog (GtkFileChooserNative: the desktop's own dialog where there is one); "" when cancelled */
 func fileDialog(save bool, title, name string) string {
 	action, accept := int32(0), "_Open"

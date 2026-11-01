@@ -98,10 +98,24 @@ func handle(s string) {
 		app.quitOK = true
 		gtk_widget_destroy(app.win)
 	case "apiStart":
+		// never from the command line: it runs beside the open app and must not take its api.json
+		if cliRequested() {
+			reply(r.ID, map[string]interface{}{"ok": false})
+			return
+		}
+		/* the local API only with the AI add-on installed (reactio-mcp beside the program) */
+		if !aiKitInstalled() {
+			reply(r.ID, map[string]interface{}{"ok": false, "noKit": true})
+			return
+		}
 		p := startLocalAPI()
 		reply(r.ID, map[string]interface{}{"ok": p > 0, "port": p})
+	case "aiKit":
+		reply(r.ID, map[string]interface{}{"installed": aiKitInstalled()})
 	case "apiStop":
-		stopLocalAPI()
+		if !cliRequested() {
+			stopLocalAPI()
+		}
 		reply(r.ID, map[string]interface{}{"ok": true})
 	case "apiResult":
 		apiDeliver(r.Name, r.Msg)
@@ -124,6 +138,32 @@ func handle(s string) {
 			}
 			replyLater(id, map[string]interface{}{"smiles": smi})
 		}(r.ID, r.Name)
+	case "aiFolders":
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+	case "aiFolderAdd":
+		if p := folderDialog("A folder the AI assistants may read and write"); p != "" {
+			list := allowedFolders()
+			has := false
+			for _, q := range list {
+				if q == p {
+					has = true
+				}
+			}
+			if !has {
+				list = append(list, p)
+				saveFolders(list)
+			}
+		}
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+	case "aiFolderRemove":
+		list := []string{}
+		for _, q := range allowedFolders() {
+			if q != r.Path {
+				list = append(list, q)
+			}
+		}
+		saveFolders(list)
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
 	case "cliDone":
 		cliDone(r.Msg)
 	case "link":
@@ -136,4 +176,15 @@ func handle(s string) {
 	default:
 		reply(r.ID, map[string]interface{}{"ok": false})
 	}
+}
+
+/* the AI add-on ("Reactio Draw — AI assistants") is installed: reactio-mcp lies beside the program. Without it the
+   local API never starts and its settings are not shown */
+func aiKitInstalled() bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(filepath.Dir(exe), "reactio-mcp"))
+	return err == nil && !st.IsDir()
 }

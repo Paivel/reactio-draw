@@ -40,7 +40,9 @@ func apiInfoPath() string {
 func startLocalAPI() int {
 	apiMu.Lock()
 	if apiLn != nil {
+		// already listening: write api.json again (another program may have replaced or removed it)
 		p := apiPort
+		writeAPIInfo(p)
 		apiMu.Unlock()
 		return p
 	}
@@ -61,9 +63,7 @@ func startLocalAPI() int {
 		logf("local API: no free port")
 		return 0
 	}
-	info, _ := json.Marshal(map[string]interface{}{"port": port, "token": apiToken, "url": fmt.Sprintf("http://127.0.0.1:%d/api", port), "pid": os.Getpid()})
-	os.MkdirAll(filepath.Dir(apiInfoPath()), 0755)
-	os.WriteFile(apiInfoPath(), info, 0600)
+	writeAPIInfo(port)
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -109,7 +109,7 @@ func startLocalAPI() int {
 		select {
 		case out := <-ch:
 			w.Write([]byte(out))
-		case <-time.After(180 * time.Second):
+		case <-time.After(1800 * time.Second):
 			w.WriteHeader(504)
 			w.Write([]byte(`{"ok":false,"error":"timed out"}`))
 		}
@@ -144,5 +144,18 @@ func stopLocalAPI() {
 		apiLn = nil
 	}
 	apiMu.Unlock()
+	// api.json goes only if it is this app's own
+	var m struct {
+		PID int `json:"pid"`
+	}
+	if b, err := os.ReadFile(apiInfoPath()); err == nil && json.Unmarshal(b, &m) == nil && m.PID != os.Getpid() {
+		return
+	}
 	os.Remove(apiInfoPath())
+}
+
+func writeAPIInfo(port int) {
+	info, _ := json.Marshal(map[string]interface{}{"port": port, "token": apiToken, "url": fmt.Sprintf("http://127.0.0.1:%d/api", port), "pid": os.Getpid()})
+	os.MkdirAll(filepath.Dir(apiInfoPath()), 0755)
+	os.WriteFile(apiInfoPath(), info, 0600)
 }

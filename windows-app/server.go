@@ -176,6 +176,9 @@ func initServer(w webview2.WebView) {
 		notimpl2, // GetClipboardData
 		windows.NewCallback(func(this, verb, msg, site, lindex, parent, rect uintptr) uintptr { // DoVerb
 			if int32(uint32(verb)) == -3 { // OLEIVERB_HIDE
+				if tab.on || tab.pending {
+					return S_OK
+				}
 				pShowWindow.Call(srv.hwnd, 0)
 				srv.shown = false
 				return S_OK
@@ -249,7 +252,8 @@ func initServer(w webview2.WebView) {
 			release(srv.stg)
 			srv.stg = stg
 			srv.kd = nil
-			startPage()
+			/* the page starts only when the object gets a window of its own (showEditor); usually it goes to a tab of the
+			   open window instead (embedtab.go) */
 			return S_OK
 		}),
 		windows.NewCallback(func(this, stg uintptr) uintptr { // Load
@@ -267,7 +271,6 @@ func initServer(w webview2.WebView) {
 				srv.pic.emfData = srv.emf
 			}
 			logf("Load: drawing %d bytes, picture %d bytes", len(srv.kd), len(srv.png))
-			startPage()
 			return S_OK
 		}),
 		windows.NewCallback(func(this, stg, same uintptr) uintptr { // Save
@@ -431,6 +434,41 @@ func writeNative(stg uintptr, full bool) bool {
 
 func showEditor() {
 	logf("DoVerb: show")
+	/* in a tab of the open Reactio Draw window (embedtab.go); a window of its own only when that cannot be. Word's
+	   call returns at once: finding (or starting) the window is done in the background */
+	if tab.on {
+		showInTab()
+		return
+	}
+	if !srv.pageStarted {
+		if tab.pending {
+			return
+		}
+		tab.pending = true
+		srv.shown = true
+		if srv.site != 0 {
+			comCall(srv.site, 6)    // ShowObject
+			comCall(srv.site, 7, 1) // OnShowWindow(TRUE)
+		}
+		go func() {
+			ok := reachMain()
+			srv.w.Dispatch(func() {
+				tab.pending = false
+				if srv.closing {
+					return
+				}
+				if !ok || !showInTab() {
+					logf("no Reactio Draw window: the object gets a window of its own")
+					showOwnWindow()
+				}
+			})
+		}()
+		return
+	}
+	showOwnWindow()
+}
+
+func showOwnWindow() {
 	startPage()
 	pShowWindow.Call(srv.hwnd, 3) // SW_MAXIMIZE
 	if ch := webview2.ChromiumOf(srv.w); ch != nil {
@@ -503,6 +541,7 @@ func closeFromContainer(save bool) {
 	if srv.closing {
 		return
 	}
+	tabGone()
 	srv.closing = true
 	if save {
 		saveToContainer()

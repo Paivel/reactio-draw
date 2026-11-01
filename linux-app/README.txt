@@ -18,7 +18,8 @@ Extras (optional)
   Paste name (systematic names to structures) needs Java 8 or newer:  sudo apt install default-jre
   Name it (structure to IUPAC name) needs Python 3.11 or newer with openclatura:
        python3 -m venv ~/.reactio-python && ~/.reactio-python/bin/pip install openclatura
-  Local API (scripts on this computer): turn it on in the Info tab; see "Local API.txt".
+  Local API and MCP (scripts and AI assistants on this computer): the separate download "Reactio Draw - AI assistants"
+       (./install-ai.sh there), then Info tab → API; see "Install with AI assistants.txt" in it.
   Command line: ./reactio (or reactio after install.sh) renders, converts and checks files without a window;
        reactio --help, and "Command line.txt".
 

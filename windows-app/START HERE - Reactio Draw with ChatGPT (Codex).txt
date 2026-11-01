@@ -1,0 +1,37 @@
+Reactio Draw with ChatGPT on Windows: start here
+
+Reactio Draw is a free chemical structure editor. With MCP, an AI agent draws in it, reads what is drawn, calculates
+properties, predicts NMR and copies reaction schemes from pictures. Everything runs on your computer.
+
+The plain ChatGPT chat cannot reach programs on your computer. Use Codex, OpenAI's agent: it comes with your ChatGPT
+plan (Plus, Pro, Business, Edu, Enterprise) and signs in with the same account.
+
+1. Keep both archives in your Downloads folder (do not unzip them yourself; Codex does it): the program,
+   ReactioDraw-Windows-x64.zip (or -ARM.zip), and this add-on for AI assistants, ReactioDraw-Windows-x64-AI-assistants.zip (or ReactioDraw-Windows-ARM-AI-assistants.zip).
+
+2. Install Codex, if you do not have it: the Codex app, or in PowerShell
+     powershell -ExecutionPolicy ByPass -c "irm https://chatgpt.com/codex/install.ps1 | iex"
+   then run  codex  and choose "Sign in with ChatGPT".
+
+3. In Codex, attach or point to the file "Install on Windows (for Codex).md" from this archive (it is inside the
+   "Reactio Draw - AI assistants" folder) and write:
+     Follow these instructions to install Reactio Draw with MCP on this computer.
+   Codex unzips the program into %LOCALAPPDATA%\Programs, connects it to Codex and adds the reactio-draw skill. It asks
+   before installing anything else (Java, Python). No administrator rights are needed.
+
+4. When Codex asks: in Reactio Draw, Info > API > tick "MCP", and Add a folder… for the folder Codex works in.
+
+5. Restart Codex and try:
+     Draw ibuprofen in Reactio Draw and give its exact mass.
+     Predict the 1H NMR of the structure on my Reactio Draw sheet.
+     Make a picture of a grid of these five compounds: …
+
+Files: Codex can read and write files through Reactio Draw only in the folders listed in Reactio Draw → Settings →
+API → "Folders for AI assistants" (empty until you add a folder). Only you
+can change that list.
+
+Without Codex, Reactio Draw works on its own as a normal editor: the program's download alone, without this add-on.
+To use Claude Desktop instead: double-click "Install AI assistants.cmd" in this add-on's folder.
+Windows 11 is needed. Reading structures from pictures atom by atom needs MolScribe installed apart (about 2 GB with
+PyTorch; "Install on Windows (for Codex).md", step 6c); without it, schemes are copied by fitting structures onto the
+picture. Text in pictures is read by Windows' own text recognition.

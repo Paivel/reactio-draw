@@ -1,0 +1,67 @@
+Reactio Draw — MCP (AI assistants)
+
+With MCP on, an AI assistant on this computer (Claude Desktop, Claude Code and other MCP clients) can draw in the open
+Reactio Draw window and read what is drawn there: draw a SMILES, a name or a reaction, list the structures with their
+SMILES, look at a picture of the sheet, calculate properties, name structures, predict NMR shifts, check and clean up
+the drawing, export it. You see every change on the sheet, and Ctrl+Z / Cmd+Z undoes it.
+
+Nothing goes to the network from Reactio Draw: the assistant's program talks to reactio-mcp, which passes the commands
+to the app on 127.0.0.1 (the local API, with its token). What the assistant itself sends to its own service is up to
+the assistant.
+
+Files: the assistant can read and write files only inside the folders listed in Reactio Draw → Info → API →
+"Folders for AI assistants" (empty until you add a folder), and only
+drawings, pictures and their data (.png, .svg, .mol, .sdf, .cdxml, .json, .reactio, .txt…). Hidden files and folders
+(.ssh, .zshrc…), the Library of the Mac and the AppData of Windows are never used. Only you can change the list, with
+"Add a folder…" (the app's own folder dialog) and "Remove"; no command of the assistant can.
+
+1. Turn it on
+   Reactio Draw → right panel → Info → tick "MCP". It turns the Local API on too. Untick it and the app refuses
+   every assistant command (scripts with the Local API still work while that box is ticked).
+
+2. Add Reactio Draw to the assistant
+   The program is reactio-mcp:
+     Mac:     /Applications/Reactio Draw.app/Contents/MacOS/reactio-mcp
+     Windows: reactio-mcp.exe in the folder Files (e.g. %LOCALAPPDATA%\Programs\Reactio Draw\Files\reactio-mcp.exe)
+     Linux:   reactio-mcp in the Reactio Draw folder
+
+   Claude Desktop, Mac: the installer offers it; or run "Connect Claude Desktop.command" (folder Files), then quit and reopen
+   Claude Desktop. Or by hand: Claude → Settings → Developer → Edit Config, and add to claude_desktop_config.json:
+     {
+       "mcpServers": {
+         "reactio-draw": { "command": "/Applications/Reactio Draw.app/Contents/MacOS/reactio-mcp" }
+       }
+     }
+   Claude Desktop, Windows: the installer offers it; or run "Connect Claude Desktop.cmd" (folder Files), or add the same entry with
+   the path of reactio-mcp.exe (backslashes doubled: "C:\\Users\\you\\AppData\\Local\\Programs\\Reactio Draw\\Files\\reactio-mcp.exe").
+   Claude Code:
+     claude mcp add reactio-draw -- "/Applications/Reactio Draw.app/Contents/MacOS/reactio-mcp"
+   Other MCP clients: a "stdio" server whose command is the path of reactio-mcp, with no arguments.
+
+3. Use it
+   Ask the assistant, for example: "Draw ibuprofen in Reactio Draw", "What is on my Reactio Draw sheet?",
+   "Predict the 1H NMR of the second structure", "Draw the esterification of ethanol with acetic acid".
+   If Reactio Draw is not open, reactio-mcp starts it and waits for it (MCP must be ticked there).
+
+Tools
+   view_drawing      a picture of the sheet, or of a part of it (for the assistant to look at)
+   place_reference   a figure to copy, laid under the drawing (a file or the clipboard)
+ In the background (the open sheet untouched, the app need not be open):
+   render_structure  a picture (PNG or SVG) of a structure     render_grid      a grid of structures, labelled a, b, c or by name
+   render_reaction   a picture of a reaction scheme           analyze_structure formula, masses, isotopes, cLogP, TPSA, R/S, E/Z
+   list_structures   the structures with index, SMILES, formula, MW
+   draw_smiles       draw a SMILES                 draw_name        draw a name (common or IUPAC)
+   draw_reaction     draw reaction SMILES          replace_drawing  replace the sheet (SMILES, Molfile, CDXML, CIF…)
+   get_properties    properties of a structure     calculate        formula, MW, exact mass of a SMILES
+   name_structure    IUPAC name (needs Python with openclatura)
+   predict_nmr       predicted 1H, 13C, 19F, 31P shifts (from nmrshiftdb2 data, nmrshiftdb2 Database License)
+   check_drawing     valence and drawing problems  clean_up         Clean Up Structure, 2D or Reaction
+   export_drawing    SMILES, Molfile, SDF, RXN, CDXML, XYZ, SVG
+   undo              undo the last change          reactio_command  any command of "Local API.txt"
+
+A skill for Claude Code, Codex and Claude Desktop (how to use these tools well, and to take structures and numbers only
+from Reactio Draw): the folder "reactio-draw" in "Skill for AI assistants"; INSTALL.md there says where it goes.
+
+Copying a figure: the assistant lays it under the drawing, finds its structures, texts and arrows, and draws the
+whole scheme in one step (see "Local API.txt", Copying a figure). With MolScribe installed apart (README; Mac and
+Windows) it can also read the structures atom by atom.

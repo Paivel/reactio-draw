@@ -14,7 +14,8 @@ Where it is:
   reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.xyz|.json|.svg|.png|.eps|.tiff | folder>
   reactio convert <input>  --format smi                             (no -o: text formats go to the screen)
   reactio convert molecule.cdx -o molecule.xyz             (3D coordinates for quantum chemistry: lowest MMFF94s+ conformer)
-  reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis of every structure
+  reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis, cLogP, TPSA, R/S and E/Z of
+                               every structure
   reactio nmr     <input>  [--nucleus 1H|13C|19F|31P]                predicted shifts (13C by default)
   reactio inchi   <input…>     InChI and InChIKey
   reactio check   <input…>     valence and drawing problems (exit code 3 when there are errors or warnings)
@@ -27,7 +28,7 @@ Where it is:
   drawings, one under another: reactio convert paper.docx -o all.cdxml
   Options: -o, --output  file or folder;  --format  output format when -o is a folder (or for the screen);
            --scale N  PNG size (3 by default);  --dpi N  TIFF resolution (600);  --style NAME  drawing style (ACS, Nature, RSC…);
-           --json  answers as JSON;  -V, --version  the version;  -h, --help  this text.
+           --json  answers as JSON (nmr, check and op always do);  -V, --version  the version;  -h, --help  this text.
   Exit codes: 0 done, 1 failed, 2 wrong command, 3 check found problems.
 
 Examples

@@ -3,12 +3,34 @@
 import Cocoa
 import WebKit
 import Network
+import Vision
+import ImageIO
 
 let GV = NSPasteboard.PasteboardType("com.microsoft.Art--GVML-ClipFormat")
 
 /* Command line: "ReactioDraw --cli <command> …" (the reactio script beside it in the app) runs the page without
    showing a window. The files named on the command line are read here and handed to the page with the arguments; the
    page answers with cliDone {out, err, code, writes}, and only the path after -o (or files inside that folder) is written. */
+/* The folders the AI assistants (reactio-mcp) may read and write, set in Info → API → Folders for AI assistants and kept
+   in allowed-folders.json beside api.json: added only through this app's own folder panel, taken off only by the user's
+   click; nothing that comes in through the API or MCP changes it. reactio-mcp applies the rules (mcp/folders.go). The
+   command line (reactio) is the user's own and is not limited by it. */
+let rdConfigDir = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Application Support/ReactioDraw").path
+/* the AI add-on ("Reactio Draw — AI assistants") is installed: reactio-mcp inside the app */
+func aiKitInstalled() -> Bool { FileManager.default.isExecutableFile(atPath: Bundle.main.bundlePath + "/Contents/MacOS/reactio-mcp") }
+func defaultFolders() -> [String] { return [] }  /* no folder until the user adds one */
+func allowedFolders() -> [String] {
+    guard let d = try? Data(contentsOf: URL(fileURLWithPath: rdConfigDir + "/allowed-folders.json")),
+          let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let f = o["folders"] as? [String] else { return defaultFolders() }
+    return f
+}
+func saveFolders(_ list: [String]) {
+    try? FileManager.default.createDirectory(atPath: rdConfigDir, withIntermediateDirectories: true)
+    if let d = try? JSONSerialization.data(withJSONObject: ["folders": list], options: [.prettyPrinted]) {
+        let p = rdConfigDir + "/allowed-folders.json"
+        try? d.write(to: URL(fileURLWithPath: p)); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: p)
+    }
+}
 let cliArgs: [String]? = CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--cli" ? Array(CommandLine.arguments.dropFirst(2)) : nil
 var cliOut = ""
 func cliErr(_ s: String) { FileHandle.standardError.write(s.data(using: .utf8) ?? Data()) }
@@ -160,11 +182,33 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
                 reply(id, ["tag": tag])
             } else { reply(id, [:]) }
         case "apiStart":
-            // the local API listens only after it is turned on in the page (Info tab), never by itself
+            // the local API listens only after it is turned on in the page (Info tab), never by itself; never from the
+            // command line, which runs beside the open app and must not take its api.json
+            if cliArgs != nil { reply(id, ["ok": false]); return }
+            /* only with the AI add-on installed (reactio-mcp inside the app): without it the API never starts */
+            if !aiKitInstalled() { reply(id, ["ok": false, "noKit": true]); return }
             if let w = web { LocalAPI.shared.start(web: w) }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.reply(id, ["ok": LocalAPI.shared.port > 0, "port": LocalAPI.shared.port]) }
         case "apiStop":
-            LocalAPI.shared.stop(); reply(id, ["ok": true])
+            if cliArgs == nil { LocalAPI.shared.stop() }
+            reply(id, ["ok": true])
+        case "aiKit":
+            reply(id, ["installed": aiKitInstalled()])
+        case "aiFolders":
+            reply(id, ["folders": allowedFolders()])
+        case "aiFolderAdd":
+            /* the only way a folder is added: this panel, chosen by the user */
+            let o = NSOpenPanel(); o.canChooseDirectories = true; o.canChooseFiles = false; o.allowsMultipleSelection = false; o.canCreateDirectories = true
+            o.message = "A folder the AI assistants may read and write"
+            if o.runModal() == .OK, let u = o.url {
+                var list = allowedFolders()
+                if !list.contains(where: { $0.lowercased() == u.path.lowercased() }) { list.append(u.path); saveFolders(list) }
+            }
+            reply(id, ["folders": allowedFolders()])
+        case "aiFolderRemove":
+            let p = (m["path"] as? String ?? "").lowercased()
+            saveFolders(allowedFolders().filter { $0.lowercased() != p })
+            reply(id, ["folders": allowedFolders()])
         case "cliDone":
             cliDone(m["msg"] as? String ?? "")
         case "apiResult":
@@ -182,6 +226,41 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             Opsin.queue.async {
                 let r = Opsin.shared.smiles(for: name)
                 DispatchQueue.main.async { self.reply(id, r) }
+            }
+        case "ocr":
+            // the text lines of a picture (macOS Vision, on this Mac): each with its box in the picture's pixels, top-left origin
+            let b64 = m["b64"] as? String ?? ""
+            DispatchQueue.global(qos: .userInitiated).async {
+                var out: [[String: Any]] = []
+                var err: String? = nil
+                if let d = Data(base64Encoded: b64), let src = CGImageSourceCreateWithData(d as CFData, nil),
+                   let img = CGImageSourceCreateImageAtIndex(src, 0, nil) {
+                    let w = Double(img.width), h = Double(img.height)
+                    let req = VNRecognizeTextRequest()
+                    req.recognitionLevel = .accurate
+                    req.usesLanguageCorrection = false
+                    do {
+                        try VNImageRequestHandler(cgImage: img, options: [:]).perform([req])
+                        let obs = (req.results as? [VNRecognizedTextObservation]) ?? []
+                        for o in obs {
+                            guard let c = o.topCandidates(1).first else { continue }
+                            let bb = o.boundingBox
+                            out.append(["text": c.string, "conf": Double(c.confidence),
+                                        "x0": Double(bb.minX) * w, "y0": (1 - Double(bb.maxY)) * h,
+                                        "x1": Double(bb.maxX) * w, "y1": (1 - Double(bb.minY)) * h])
+                        }
+                    } catch { err = "\(error)" }
+                } else { err = "the picture could not be read" }
+                DispatchQueue.main.async {
+                    if let e = err { self.reply(id, ["ok": false, "error": e]) } else { self.reply(id, ["ok": true, "lines": out]) }
+                }
+            }
+        case "ocsr":
+            // structures read from boxes of a picture by MolScribe, when it is installed apart (reactio_ocsr.py, README)
+            let req: [String: Any] = ["b64": m["b64"] as? String ?? "", "boxes": (m["boxes"] as? [Any]) ?? [Any]()]
+            DispatchQueue.global(qos: .userInitiated).async {
+                let ans = OCSR.run(req)
+                DispatchQueue.main.async { self.reply(id, ans) }
             }
         default: reply(id, ["ok": false])
         }
@@ -337,6 +416,47 @@ final class Opsin {
 }
 
 
+/* Structures read from a picture: MolScribe (MIT, https://github.com/thomas0809/MolScribe), installed apart in a Python of
+   its own (~/.reactio-ocsr), through reactio_ocsr.py (in the app's Resources): one JSON request in, one JSON answer out */
+enum OCSR {
+    static func run(_ req: [String: Any]) -> [String: Any] {
+        guard let script = Bundle.main.path(forResource: "reactio_ocsr", ofType: "py") else { return ["ok": false, "error": "reactio_ocsr.py is missing: reinstall Reactio Draw"] }
+        guard let body = try? JSONSerialization.data(withJSONObject: req) else { return ["ok": false, "error": "the request could not be written"] }
+        let home = NSHomeDirectory()
+        var c: [String] = []
+        if let p = ProcessInfo.processInfo.environment["REACTIO_OCSR_PYTHON"] { c.append(p) }
+        c.append(home + "/.reactio-ocsr/bin/python3")
+        c.append(home + "/.reactio-python/bin/python3")
+        let pys = c.filter { FileManager.default.isExecutableFile(atPath: $0) }
+        if pys.isEmpty { return ["ok": false, "error": "structure recognition needs MolScribe in ~/.reactio-ocsr. In Terminal: python3.10 -m venv ~/.reactio-ocsr && ~/.reactio-ocsr/bin/pip install \"numpy<2\" torch MolScribe huggingface_hub (Python 3.10: there is no torch 1.x for 3.11 or newer; numpy 2 stops torch with 'Numpy is not available'). A Python that already has MolScribe can be linked instead: ln -s <its venv folder> ~/.reactio-ocsr"] }
+        var last = ""
+        for py in pys {
+            let p = Process(); p.executableURL = URL(fileURLWithPath: py); p.arguments = ["-u", script]
+            var env = ProcessInfo.processInfo.environment; env["PYTHONIOENCODING"] = "utf-8"; p.environment = env
+            let i = Pipe(), o = Pipe(), e = Pipe(); p.standardInput = i; p.standardOutput = o; p.standardError = e
+            do { try p.run() } catch { last = "\(error)"; continue }
+            var outData = Data(), errData = Data()
+            let g = DispatchGroup()
+            g.enter(); DispatchQueue.global().async { outData = o.fileHandleForReading.readDataToEndOfFile(); g.leave() }
+            g.enter(); DispatchQueue.global().async { errData = e.fileHandleForReading.readDataToEndOfFile(); g.leave() }
+            i.fileHandleForWriting.write(body); try? i.fileHandleForWriting.close()
+            // the first run downloads the model: up to ten minutes
+            if g.wait(timeout: .now() + 600) == .timedOut { p.terminate(); return ["ok": false, "error": "structure recognition took too long"] }
+            p.waitUntilExit()
+            let txt = String(decoding: outData, as: UTF8.self)
+            if let line = txt.split(separator: "\n").last, let d = line.data(using: .utf8),
+               let ans = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
+                if ans["ok"] as? Bool == true { return ans }
+                last = ans["error"] as? String ?? "failed"
+                continue
+            }
+            let err = String(decoding: errData, as: UTF8.self).split(separator: "\n").suffix(3).joined(separator: " ")
+            last = err.isEmpty ? "no answer from " + py : err
+        }
+        return ["ok": false, "error": last]
+    }
+}
+
 /* Structure → name: openclatura (MIT, https://github.com/lamalab-org/openclatura) in the Mac's own Python, unchanged, through
    reactio_name.py (in the app's Resources): it stays running, one SMILES line in, one JSON line out */
 final class Namer {
@@ -355,7 +475,8 @@ final class Namer {
         c.append(home + "/.reactio-python/bin/python3")
         /* the Python the user's own terminal finds (a Mac app does not get the terminal's PATH) */
         let sh = Process(); sh.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        sh.arguments = ["-lic", "for n in python3.14 python3.13 python3.12 python3.11 python3; do whence -ap $n; done 2>/dev/null; for q in $(whence -ap pip3 pip 2>/dev/null); do head -1 \"$q\" 2>/dev/null; echo; done"]
+        /* a login shell, not an interactive one: ~/.zshrc (and whatever it runs) is not run by the app */
+        sh.arguments = ["-lc", "for n in python3.14 python3.13 python3.12 python3.11 python3; do whence -ap $n; done 2>/dev/null; for q in $(whence -ap pip3 pip 2>/dev/null); do head -1 \"$q\" 2>/dev/null; echo; done"]
         let so = Pipe(); sh.standardOutput = so; sh.standardError = FileHandle.nullDevice; sh.standardInput = FileHandle.nullDevice
         if (try? sh.run()) != nil {
             let t = Date().addingTimeInterval(8); while sh.isRunning && Date() < t { usleep(50000) }
@@ -363,7 +484,7 @@ final class Namer {
             let out = String(decoding: so.fileHandleForReading.readDataToEndOfFile(), as: UTF8.self)
             for l in out.split(separator: "\n") { let x = l.trimmingCharacters(in: .whitespaces); if x.hasPrefix("/") { c.append(x) } else if x.hasPrefix("#!/") { let i = String(x.dropFirst(2)).split(separator: " ").first.map(String.init) ?? ""; if !i.hasSuffix("/env") { c.append(i) } } }
         }
-        for b in ["/opt/homebrew/bin", "/usr/local/bin"] { for n in ["python3.14", "python3.13", "python3.12", "python3.11", "python3"] { c.append(b + "/" + n) } }
+        for b in ["/opt/homebrew/bin", "/usr/local/bin", home + "/miniconda3/bin", home + "/anaconda3/bin", home + "/miniforge3/bin", home + "/mambaforge/bin"] { for n in ["python3.14", "python3.13", "python3.12", "python3.11", "python3"] { c.append(b + "/" + n) } }
         let pyenv = home + "/.pyenv/versions"
         if let vs = try? FileManager.default.contentsOfDirectory(atPath: pyenv) { for v in vs.sorted(by: >) { c.append(pyenv + "/" + v + "/bin/python3") } }
         for v in ["3.14", "3.13", "3.12", "3.11"] { c.append("/Library/Frameworks/Python.framework/Versions/\(v)/bin/python3") }
@@ -435,7 +556,8 @@ final class LocalAPI {
     var port = 0
     func start(web: WKWebView) {
         self.web = web
-        if listener != nil { return }
+        // already listening: write api.json again (another program may have replaced or removed it)
+        if listener != nil { if port > 0 { writeInfo(port) }; return }
         token = (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
         tryPort(47615)
     }
@@ -451,9 +573,7 @@ final class LocalAPI {
             switch st {
             case .ready:
                 self.port = Int(p)
-                let info: [String: Any] = ["port": Int(p), "token": self.token, "url": "http://127.0.0.1:\(p)/api", "pid": Int(ProcessInfo.processInfo.processIdentifier)]
-                try? FileManager.default.createDirectory(at: self.infoURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-                if let d = try? JSONSerialization.data(withJSONObject: info) { try? d.write(to: self.infoURL); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: self.infoURL.path) }
+                self.writeInfo(Int(p))
             case .failed(_):
                 l.cancel(); DispatchQueue.main.async { self.tryPort(p + 1) }
             default: break
@@ -464,7 +584,19 @@ final class LocalAPI {
         listener = l
     }
 
-    func stop() { listener?.cancel(); listener = nil; port = 0; try? FileManager.default.removeItem(at: infoURL) }
+    func writeInfo(_ p: Int) {
+        let info: [String: Any] = ["port": p, "token": token, "url": "http://127.0.0.1:\(p)/api", "pid": Int(ProcessInfo.processInfo.processIdentifier)]
+        try? FileManager.default.createDirectory(at: infoURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        if let d = try? JSONSerialization.data(withJSONObject: info) { try? d.write(to: infoURL); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: infoURL.path) }
+    }
+
+    // api.json goes only if it is this app's own (not one another copy of the app wrote)
+    func stop() {
+        listener?.cancel(); listener = nil; port = 0
+        if let d = try? Data(contentsOf: infoURL), let m = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
+           (m["pid"] as? Int) != Int(ProcessInfo.processInfo.processIdentifier) { return }
+        try? FileManager.default.removeItem(at: infoURL)
+    }
 
     func accept(_ c: NWConnection) {
         c.start(queue: .main)
@@ -536,13 +668,21 @@ final class LocalAPI {
         // pair is ["id","op"]; the page gets (id, op, args)
         let js = "(function(p){window.__rdApiCall&&window.__rdApiCall(p[0],p[1],\(args));})(\(pair))"
         web?.evaluateJavaScript(js, completionHandler: nil)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 180) { [weak self] in
+        // a long command (a batch fitting many structures) may take minutes: the answer is waited for up to 30 min
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1800) { [weak self] in
             if let w = self?.waits.removeValue(forKey: id) { self?.send(w, "504 Gateway Timeout", "{\"ok\":false,\"error\":\"timed out\"}") }
         }
     }
 
     func deliver(_ id: String, _ out: String) {
         if let c = waits.removeValue(forKey: id) { send(c, "200 OK", out) }
+    }
+
+    // the page was loaded again (reloaded, or the window opened anew): the commands it was working on will never answer
+    func failWaiting(_ why: String) {
+        guard let d = try? JSONSerialization.data(withJSONObject: ["ok": false, "error": why]), let s = String(data: d, encoding: .utf8) else { return }
+        for (_, c) in waits { send(c, "200 OK", s) }
+        waits.removeAll()
     }
 }
 
@@ -576,6 +716,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     /* the command line: the page in a window nobody sees (transparent, ignores the mouse, not in the Dock) */
     func startCli(_ args: [String]) {
         let cfg = WKWebViewConfiguration()
+        // a storage of its own that is thrown away: the command line never touches the open app's documents or settings
+        cfg.websiteDataStore = .nonPersistent()
         cfg.userContentController.add(bridge, name: "rd")
         cfg.userContentController.addUserScript(WKUserScript(source: cliScript(args), injectionTime: .atDocumentStart, forMainFrameOnly: true))
         let rect = NSRect(x: 0, y: 0, width: 1200, height: 800)
@@ -607,7 +749,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         flushFiles()
         sender.reply(toOpenOrPrint: .success)
     }
-    func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) { loaded = true; flushFiles() }
+    func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) { loaded = true; flushFiles(); LocalAPI.shared.failWaiting("the page was loaded again before it answered: the command may have been done in part; look at the sheet before sending it again") }
     func flushFiles() {
         guard loaded, let web = web else { return }
         let list = pending; pending = []

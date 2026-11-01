@@ -1,0 +1,110 @@
+Reactio Draw with AI assistants (MCP): installing, step by step
+
+What you get: an AI assistant on your computer (Claude Desktop, Claude Code, Codex or another MCP client) draws in the
+open Reactio Draw window, reads what is drawn, calculates properties, predicts NMR, copies schemes from pictures and
+makes structure pictures in the background. Everything runs on your computer; Reactio Draw sends nothing to the network.
+
+Python is NOT needed for MCP. It is needed only for two extras (step 5): IUPAC names of drawn structures, and reading
+structures from pictures with MolScribe (Mac and Windows).
+
+
+1. Install Reactio Draw, then this add-on
+
+   Reactio Draw itself is the download "Reactio Draw" (ReactioDraw-Mac.zip, ReactioDraw-Windows-x64.zip…): install
+   it first, as its README says. This download, "Reactio Draw - AI assistants", is added on top of it: without it
+   Reactio Draw has no local API and no MCP at all.
+
+   Mac
+   - Double-click "Install AI assistants.command" (at the top of this folder). If macOS says it cannot check the
+     file: System Settings > Privacy & Security > Open Anyway (older macOS: right-click > Open).
+   - It puts reactio-mcp, the program assistants talk to, into Reactio Draw.app, and offers the connection to Claude
+     Desktop. Building Reactio Draw again later keeps it.
+
+   Windows 11
+   - Double-click "Install AI assistants.cmd": it puts reactio-mcp.exe beside the installed program (the folder Files
+     of Reactio Draw) and offers the connection to Claude Desktop.
+
+   Linux
+   - In a terminal, in this folder: ./install-ai.sh. It puts reactio-mcp beside ReactioDraw (installed with
+     ./install.sh). Connect the assistant to that reactio-mcp as step 3 says for Claude Code.
+
+   To take it away again: "Remove AI assistants.command" (Mac), "Remove AI assistants.cmd" (Windows) or
+   ./remove-ai.sh (Linux).
+
+
+2. Turn MCP on in Reactio Draw, and choose its folders
+
+   Close and open Reactio Draw, then Info > API: tick "MCP" (it turns the Local API on too). Untick it and
+   assistants are refused. Under "Folders for AI assistants", Add a folder… for each folder the
+   assistant may read and write: none until you add one, and only you can change the list.
+   If an assistant ever says Reactio Draw does not answer, untick and tick MCP again.
+
+
+3. Add Reactio Draw to the assistant
+
+   Claude Desktop
+   - "Install AI assistants" offers it (Mac and Windows). Later, or again: "Connect Claude Desktop.command" (Mac, in
+     the folder Files of this download) or "Connect Claude Desktop.cmd" (Windows, beside the installed program).
+   - Quit Claude Desktop completely and open it again. Reactio Draw's tools appear under the tools button of a chat.
+
+   Claude Code (Terminal)
+     Mac:      claude mcp add reactio-draw -- "/Applications/Reactio Draw.app/Contents/MacOS/reactio-mcp"
+     Windows (command prompt):  claude mcp add reactio-draw -- "%LOCALAPPDATA%\Programs\Reactio Draw\Files\reactio-mcp.exe"
+
+   Codex: in ~/.codex/config.toml
+     [mcp_servers.reactio-draw]
+     command = "/Applications/Reactio Draw.app/Contents/MacOS/reactio-mcp"
+
+   Other MCP clients: a "stdio" server whose command is the path of reactio-mcp, with no arguments.
+
+
+4. Add the skill (recommended)
+
+   The folder "Skill for AI assistants" holds the reactio-draw skill: it tells the assistant how to use Reactio Draw well
+   and to take structures and numbers only from it, never from memory. INSTALL.md there says where it goes:
+   Claude Code ~/.claude/skills, Codex ~/.codex/skills, Claude Desktop Settings > Capabilities > Skills (upload a zip of
+   the folder).
+
+   Try it: "Draw ibuprofen in Reactio Draw and give its exact mass", "Predict the 1H NMR of the structure on my sheet".
+
+
+5. Optional extras
+
+   a) Names: SMILES from a name (OPSIN) needs Java 8 or newer (e.g. Eclipse Temurin, adoptium.net). Common names work
+      without it.
+
+   b) IUPAC names of drawn structures (name_structure): Python 3.11 or newer with openclatura.
+        Mac:      python3.13 -m venv ~/.reactio-python && ~/.reactio-python/bin/pip install openclatura
+        Windows:  install Python 3.11+ from python.org, then in a command prompt: py -m pip install openclatura
+
+   c) Reading structures from pictures (recognizeStructures): MolScribe in a Python 3.10 of its own.
+      It is large (PyTorch about 1 GB and a model of about 1.1 GB), so it is not part of Reactio Draw.
+      An environment already there is checked first (its python imports numpy, torch and molscribe): it is not
+      reinstalled because pip is missing. The model is read from MOLSCRIBE_CKPT, else .reactio-ocsr/molscribe.pth,
+      else .reactio-ocsr/models/molscribe.pth, and downloaded only when none is there.
+      Mac:
+        python3.10 -m venv ~/.reactio-ocsr
+        ~/.reactio-ocsr/bin/pip install "numpy<2" torch MolScribe huggingface_hub
+      Python 3.10 exactly (there is no torch 1.x for 3.11 or newer) and numpy below 2 (numpy 2 stops torch).
+      No python3.10? Install it from python.org or with Homebrew: brew install python@3.10.
+      A Python that already has MolScribe can be linked instead: ln -s <its venv folder> ~/.reactio-ocsr
+      Check it: double-click "Check structure recognition.command" (in the folder "Files"): it reads a test picture
+      and offers to install MolScribe if it is missing. The first run downloads the model (a few minutes).
+      Windows (Python 3.10 from python.org, "py" launcher ticked), in a command prompt:
+        py -3.10 -m venv %USERPROFILE%\.reactio-ocsr
+        %USERPROFILE%\.reactio-ocsr\Scripts\python.exe -m pip install "numpy<2" torch MolScribe huggingface_hub
+      then close and open Reactio Draw (the user closes it: never by force). Check the whole path: place_reference
+      with a known structure, recognizeStructures without draw, look at what it read, then draw.
+      MolScribe reads plain structures: on mechanisms it may take orbitals and electron pairs for atoms, and a high
+      confidence does not prove the chemistry right.
+      Text in pictures (recognizeText) needs nothing: macOS and Windows read it themselves.
+      Without MolScribe, assistants still copy schemes by fitting structures onto the picture.
+
+
+If something does not work
+
+   - "Reactio Draw is not open, or MCP is off": open Reactio Draw and tick Info > MCP (untick and tick it if it is on).
+   - The tools do not show in Claude Desktop: quit it completely (Cmd+Q / from the tray) and open it again.
+   - Pictures and analyses in the background (render_structure, render_grid, render_reaction, analyze_structure) need
+     Reactio Draw installed, not open.
+   - More: MCP.txt (the tools), "Local API.txt" (every command), "Command line.txt".

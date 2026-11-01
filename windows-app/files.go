@@ -38,7 +38,12 @@ func fileArgs() [][3]string {
 // true when another main window of Reactio Draw is already running (this one then hands its files over)
 func otherInstance() bool {
 	h, _, err := pCreateMutexW.Call(0, 0, uintptr(unsafe.Pointer(u16("Local\\ReactioDrawMainWindow"))))
-	return h != 0 && err == windows.ERROR_ALREADY_EXISTS
+	if h != 0 && err == windows.ERROR_ALREADY_EXISTS {
+		/* only the first window holds it: when that one closes, the next one started becomes the first */
+		windows.CloseHandle(windows.Handle(h))
+		return true
+	}
+	return false
 }
 
 func inboxDir() string { return filepath.Join(app.base, "inbox") }
@@ -60,7 +65,7 @@ func watchInbox() {
 		for _, n := range names {
 			b, err := os.ReadFile(n)
 			os.Remove(n)
-			if err != nil {
+			if err != nil || embedInbox(b) {
 				continue
 			}
 			var f [3]string

@@ -16,44 +16,455 @@ It contains {"url": "http://127.0.0.1:47615/api", "token": "...", "port": 47615}
 Request: POST <url>, header X-Reactio-Token: <token>, JSON body {"op": "<command>", "args": {...}}
 Answer:  {"ok": true, "result": ...}  or  {"ok": false, "error": "..."}
 
-Useful commands
-  calc            {"smiles": "CCO"}                      formula, charge, MW, exact mass, [M+H]+ (nothing is drawn)
-  smilesFromName  {"name": "2-acetyloxybenzoic acid"}    SMILES from a name (common names built in; others by OPSIN, which needs Java)
-  addName         {"name": "...", "x": 300, "y": 200}    draws the structure for a name
-  addSmiles       {"smiles": "...", "x": 300, "y": 200}  draws a SMILES (R/S from @/@@ become wedges; a CXSMILES
-                                                       part such as |&1:1| sets stereo groups)
-  name            {"index": 0}  or  {"smiles": "..."}    IUPAC name (openclatura; needs Python with openclatura),
-                                                         checkedByOpsin = the name reads back as the same structure
-  nmr             {"nucleus": "13C", "index": 0}  or  {"nucleus": "1H", "smiles": "..."}
-                                                         predicted shifts (1H, 13C, 19F, 31P) with typical errors (offline)
-  list, properties {"index": 0}, scheme, table, export {"format": "smiles|mol|sdf|rxn|cdxml|xyz|svg|json"}
-                                                         the structures, their properties, the scheme, the reagent table, a file
-  inchi           {"index": 0}  or  {"smiles": "..."}    InChI and InChIKey (InChI library, built in)
-  prefixStyle     {"mode": "plain|italic|sup"}         t, i, s, n of tBu, iPr… plain, italic or italic superscript
-  picture         {"scale": 1}                         the drawing as a PNG picture (base64)
-  set             {"text": "...", "format": "mol"}      replaces the whole drawing (format found from the text if left out)
-  image           {"text": "CCO", "output": "svg|png"}  a picture of any structure or reaction, the sheet untouched
-  selection, select {"index": 0} / {"all": true} / {}    what is selected; select structures, all, or nothing
-  atoms           {"index": 0}                         the atoms of a structure, numbered from 1
-  highlight       {"index": 0, "atoms": [1, 2], "color": "#ffcc00"}  colour atoms and their bonds ({"clear": true} removes)
-  check                                                valence errors, unreadable labels and structure checks
-                                                       (problems[].other: {n, element, issue, level}; level is err, warn
-                                                       or hint; ok is false only for errors and warnings)
-  saved, markSaved                                     unsaved changes?  /  mark as saved
-  zoom            {"value": 1.5} or {"fit": true}       zoom (1 = 100 %) or fit the drawing in the window
+Commands (help {"op": "<command>"} gives every argument; an argument a command does not take is an error)
+
+Basics
+  help            {"op": "addScheme"}                  a command's arguments; help alone lists the commands;
+                                                       {"op": "guide"}: how to copy a figure, step by step
+  version                                              the name and version of Reactio Draw
+  undo, redo                                           every command is one undo step; the answer says what was undone
+  batch           {"ops": [{"op": "move", "args": {...}}, {"op": "delete", "id": 12}], "stopOnError": false}
+                                                       several commands as one undo step (arguments in "args" or beside
+                                                       "op"); answers the errors, the ids made and each command's answer
+                                                       in "results" (pictures left out; "results": false for none);
+                                                       through the MCP, {"path": "ops.json"} reads the ops from a file
+                                                       A command from outside that runs for more than a second shows a
+                                                       bar over the sheet (the command, its step, the time) with Stop: a
+                                                       batch stops between its commands, fitToReference between its
+                                                       structures, and says so ("stopped"); what was done stays.
+                                                       Through the MCP: {"op": "result", "args": {"cancel": true}} stops
+                                                       waiting for a long command.
+  saved, markSaved                                     unsaved changes? / mark the drawing as saved
   readOnly        {"on": true}                         view only (toolbars hidden, nothing can be changed)
-  addChart        {"slices": [{"label": "A", "value": 3}, {"label": "B", "value": 1}], "x": 300, "y": 200}
-                                                       a product-ratio chart (also size, hole, legend, percentages…)
-  addRadar        {"axes": [{"label": "H2O", "value": 80}, ...], "x": 300, "y": 200}
-                                                       a sensitivity screen (also size, min, max, step, shape, zones…)
-  export          {"format": "xyz", "maxConformers": 20, "maxSeconds": 30}
-                                                       3D coordinates for quantum chemistry: hydrogens added, lowest
-                                                       MMFF94s+ conformer, charge and multiplicity in each comment line
-  enumerate       {"index": 0}                         draws every compound of a Markush structure (lists as texts: R1 = H, Me)
-  decompose       {"scaffold": 0, "compounds": [1, 2]}  writes the R-group lists of a series (Collect into Markush); compounds: all others if left out
-  clean           {"what": "reaction"} or {"flat": true}  Clean Up Reaction, Clean Up 2D (flat), or Clean Up Structure ({})
-  addReaction, addText, import, delete, clear, undo, redo, setStyle, setRole, setAmount, help, version (the name and version of Reactio Draw)
-  Every SMILES in the answers carries the drawn stereochemistry: @/@@ from wedges and hashes, / and \ for E/Z.
+  zoom            {"value": 1.5} or {"fit": true}      zoom (1 = 100 %) or fit the drawing in the window
+
+Documents
+  newDocument     {"name": "Compare"}                  a new empty document in its own tab, shown at once
+  documents                                            the open documents and which one is shown
+  openDocument    {"id": "…"} or {"name": "…"}         show another one; the commands work on the document shown
+  closeDocument   {"id": "…"} or {"name": "…"}         close one without asking (none given: the one shown);
+                                                       newDocument gives an error when no tab more fits
+  set             {"text": "...", "format": "mol"}     replace the whole sheet (format found from the text if left out)
+  import          {"text": "...", "format": "cdxml"}   add a file's content to the sheet
+  export          {"format": "smiles|mol|sdf|rxn|cdxml|xyz|svg|json"}   the drawing as a file text; xyz: 3D for
+                                                       quantum chemistry (hydrogens added, lowest MMFF94s+ conformer;
+                                                       maxConformers 20, maxSeconds 30)
+  clear           {"keepReference": true}              empty the sheet (keepReference: the figure laid last stays)
+                  {"resetIds": true}                   … and the ids start again at 1 (a figure kept becomes 1)
+
+Reading the sheet
+  list                                                 the structures: index, id, SMILES (stereo as drawn), formula, MW, role, box
+  objects         {"type": "text", "ids": [...], "fields": ["id", "box"]}   every object (structures, arrows, + signs,
+                                                       texts, shapes, pictures, charts) with type, id and box
+                                                       ("image" or "picture" for pictures)
+  atoms           {"index": 0, "fields": ["n", "x", "y"]}   the atoms of a structure numbered from 1 as made (as written
+                                                       in the SMILES or Molfile), with x, y and their bonds (to, order, style)
+  properties      {"index": 0}                         formula, masses, elemental analysis and more
+  scheme, table                                        the reaction scheme in order; the reagent table
+  selection, select {"index": 0} / {"all": true} / {}  what is selected; select structures, all, or nothing
+  check           {} or {"layout": true}               valence errors, unreadable labels and structure checks
+                                                       ("shortStereo": a wedge or hash whose visible part is
+                                                       under 10 units, which reads as a wedge; "stereoProblems": a
+                                                       wedge or hash with its wide end at the stereocentre, on an atom
+                                                       that is no stereocentre, two in a chain, two of one kind at a
+                                                       centre with three bonds — setBond answers them too;
+                                                       "tightAngles": open-chain atoms whose bonds stand under 55°
+                                                       apart, an acetyl folded onto itself); layout skips an
+                                                       orbital on its own atom and a line or arc tied to atoms
+                                                       (overlaps of a structure are measured by its bonds and letters,
+                                                       not its box; problems[].other: {n, element, issue, level}; level err, warn or
+                                                       hint; ok is false only for errors and warnings); layout: true
+                                                       gives the overlaps of structures, arrows and texts (not the
+                                                       figure, orbitals on their atom or curved arrows at atoms;
+                                                       "ignore": [ids])
+  picture         {"scale": 1, "region": [x0, y0, x1, y1]}   a PNG (base64) of the sheet, or of a part: region, or
+                                                       round some objects ("ids") or structures ("index": [0, 2])
+
+Chemistry without drawing
+  calc            {"smiles": "CCO"}                    formula, charge, MW, exact mass, [M+H]+
+  smilesFromName  {"name": "2-acetyloxybenzoic acid"}  SMILES from a name (common names built in; others by OPSIN, needs Java)
+  name            {"index": 0} or {"smiles": "..."}    IUPAC name (openclatura, needs Python with openclatura);
+                                                       checkedByOpsin = the name reads back as the same structure
+  inchi           {"index": 0} or {"smiles": "..."}    InChI and InChIKey (InChI library, built in)
+  nmr             {"nucleus": "13C", "index": 0}       predicted shifts (1H, 13C, 19F, 31P) with typical errors (offline);
+                                                       per signal atomNumbers, sphere (bonds round the atom matched, 1-5)
+                                                       and references (measured shifts behind it)
+  image           {"text": "CCO", "output": "svg|png", "style": "nature"}   a picture of any structure or reaction, the
+                                                       sheet untouched; {"items": ["CCO", {"smiles": "…", "name": "…"}],
+                                                       "labels": "letters|names|none", "columns": 3}: a grid of structures;
+                                                       {"reaction": {addReaction's arguments}}: a reaction scheme
+  analyze         {"smiles": "..."} or {"index": 0}    formula, masses, [M+H]+, elemental analysis, isotope pattern, cLogP,
+                                                       TPSA, H-bond donors and acceptors, rotatable bonds, rule of five,
+                                                       stereocentres and stereo double bonds (R/S, E/Z, specified or not)
+
+Drawing
+  addSmiles       {"smiles": "...", "x": 300, "y": 200, "alias": {"1": "MeO"}}   a SMILES (@/@@ become wedges; CXSMILES
+                                                       |&1:…| sets stereo groups, |$MeO;;$| labels atoms; [*:1] with alias)
+  addName         {"name": "...", "x": 300, "y": 200}  the structure of a name
+  addReaction     {"smiles": "A.B>agents>C"} or reactants, products, above, below, "labels": [["1a", "(1.0 equiv.)"]],
+                  arrowLength, gap, fontSize            a reaction: arrow as long as its texts, labels under the compounds
+  addText         {"text": "\\b{1a}", "x": 120, "y": 340, "align": "center", "size": 25, "color": "#000"}   answers its
+                                                       id and box; rich text \\b{bold} \\i{italic} \\u{underline} _{sub}
+                                                       ^{sup} \\c[#e8251f]{coloured} (also in atom labels); "bold",
+                                                       "italic", "underline": true for the whole text (also setText,
+                                                       true or false, and addScheme texts); atom letters bold: setAtom
+                                                       {"bold": true}, addScheme "boldLabels"; "lines": [...]
+                                                       for several lines; "above" / "below": {"letter": 2, "text": "O",
+                                                       "bond": 2}: a group on one of its letters (K–P(=O)Ph2 as
+                                                       "KPPh_{2}"); "arrow": id, "place":
+                                                       "above" | "below", "line": 1, 2… puts it over or under an arrow's
+                                                       middle, the same gap off it, and it goes with the arrow (also
+                                                       addScheme texts [{text, arrow: "tag", place}]); "gap": the room
+                                                       off the arrow in line heights (0.5 if left out)
+  addArrow        {"from": [x, y], "to": [x, y]} or {"points": [[x, y], ...]}, "head": "filled", "tail", "type"
+                                                       head and tail: filled, open, half, harpoon (a thin barb), none; type: forward,
+                                                       equilibrium, retro, dashed, hollow, wavy; setArrow {"id", …} changes one.
+                                                       An unequal equilibrium: "favored": "forward" or "reverse" (the other half
+                                                       arrow shorter).
+                                                       An end on a text: {"text": id, "at": "upper-left" | top | upper-right
+                                                       | right | lower-right | bottom | lower-left | left} (just off its
+                                                       letters, tied to it). objects gives each arrow's from, to, curve,
+                                                       bend, side, head, kind and what it is tied to
+  addBracket      {"type": "}", "x": 240, "y1": 220, "y2": 320, "width": 22}   a brace, bracket or parenthesis;
+                                                       {} [] () with x2 for a pair; {"type": "chargeCorner", "structure":
+                                                       id, "charge": "+"}: the charge corner ⌉ of a whole species at its
+                                                       right, its shelf level with the uppermost atom there (raised off
+                                                       bonds and letters), its side a third of the structure ("arm", "drop";
+                                                       "box" places it, the structure's signs are still hidden), its sign
+                                                       outside (it goes with the corner); the atoms' own charges are not
+                                                       drawn (they still count; setAtom "chargeVisible" / "chargeStyle":
+                                                       "hidden" by hand)
+  addShape        {"type": "rect", "box": [x0, y0, x1, y1], "fill": "#e6e6e6", "stroke": "none", "radius": 6}
+                                                       also ellipse, circle, line (from, to), polyline (points); dash,
+                                                       opacity, width, shade (a ball); behind the drawing unless "z": "front"
+  addArrow        arcs of circles: {"through": [[x, y], [x, y], [x, y]]} (start, a point on the way, end) or {"arc":
+                  {"centre": [x, y], "radius": 150, "from": -80, "to": 0}} (degrees clockwise from pointing right; "rx",
+                  "ry" for an ellipse; {"ellipse": {"centre", "rx", "ry", "tilt"}, "from", "to"} a turned one; an arc
+                  through three points going more than half round is warned about); in addScheme "cycles": {"main": {"centre", "radius"}} and arrows [{"cycle":
+                  "main", "from": 10, "to": 80, "offset": 0, "type": "equilibrium"}]: a catalytic cycle's arrows on one
+                  circle. An arrow leaving another along its way: {"from": {"arrow": 12, "at": 0.4, "tangent":
+                  true}, "to": [x, y]}; one just touching another from outside: {"from", "to", "tangentTo": 12};
+                  check {"layout": true} lists arrows "nearlyTouching" (a gap of a few units)
+  addArrow        curved (mechanism) arrows: {"from": {"index": 0, "atom": 3}, "to": {"index": 1, "bond": [2, 3]},
+                  "bend": 0.3, "side": "left"} (or "curve": degrees); ends on an atom, a bond's middle or an orbital's tip
+                  ({"orbital": id}) stay off it as in the editor; {"points": [...], "smooth": true}: a smooth curve.
+                  Into a lobe from the side: {"orbital": id, "at": "side"} (its widest place, the side facing the arrow's
+                  start; "side": "left" | "right" seen from the atom), "at": "middle" inside it; tied, it follows the lobe
+  addShape        also {"type": "arc", "from": [x, y], "to": [x, y], "bulge": 0.3, "bow": "down", "dash": true} (bow: up,
+                  down, left or right whichever way from → to runs; a ring's tether not drawn
+                  in full) and polyline "smooth": true; from and to on atoms ({"index": 0, "atom": 2, "at": "bottom"}:
+                  at the edge of its letters, or below, above, left, right of them): a tether that goes with them.
+                  "fit": true reads the bulge from the figure under the drawing (the arc laid along its ink; answers it).
+                  {"type": "delocalization", "structure": id, "atoms": [2, 14, 12], "side": "below" | "auto",
+                  "charge": "+"}: the arc of a charge spread over atoms (allyl, amidinium, carboxylate), its sign
+                  beyond it, the atoms' own signs not drawn (they still count); it follows the atoms. With three or more
+                  atoms it bows toward the atoms between, on the side of the chain away from them (a small ∩ under a
+                  bent N–N–N, its ends beside the end letters, about a fifth of its chord high, clear of every atom;
+                  "side" says which side of the chain, and is turned round when the middle atoms stand on it)
+  addOrbital      {"index": 0, "atom": 2, "type": "lobe", "filled": false, "angle": -90}   s, p, lobe, sp3, dxy, dz2 on an
+                  atom (it follows the atom and goes with it when the structure is deleted); on a labelled atom (N, O, N+)
+                  the lobes start just off the letter (not the charge; setStyle "orbitalGap", 0.05 of the letter height),
+                  "start": "centre" from the atom's centre, "offset": its own shift in
+                  bond lengths; "size", "length"; "filled": true / "second" (p: which half); "electrons": 1 or 2 dots
+                  inside a lobe ("electronLobe": "empty" | "filled", "along": 0.67, "electronColor"); answers the
+                  orbital as objects shows it (orbitalType, angle, size, offset, centre, tip, tip2, electrons, atom)
+  setOrbital      {"id": 69, "angle": -70, "size": 1.2, "filled": true, "offset": 0.3, "electrons": 2}   changes an
+                  orbital in place; arrows tied to it follow. All orbitals on one atom at once: {"index": 0, "atom": 2,
+                  "size": 1.3} or {"ids": [69, 70], "scale": 1.2} (scale: times the present size; angle goes to one
+                  orbital at a time). An arrow's end {"orbital": id, "lobe": "empty" |
+                  "filled" | 1 | 2} picks the lobe of a p orbital
+  addSymbol       {"type": "lonePair", "at": [x, y]} or {"type": "electron", "orbital": 69, "lobe": 1, "along": 0.67}
+                  a lone pair (••), radical or electron (•) on its own, black unless "color"; "angle" turns the pair;
+                  "size": 1.5 half as big again.
+                  In a lobe it sits on the axis with the dots across it and goes with the orbital (objects gives its
+                  orbital, lobe, along). Drawing only: the atom's lone pairs do not change. In addScheme: "symbols":
+                  [{type, at} or {type, orbital: id, "tag.n" (the n-th orbital of structure tag, from 1) or {"structure":
+                  tag, "atom": 3, "angle": 0}}], or an orbital's "symbol": "lonePair" (a free pair in that lobe instead
+                  of drawn electrons). {"type": "charge", "text": "+", "at": [x, y] or {index, atom}, "circled": false}:
+                  a free charge (it counts for the structure it stands by)
+  setSymbol       {"id": 74, "along": 0.5} / {"id": 74, "orbital": null, "at": [x, y]} / {"id": 74, "angle": 30}
+  setAtom         {"index": 0, "atom": 2, "lonePairs": 1, "partial": "+", "radical": 0, "hydrogens": 0, "bold": true}
+                  lone pairs, δ+ / δ−, attachment point, radical dots, hydrogens (0: none and no dots), charge, bold label;
+                  in addScheme a structure's "atoms": {"2": {…}}, "boldLabels": true or [n], "orbitals": [{atom, type, …}].
+                  "chargeStyle": plain (+), circled (⊕) or "auto" (setStyle "chargeStyle" for the whole document).
+                  One electron put in an orbital of an atom (setOrbital {"electrons": 1}) is that atom's radical:
+                  counted, drawn in the lobe only.
+                  setOrbital / addOrbital "bonds": 0.55 sets a lobe's length in bonds, "electronSize": 1.6 its dots.
+                  "symbolSize": 1.6 draws its charge, radical dots, lone pairs and δ that many times bigger (setStyle
+                  "symbolSize" for every atom).
+                  "hSide": "left" | "right" | "above" | "below" | "auto" sets the side of an N's (O's) H: left writes HN.
+                  "explicitH": "plain" | "wedge" | "hash" draws an H on the atom, on its freest side outside the rings
+                  (a wedge or hash with its narrow end at the atom); its number is answered in "hydrogens". With a figure
+                  under the drawing the H goes where the figure writes it. A wedge or hash on the H never changes the
+                  molecule: the centre's other wedges give way, or the H stays plain ("notes" says which).
+                  "isotope": 15 (¹⁵N: drawn upper left of the symbol unless a bond runs there, "isotopePos":
+                  "upper-left" | "upper-right" (N¹⁵) | "auto"; "isotopeColor" (the colour of text if left out); counted with
+                  its own mass in formula, masses and isotope pattern). SMILES [15N], [13CH3], Molfile M  ISO and CDXML
+                  Isotope are read and written
+                  Where the symbols stand: "chargePos", "partialPos", "radicalPos": upper-right, right, lower-right, below,
+                  lower-left, left, upper-left, above, degrees (clockwise from right) or "auto"; "lonePairAngles": [deg…].
+                  "number": "8" (a locant: small beside the atom on its freest side, going with it), "numberColor",
+                  "numberAngle", "numberBold"; in addScheme "atoms": {"3": {"number": "8", "numberColor": "#1565c0"}}.
+                  atoms gives each atom's "symbols" (charge, radical, lonePairs, partial: at and angle). Left to the
+                  program, a charge keeps off bonds, labels and orbitals' lobes, upper right when it is free
+  addChart        {"slices": [{"label": "A", "value": 3}, ...], "x": 300, "y": 200}   a product-ratio chart
+  addRadar        {"axes": [{"label": "H2O", "value": 80}, ...], "x": 300, "y": 200}   a sensitivity screen
+  addImage        {"data": "<base64 PNG/JPEG>", "x": 40, "y": 60, "width": 600, "opacity": 0.35}   a picture behind
+                                                       the drawing; "bond": the figure's bond in pixels scales it to the
+                                                       sheet; "replace": true takes the earlier figures away; a new
+                                                       figure goes where the last one of this sheet lay, unless x/y
+                                                       are given;
+                                                       {"fromReference": true, "crop": [px], "box": [...]}: a piece of
+                                                       the figure (a photo in a scheme); "eraseInk": true takes the
+                                                       drawing's dark lines and letters out of the piece (its coloured
+                                                       background stays), for a structure drawn again on top
+  setImage        {"id": 12, "opacity": 0.5}           a picture already laid: "opacity", "box" or "x", "y", "front"
+  delete          {"index": 0} or {"id": 151} or {"ids": [151, 152]}   a structure drawn in parts goes whole;
+                                                       "part": true only the connected piece holding that atom id
+
+Changing what is drawn (a structure by "index", or by "id": any of its atom ids, as objects and addScheme give it;
+an id given as "index" is taken as the id when no structure has that number: give "id" to be sure)
+  move            {"id": 85, "dx": 40, "dy": 0} or {"index": 1, "x": 600, "y": 220}   a structure, arrow or text
+  flip            {"index": 1, "axis": "h"}            mirror (h: left to right, v: upside down; wedges go with it)
+  rotate          {"index": 1, "angle": 90}            turn clockwise
+  moveAtoms       {"index": 0, "atoms": [{"n": 3, "dx": 0, "dy": 20}, {"n": 4, "x": 120, "y": 80}]}
+  flipBond        {"index": 0, "n1": 4, "n2": 5}       mirror the smaller side of an open-chain bond over it
+  stretch         {"index": 0, "bond": [4, 5], "factor": 1.75}   a ring bond made longer (a Togni reagent's O–I): the
+                                                       ring rebuilt symmetric round it, other sides a bond long (a
+                                                       five-membered ring square at both ends of the long bond, as a
+                                                       benziodoxole is drawn; "shape": "circle" puts all on a circle);
+                                                       a lone group on its end goes on in its line (I–CF3); a fused ring
+                                                       sharing a bond stays, groups go with their atoms
+  flipPart        {"index": 0, "atom": 9, "part": 10}  mirror all on the side of "part" away from "atom" over the
+                                                       part's own axis (a ring system on a spiro atom, an aryl); "axis":
+                                                       "bond" mirrors it over the bond instead
+  rotateGroups    {"index": 0, "atom": 4, "steps": 1}  the groups round an open-chain atom one place round
+  setLabel        {"index": 0, "atom": 3, "label": "SO2Ar", "direction": "keep"}   an atom's label or element in place
+                                                       ("Cl" an element, "" carbon); direction keep / reverse / auto
+  duplicate       {"index": 0, "dx": 300, "flip": "h"} a copy with its looks, moved, mirrored or turned (rotate)
+  bondAtoms       {"index": 0, "n1": 1, "n2": 6} or {"from": {"index", "atom"}, "to": {…}}   join two atoms
+                                                       (an H put down on its own loses its radical dot when bonded)
+  key             {"index": 0, "atom": 7, "key": "J"}  a key of the editor on an atom (or "bond": [3, 4]): J an η6-benzene,
+                                                       j a Cp sandwich, K tBu, a fused ring on a bond…; "keys": ["j", "j"];
+                                                       keys {"place": "atom|bond|tool", "query": "η"} lists them
+  clean           {} / {"flat": true} / {"what": "reaction"} / {"index": 2, "keepOrientation": true} /
+                  {"index": 2, "rings": true} (each ring system laid out whole, fused rings together, and turned
+                  back onto its place; chains keep their drawn shape; "rings": "each" every ring on its own) /
+                  {"index": 2, "keepBox": true} (also no bigger than its old box) / {"index": 2, "level": true} (only turned
+                  by its lean, a few degrees, to the straight position) / {"flat": true, "bridge": "above" | "below" | "flip"}
+                  (a flat bridge put on that side of its bridgeheads' line, the molecule kept; "fromReference": the side
+                  the figure has it) / {"index": 2, "straighten": true} (a junction H put on the shared bond's line,
+                  open-chain angles 120°, 180° at a triple bond, crooked atoms' bonds on the grid, a lone group on a ring
+                  atom (MeO, CF3, Ac) on the atom's axis; the smaller side turned, nothing laid out again) / {"index": 2, "groups": "fromReference"} (groups on one atom swapped
+                  where the figure has them the other way round: H and Ph, F and CF3; the molecule kept)
+                  / {"index": 2, "atoms": [9, 10, 11]} (only these atoms tidied, joined to the rest where it stands)
+                                                       Clean Up Structure, 2D, or Reaction; keepOrientation: tidied where
+                                                       it is, turned and flipped back onto its place, the molecule kept
+                                                       (a centre turned over gets its wedge and hash swapped, answered
+                                                       in "stereoSwapped"); answers the overlaps of the structures it
+                                                       cleaned. Flat: a bridge laid inside its ring gets two wedges (or
+                                                       hashes) from its bridgeheads when the molecule says so
+  setShape        {"id": 9, "box": [x0, y0, x1, y1]}    a shape already drawn: box, a line's from/to, fill, stroke,
+                                                       width, opacity; the lines, polylines and arcs of addScheme too
+                                                       (from/to). setArrow takes one end alone too
+  scale           {"index": 2} or {"index": [2, 3], "bond": 40}   structures made to the document's bond length (or bond),
+                                                       about their centres
+  setText         {"ids": [12, 13], "size": 25.4, "color": "", "text": "…"}   change texts already drawn
+  order           {"id": 12, "to": "back"}             front, back, forward, backward
+
+Look
+  setBond         {"index": 1, "n1": 4, "n2": 5, "style": "bold", "order": 1, "color": "#8b3fd9", "width": 1.6}
+                                                       style plain, bold, wedge, hash, wavy or dash (a wedge widens towards
+                                                       n2); width: times the style's line; "bonds": [{n1, n2, …}] for several
+  mark            {"index": 1, "n": 9, "size": 3, "color": "#4a7fc1"}   a coloured ball on an atom (formula unchanged);
+                                                       diameter, opacity, outline: false, fill: false (a ring)
+  highlight       {"index": 0, "atoms": [4, 5, 6], "color": "#a9c6ea", "bonds": true, "width": 14}   bonds: true = a band
+  setColor        {"index": 0, "color": "#d32f2f"} or {"index": 0, "atoms": [3, 4], "color": "#1565c0", "bonds": true}
+  ring            {"index": 0, "atom": 1, "label": "Het", "fill": "#d9d9d9"}   a label and a fill in a ring (its double
+                                                       bonds stay; "fill": "" takes only the fill away), or an inner
+                                                       line ("style": "circle" or "inner"); "atoms": [...] its atoms in
+                                                       any order. addScheme "ringFills": "fromReference" fills each ring
+                                                       with the figure's colour under it, read after the fit, solid
+                                                       (fitToReference "ringFills": "fromReference" too)
+  setStyle        {"style": "journal"} / {"atomColors": false} / {"fontPerBond": 0.635, "linePerBond": 0.042}
+                                                       the drawing style; help {"op": "setStyle"} lists each style's
+                                                       proportions, to match a figure
+                  "existing": true applies the proportions to what is already drawn too (structures from a figure
+                  included); "labelsOnly": true to the atom labels only, leaving texts as they are.
+                  "textFontPerBond": texts apart from atom labels ("labelFontPerBond" = fontPerBond); fromReference
+                  measures both on the figure (labels: letters alone or in short groups by a bond; texts: rows of letters)
+                  "labelGap": the room between an atom label and its bonds against the letter size (e.g. 0.15);
+                  "hashSpacing": the room between hash strokes against the bond (a hash always has 4 strokes or more)
+  prefixStyle     {"mode": "plain|italic|sup"}         t, i, s, n of tBu, iPr… plain, italic or italic superscript
+
+A whole scheme
+  addScheme       {"replace": true, "units": "figure", "structures": [...], "arrows": [...], "texts": [...],
+                   "brackets": [...], "shapes": [...], "images": [...], "style": {"atomColors": false}}
+                  one command and one undo step; answers {"ok", "ids", "fit", "check", "warnings"}. A structure:
+                  {"id": "1a", "smiles": "…" or "molfile": "…", "at": [x, y] or "box": [x0, y0, x1, y1], "rotate": 30,
+                   "flip": "h", "fit": true, "layout": 1, "pin": {"5": [x, y]}, "like": "3a", "coords": {"3": [x, y]},
+                   "bonds": {"bold": [[1, 2]], "wedge": [[3, 4]], "hash": [], "color": {"#8b3fd9": [[4, 5]]}},
+                   "marks": [{"atom": 7, "color": "#8fb0d3", "size": 3, "shade": true (a lit 3D ball)}], "highlight": [{"atoms": [1, 2, 3]}],
+                   "rings": [{"atom": 1, "label": "Het"}], "color", "atomColors", "showCarbons", "hSide": {"3": "left"},
+                   "alias": {"1": "MeO"}, "flipBonds": [[4, 5]]}
+                  "regular": true with coords: the directions as drawn, every bond a bond long, rings regular.
+                  The answer lists in "created" the ids of every arrow, text, shape, bracket and picture it made.
+                  Also "tidyRings": true (rings of coords made regular; "keepShape": each atom moves at most "maxMove",
+                  a fifth of a bond, so a ring in perspective keeps its look; atoms with letters stay where they were
+                  put, the bare carbons move; atoms moved are answered in "tidyRings"), "labelDir": {"3": "keep"}; a structure in several
+                  parts (a complex with its arene) is grouped and its part ids answered in "parts".
+                  Atoms are numbered as written in the SMILES or Molfile. "at" is the centre of the atoms ("anchor":
+                  "box" centres the box with labels and balls). A structure with coords stays exactly there. "replace":
+                  true keeps the see-through figure ("all" removes it too). Generic labels ([B], Het, LG) are
+                  placeholders, not errors.
+
+Copying a figure (lay it with addImage or, through MCP, place_reference; then all in the figure's pixels)
+  findStructures  {"ref": 12}                          where its structures, texts, lines and arrows, coloured fills,
+                                                       (arrows standing free do not join what is round them, so a
+                                                       catalytic cycle splits into its structures)
+                                                       atomLabels (box, ink colour, capHeight, the letters they read as:
+                                                       text, confidence, "or" when another reading is close), and per
+                                                       structure "vertices" (where its bonds meet and end: unlabelled atoms,
+                                                       with degree; corners of letters left out); "arrows" of any slope
+                                                       (straight: a bond and a half long at least, with a head; not
+                                                       letters, rows of text or braces; from, to, head; curved: curve,
+                                                       bend, side, points); "dashedLines" and "dashedArcs" (dashed or dotted:
+                                                       from, to, strokes; arcs with bulge and points); orbitals' lobes,
+                                                       also those touching their letters (found by the paper inside an
+                                                       outline or the core of a solid one; confidence),
+                                                       (round: balls) and photos are, in figure pixels and on the sheet
+                                                       and orbitals' lobes standing free of other ink (type lobe or
+                                                       p, filled, the point it starts from, angle, length in pixels,
+                                                       size): addScheme "units": "figure" takes orbitals' "length" in
+                                                       pixels
+  recognizeText   {"ref": 12}                          its text lines with box, baseline and size (the size from the
+                                                       capitals' height, the same way for every line; Mac and Windows
+                                                       apps: the system's text recognition); atomLabel marks a label
+                                                       inside a structure. {"letters": true}: also each letter on its own
+                                                       (text, box, centre, colour, capHeight; a sign (+, −) apart from its
+                                                       letter with "sign": true, strokes and lobes left out, "or" for a
+                                                       doubtful reading; missed ones guessed from the ink): the answer is
+                                                       {lines, letters}
+  recognizeStructures {"ref": 12, "boxes": [[x0, y0, x1, y1]], "draw": true}   its structures read atom by atom by
+                                                       MolScribe (installed apart, Mac and Windows: README) and answered as
+                                                       addScheme structures (units "figure": molfile with coords, wedges,
+                                                       hashes and bold bonds as drawn, balls as marks); under
+                                                       minConfidence (0.5) a SMILES with fit: true instead; "results":
+                                                       MolScribe's answer read elsewhere, instead of running it;
+                                                       "smiles": [...] (one per box): your chemistry laid on the places
+                                                       the model read (matched by bonds or the largest common part),
+                                                       with "matched" and "warnings" where they differ; under
+                                                       "minMatched" (0.9) of its atoms matched it is "not read" (read:
+                                                       false) and fitted from the SMILES instead. Labels come as figures
+                                                       write them (R^{1}, ^{i}Pr, ^{t}Bu); stray pieces under "minAtoms"
+                                                       (4) beside a molecule are left out ("keepFragments": true keeps
+                                                       them); a graph that cannot be (five bonds to C, C=C=C in a ring, an
+                                                       I where the figure has none) is warned about. The answer goes to
+                                                       addScheme as it is (its "figure" checked against the figure now,
+                                                       then left out; "out" files carry "savedAt"). Each structure
+                                                       may carry warnings: atoms near but not bonded, letters on the
+                                                       figure (Mac and Windows) other than the atom read
+  calibrateReference {"structures": [{"smiles", "box"}]}   the figure's bond found from its structures and the figure
+                                                       scaled to the sheet's bond (addScheme with units "figure" and
+                                                       recognizeStructures do it by themselves); answers fontPerBond and
+                                                       linePerBond measured on the figure, with "measuredOn" (the widths
+                                                       and letters they come from; the line width the median of the
+                                                       bonds' widths to a fraction of a pixel; labelFontPerBond and
+                                                       textFontPerBond apart). setStyle {"fromReference": id} takes
+                                                       them (the figure's bond known)
+  placeLike       {"index": 0, "minScore": 0.9}         copies of one structure drawn on the figure (a core: norbornene,
+                                                       oxabicycle, azulene) laid on every other place where the figure
+                                                       draws it, each fitted as fitToReference fits; "boxes" (with
+                                                       "units": "figure") to give the places; answers placed [{id, score,
+                                                       box}] and notPlaced; then add the substituents to the copies
+  fitToReference  {"index": [0, 2], "box": [...], "units": "figure", "tidy": true}   lay drawn structures onto the figure without
+                                                       bending them (turned, mirrored, ring symmetries, open chains
+                                                       flipped, skeleton templates); per structure: score, geometry, ink,
+                                                       off and, under 0.95, alternatives ("layout": k takes one); "pin",
+                                                       "angles": true, "templates": "auto" | false | a name, "bend": true;
+                                                       "bondSpread" (shortest–longest bond) and a warning when uneven;
+                                                       A bridged bicycle (norbornane) is fitted both in perspective
+                                                       and flat (a hexagon with the bridge inside), the better kept
+                                                       ("drawnAs"); it keeps the document's bond length. "minScore": 0.9
+                                                       leaves a structure as it was when its fit scores under it
+                                                       ("applied": false); "translateOnly": true only moves it onto the
+                                                       lines ("maxShift" in bonds, 1; the whole window searched; not
+                                                       applied under 0.6). After a full fit (here and in addScheme):
+                                                       crooked bonds and a lean the layout brought are straightened
+                                                       ("straightened", "levelled"; "straighten": false keeps the fit as
+                                                       it lies), small end groups mirrored to the figure's side
+                                                       ("endsFlipped"), groups on one atom swapped as the figure has
+                                                       them ("groupsSwapped"). "tidy": "flat" puts a flat bridge on the
+                                                       figure's side ("bridgeFlipped"; in addScheme a warning).
+                                                       "tidy": true cleans it in place after the fit (also per structure
+                                                       in addScheme; "tidy": "flat" as Clean Up 2D, a norbornane flat;
+                                                       wedges swapped to keep the molecule answered in "stereoSwapped"
+                                                       or warned about). A SMILES with @/@@ keeps its stereoisomer in
+                                                       addScheme whatever the coords and the wedges given (a model's)
+                                                       do: its wedges are set again from the SMILES, with a warning;
+                                                       wedges from the figure that give another one are warned about.
+                                                       A coords structure whose atoms land on each other is tidied
+                                                       where it lies (its cage from a template, e.g. a bicyclobutane
+                                                       butterfly); a model's wedge between two atoms that are no
+                                                       stereocentres is made plain (both said).
+                                                       addScheme "regular": true lays fused and
+                                                       bridged ring systems out whole, at the document's bond length,
+                                                       the chains' bonds on the 30° grid (each its own direction),
+                                                       its centre where the coords put it; a fit or coords structure is
+                                                       warned about for folded angles and wrong wedges
+  compareReference                                     how well each structure lies on the figure (a high score does
+                                                       not prove a match: look at the structure)
+  wedgesFromReference {"index": 0} (or "ids")           the wedges and hashes the figure shows, read off its lines (a
+                                                       wedge widens with no gaps, a hash is strokes that grow; the
+                                                       narrow end where it is thin; a bond to an H turned to the
+                                                       figure's), put on the structure lying on it; "apply": false only
+                                                       says what differs; answers set, and smilesBefore/smiles when the
+                                                       figure's wedges give another stereoisomer. addScheme per
+                                                       structure: "wedges": "fromReference" (after fit and tidy).
+                                                       Only stereocentres take a narrow end; a flat bridge is read
+                                                       as one (both its bonds alike).
+                                                       A bold ring bond of a bridged system in perspective is read
+                                                       as bold (set so where the sheet has a wedge there); a reading
+                                                       that would leave two hashes or two wedges side by side at a
+                                                       centre is taken back. check lists such pairs too.
+                                                       check {"figure": true}: stereoVsFigure, what differs where the
+                                                       reading is sure ("unsure": how many it left out; readings on
+                                                       ring bonds count unsure and are not put on); groupsVsFigure:
+                                                       groups on one atom the other way round than the figure's lines
+                                                       and letters (or a group where the figure has the atom's H).
+                                                       wedgesFromReference also takes off a wedge or hash the figure
+                                                       surely draws plain (not on a bond to an H or an end atom). addScheme swaps those itself for coords structures
+                                                       (a warning).
+                                                       check {"geometry": true}: per structure bondLength (median off
+                                                       the document's), bonds off it by more than 1.5 of 40, rings off
+                                                       regular by more than 3°, tilt (lean off the straight position),
+                                                       offAxis (a lone group off its ring atom's axis), junctionH (a
+                                                       junction H off the shared bond's line), chainAngles (open-chain
+                                                       angles off 120° / 180°), crooked (an atom whose bonds stand off
+                                                       the 30° grid unevenly: angles now and expected); bridged rings
+                                                       drawn in projection and
+                                                       peri-fused rings (acenaphthene) are left out
+  saveTemplate    {"index": 2, "name": "norbornene-endo"}   a skeleton drawn by hand kept for the fit, with its
+                                                       bold bonds, wedges and hashes; listTemplates, deleteTemplate
+  history         {"since": 120}                       test builds only: the log of changes by the user and the API
+
+Reagent table and Markush structures
+  setRole         {"name": "Et3N", "kind": "reagent"}  the role of a compound (id, name or formula); {"index": 2,
+                                                       "role": "product"} of a structure on the sheet ("auto": by the
+                                                       arrows again). list gives each structure's role by every reaction
+                                                       arrow, by its tail and head (an arrow pointing left starts on the
+                                                       right; a scheme branching two ways reads right; "intermediate")
+  setAmount       {"name": "Et3N", "field": "eq", "value": 2}   an amount (eq, mass, mmol, volume…); "limiting": true
+  enumerate       {"index": 0}                         every compound of a Markush structure (lists as texts: R1 = H, Me)
+  decompose       {"scaffold": 0, "compounds": [1, 2]}  the R-group lists of a series (Collect into Markush)
+
+Coordinates: sheet units (1 = a screen pixel at 100 %), x right, y down, a bond about 40. A structure's x, y is the
+centre of its box; addText's x, y is the start of the first line's baseline. Every SMILES in the answers carries the
+drawn stereochemistry: @/@@ from wedges and hashes, / and \ for E/Z.
+
+Through the MCP bridge (Claude): import/set/addImage/addScheme take {"path": "…"} to read a file, export/picture
+{"path": "…"} write one, and any command's answer goes to a file with {"out": "…"}. A command still running after
+25 s answers "still working"; {"op": "result"} fetches its answer.
 
 For one-off jobs without the app open (pictures, conversion, checks), use the command line: "Command line.txt".
 

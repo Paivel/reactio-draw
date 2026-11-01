@@ -13,21 +13,23 @@ import (
 )
 
 type request struct {
-	ID     string `json:"id"`
-	Cmd    string `json:"cmd"`
-	Name   string `json:"name"`
-	B64    string `json:"b64"`
-	Accept string `json:"accept"`
-	KD     string `json:"kd"`
-	PNG    string `json:"png"`
-	EMF    string `json:"emf"`
-	CDX    string `json:"cdx"`
-	W      int32  `json:"w"`
-	H      int32  `json:"h"`
-	Final  bool   `json:"final"`
-	Msg    string `json:"msg"`
-	Path   string `json:"path"`
-	URL    string `json:"url"`
+	ID     string          `json:"id"`
+	Cmd    string          `json:"cmd"`
+	Name   string          `json:"name"`
+	B64    string          `json:"b64"`
+	Accept string          `json:"accept"`
+	KD     string          `json:"kd"`
+	PNG    string          `json:"png"`
+	EMF    string          `json:"emf"`
+	CDX    string          `json:"cdx"`
+	W      int32           `json:"w"`
+	H      int32           `json:"h"`
+	Final  bool            `json:"final"`
+	Msg    string          `json:"msg"`
+	Path   string          `json:"path"`
+	URL    string          `json:"url"`
+	Boxes  json.RawMessage `json:"boxes"`
+	EID    string          `json:"eid"`
 }
 
 func reply(id string, v interface{}) {
@@ -134,13 +136,31 @@ func handle(s string) {
 	case "embedSave":
 		if app.embedding {
 			embedUpdate([]byte(r.KD), b64(r.PNG), b64(r.EMF), r.W, r.H, r.Final)
+		} else if r.EID != "" {
+			/* a tab holding a drawing from Word (embedtab.go); not ok when Word has let it go */
+			reply(r.ID, map[string]interface{}{"ok": toWordSide(r.EID, map[string]interface{}{"cmd": "save", "kd": r.KD, "png": r.PNG, "emf": r.EMF, "w": r.W, "h": r.H, "final": r.Final})})
+			return
 		}
 		reply(r.ID, map[string]interface{}{"ok": true})
 	case "apiStart":
+		// never from the command line: it runs beside the open app and must not take its api.json
+		if cliRequested() {
+			reply(r.ID, map[string]interface{}{"ok": false})
+			return
+		}
+		/* the local API only with the AI add-on installed (reactio-mcp beside the program) */
+		if !aiKitInstalled() {
+			reply(r.ID, map[string]interface{}{"ok": false, "noKit": true})
+			return
+		}
 		p := startLocalAPI()
 		reply(r.ID, map[string]interface{}{"ok": p > 0, "port": p})
+	case "aiKit":
+		reply(r.ID, map[string]interface{}{"installed": aiKitInstalled()})
 	case "apiStop":
-		stopLocalAPI()
+		if !cliRequested() {
+			stopLocalAPI()
+		}
 		reply(r.ID, map[string]interface{}{"ok": true})
 	case "apiResult":
 		apiDeliver(r.Name, r.Msg)
@@ -168,16 +188,63 @@ func handle(s string) {
 				}
 			})
 		}(r.ID, r.Name)
+	case "ocr":
+		// the text lines of a picture (Windows' own text recognition): each with its box in the picture's pixels
+		go func(id, b string) {
+			ans := ocrRun(b)
+			app.w.Dispatch(func() { reply(id, ans) })
+		}(r.ID, r.B64)
+	case "ocsr":
+		// structures read from boxes of a picture by MolScribe, when it is installed apart (tools\reactio_ocsr.py, README)
+		go func(id, b string, boxes json.RawMessage) {
+			ans := ocsrRun(b, boxes)
+			app.w.Dispatch(func() { reply(id, ans) })
+		}(r.ID, r.B64, r.Boxes)
+	case "aiFolders":
+		// the folders the AI assistants may use (folders.go): only listed here; added only through
+		// the app's own folder dialog, taken off only by the user's click in Settings
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+	case "aiFolderAdd":
+		if p := folderDialog("A folder the AI assistants may read and write"); p != "" {
+			list := allowedFolders()
+			has := false
+			for _, q := range list {
+				if samePathCase(q) == samePathCase(p) {
+					has = true
+				}
+			}
+			if !has {
+				list = append(list, p)
+				saveFolders(list)
+			}
+		}
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+	case "aiFolderRemove":
+		list := []string{}
+		for _, q := range allowedFolders() {
+			if samePathCase(q) != samePathCase(r.Path) {
+				list = append(list, q)
+			}
+		}
+		saveFolders(list)
+		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
 	case "cliDone":
 		cliDone(r.Msg)
 	case "link":
 		reply(r.ID, map[string]interface{}{"ok": openLink(r.URL)})
 	case "log":
 		logf("page: %s", r.Msg)
+	case "embedReady":
+		reply(r.ID, map[string]interface{}{"ok": true})
+		if !app.embedding {
+			embedPageReady()
+		}
 	case "embedClose":
 		reply(r.ID, map[string]interface{}{"ok": true})
 		if app.embedding {
 			finishClose()
+		} else if r.EID != "" {
+			toWordSide(r.EID, map[string]interface{}{"cmd": "close"})
 		}
 	default:
 		reply(r.ID, map[string]interface{}{"ok": false, "err": "unknown command " + r.Cmd})
@@ -292,4 +359,15 @@ func fileDialog(save bool, name, accept string) string {
 		n++
 	}
 	return string(utf16.Decode(buf[:n]))
+}
+
+/* the AI add-on ("Reactio Draw — AI assistants") is installed: reactio-mcp lies beside the program. Without it the
+   local API never starts and its settings are not shown */
+func aiKitInstalled() bool {
+	exe, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	st, err := os.Stat(filepath.Join(filepath.Dir(exe), "reactio-mcp.exe"))
+	return err == nil && !st.IsDir()
 }

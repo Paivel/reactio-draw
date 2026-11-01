@@ -36,6 +36,7 @@ var app struct {
 	embedding bool
 	base      string
 	quitOK    bool
+	owner     bool
 }
 
 var logFile *os.File
@@ -99,10 +100,14 @@ func main() {
 		installWordTab(exe)
 	}
 	// Reactio Draw is open already: its window takes the files
-	if !app.embedding && !cliOn && !hasArg("/register", "-register") && otherInstance() {
-		if files := fileArgs(); len(files) > 0 {
-			handOver(files)
-			return
+	if !app.embedding && !cliOn && !hasArg("/register", "-register") {
+		if otherInstance() {
+			if files := fileArgs(); len(files) > 0 {
+				handOver(files)
+				return
+			}
+		} else {
+			app.owner = true // the first window: it takes files and drawings from Word handed over by other processes
 		}
 	}
 	if hasArg("/register", "-register") {
@@ -139,6 +144,10 @@ func main() {
 	}
 	app.w = w
 	app.hwnd = webview2.HWND(w)
+	if app.owner {
+		saveMainWindow() // embedtab.go: a drawing opened from Word brings this window to the front
+		cleanEmbedDirs()
+	}
 	ch := webview2.ChromiumOf(w)
 	if s, err := ch.GetSettings(); err == nil {
 		s.PutIsZoomControlEnabled(false)
@@ -186,7 +195,9 @@ func main() {
 			j, _ := json.Marshal(files)
 			w.Init("window.__rdPending=" + string(j) + ";")
 		}
-		go watchInbox()
+		if app.owner {
+			go watchInbox()
+		}
 	}
 	w.Init(fmt.Sprintf("window.__rdWin={embed:%v};", app.embedding))
 	// page errors and the moment the page is ready go to ReactioDraw.log

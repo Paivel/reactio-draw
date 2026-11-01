@@ -5,8 +5,8 @@ d="$(cd "$(dirname "$0")" && pwd)"
 if ! xcrun -f swiftc >/dev/null 2>&1; then echo "Needs Apple's Command Line Tools: run  xcode-select --install  and try again."; exit 1; fi
 w="$(mktemp -d)"; b="$w/stage/Reactio Draw.app/Contents"; mkdir -p "$b/MacOS" "$b/Resources"
 echo "Building for Apple Silicon and Intel..."
-xcrun swiftc -O -target arm64-apple-macos11 "$d/main.swift" -o "$w/k-arm" -framework Cocoa -framework WebKit
-xcrun swiftc -O -target x86_64-apple-macos11 "$d/main.swift" -o "$w/k-x86" -framework Cocoa -framework WebKit
+xcrun swiftc -O -target arm64-apple-macos11 "$d/main.swift" -o "$w/k-arm" -framework Cocoa -framework WebKit -framework Vision
+xcrun swiftc -O -target x86_64-apple-macos11 "$d/main.swift" -o "$w/k-x86" -framework Cocoa -framework WebKit -framework Vision
 lipo -create "$w/k-arm" "$w/k-x86" -output "$b/MacOS/ReactioDraw"
 # the command line (reactio --help): a small script in the app that runs it without a window
 cat > "$b/MacOS/reactio" <<'SH'
@@ -16,7 +16,7 @@ s="$0"; while [ -L "$s" ]; do t="$(readlink "$s")"; case "$t" in /*) s="$t";; *)
 exec "$(cd "$(dirname "$s")" && pwd)/ReactioDraw" --cli "$@"
 SH
 chmod 755 "$b/MacOS/reactio"
-cp "$d/index.html" "$b/Resources/index.html"; cp "$d/ReactioDraw.icns" "$b/Resources/ReactioDraw.icns"; cp "$d/opsin.jar" "$b/Resources/opsin.jar" 2>/dev/null || true; cp "$d/reactio_name.py" "$b/Resources/reactio_name.py" 2>/dev/null || true
+cp "$d/index.html" "$b/Resources/index.html"; cp "$d/ReactioDraw.icns" "$b/Resources/ReactioDraw.icns"; cp "$d/opsin.jar" "$b/Resources/opsin.jar" 2>/dev/null || true; cp "$d/reactio_name.py" "$b/Resources/reactio_name.py" 2>/dev/null || true; cp "$d/reactio_ocsr.py" "$b/Resources/reactio_ocsr.py" 2>/dev/null || true
 # licenses travel inside the app
 for f in LICENSE LICENSE.txt THIRD-PARTY-NOTICES.md; do [ -f "$d/$f" ] && cp "$d/$f" "$b/Resources/"; done; [ -d "$d/LICENSES" ] && cp -R "$d/LICENSES" "$b/Resources/" || true
 # the version comes from the page (const RD_VERSION = '1.3' in index.html)

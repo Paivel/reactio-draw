@@ -9,14 +9,16 @@ Works on Windows 11 only (regular and ARM).
    Copy the whole "Reactio Draw" folder from the archive there; nothing else to create.
    If Windows says the Programs folder does not exist, open %LOCALAPPDATA% and make a folder named Programs.
    C:\Program Files works too, but copying there asks for administrator rights.
-2. Run ReactioDraw.exe
-   (on a Mac with Parallels, i.e. Windows on ARM, run ReactioDraw-ARM.exe).
-   On the first start the program registers itself for the current user:
-   no administrator rights and no installer.
+2. Double-click "Install Reactio Draw.cmd". It starts the program (Files\ReactioDraw.exe, or
+   ReactioDraw-ARM.exe on Windows on ARM), which registers itself for the current user on its first
+   start: no administrator rights. It then offers the Reactio Draw tab in Excel. The program's own files are
+   in the folder Files; the guides are in Documentation. AI assistants (Claude, Codex) are a separate
+   download, "Reactio Draw - AI assistants", installed on top of this one; without it Reactio Draw has
+   no local API and no MCP at all. Later, start Reactio Draw with Files\ReactioDraw.exe (or a .reactio file).
 3. Draw a reaction, press Ctrl+C (or Ctrl+Shift+D), then Ctrl+V in Word or PowerPoint.
-4. Double-clicking the drawing in Word opens it in Reactio Draw.
-   The picture in Word follows your edits; Ctrl+S or closing the window
-   saves the drawing into the Word document.
+4. Double-clicking the drawing in Word opens it in a tab "Word object" of the open Reactio Draw
+   window. The picture in Word follows your edits; Ctrl+S or closing that tab saves the drawing
+   into the Word document, and the window stays open.
 5. An object copied from Word (Ctrl+C) pastes back (Ctrl+V)
    together with its table.
 6. From other chemistry editors: Ctrl+C there, Ctrl+V in Reactio Draw brings structures,
@@ -56,7 +58,6 @@ Trust only names marked with the OPSIN check (✓).
 NMR prediction (Analysis tab) predicts 1H, 13C, 19F and 31P shifts of the selected structure
 offline, from measured spectra in nmrshiftdb2. Nothing to install.
 
-Local API: scripts on this computer can drive the open program over 127.0.0.1; see "Local API.txt".
 Command line: reactio.exe in this folder renders, converts and checks files without a window
 (reactio --help, and "Command line.txt").
 
