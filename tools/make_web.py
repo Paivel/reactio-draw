@@ -3,9 +3,11 @@
 index.html is the whole program in one file (the apps and the download use it as it is).
 For a site, the NMR shift tables (about 2 MB) are left out of the page: they go into
 web/nmr-data.<hash>.json, which the page downloads on the first Predict, after asking,
-and keeps in the browser. Run from the repository root:  python3 tools/make_web.py
+and keeps in the browser. The name reader (OPSIN and the name tables, names/README.md; about
+3 MB) goes the same way into web/names-pack.<hash>.bin, downloaded on the first name that is
+not in Reactio Draw's own list. Run from the repository root:  python3 tools/make_web.py
 """
-import hashlib, pathlib, re
+import base64, hashlib, pathlib, re
 
 root = pathlib.Path(__file__).resolve().parent.parent
 page = (root / "index.html").read_text(encoding="utf-8")
@@ -22,6 +24,17 @@ for old in web.glob("nmr-data.*.json"):
 (web / name).write_text(data, encoding="utf-8")
 meta = '<meta name="rd-nmr-pkg" content="%s" data-size="%.1f MB">' % (name, mb)
 page = page[:m.start()] + meta + page[m.end():]
+
+m = re.search(r'<script type="application/octet-stream" id="namesPack">(.*?)</script>\n?', page, re.S)
+if not m:
+    raise SystemExit("index.html has no names pack (run tools/make_names_pack.py)")
+pack = base64.b64decode(m.group(1).strip())
+pname = "names-pack.%s.bin" % hashlib.sha256(pack).hexdigest()[:10]
+pmb = len(pack) / 1e6
+for old in web.glob("names-pack.*.bin"):
+    old.unlink()
+(web / pname).write_bytes(pack)
+page = page[:m.start()] + '<meta name="rd-names-pkg" content="%s" data-size="%.1f MB">' % (pname, pmb) + page[m.end():]
 
 # Search engines and link previews (site only; web/og.png is the preview picture)
 URL = "https://paivel.github.io/reactio-draw/web/"
@@ -49,4 +62,4 @@ if page.count("<title>Reactio Draw</title>") != 1:
     raise SystemExit("index.html: <title> not found")
 page = page.replace("<title>Reactio Draw</title>", head, 1)
 (web / "index.html").write_text(page, encoding="utf-8")
-print("web/index.html (%.1f MB) and web/%s (%.1f MB)" % (len(page.encode()) / 1e6, name, mb))
+print("web/index.html (%.1f MB), web/%s (%.1f MB) and web/%s (%.1f MB)" % (len(page.encode()) / 1e6, name, mb, pname, pmb))

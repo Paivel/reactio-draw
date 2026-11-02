@@ -1,3 +1,29 @@
+# Reactio Draw 1.8
+
+## New
+
+- Paste name reads names everywhere, the web version and the single-file page included, with no Java: systematic (IUPAC) names by OPSIN compiled to JavaScript, about 800 abbreviations, reagents and drugs from Octet Draw's tables, and a dictionary of 28,880 compounds from Wikidata with their common and trade names, CAS numbers and InChIKeys (type 58-08-2 or an InChIKey). It runs in the page, nothing is sent anywhere. In the web version the name reader (3 MB) is downloaded on the first name that is not in Reactio Draw's own list, after asking, and kept in the browser. The apps still use OPSIN with Java when the page cannot read a name. All taken unchanged from Octet Draw by Sam Ellis (Apache-2.0; OPSIN: MIT; Wikidata: CC0); see names/README.md
+- Local API: smilesFromName and addName read the same names, CAS numbers and InChIKeys; the answer's source says where the structure came from
+- Name it: each name is read back by OPSIN in the page (in the Java one when the page cannot)
+- Alternative name, beside Name it: names a structure with the namer of Octet Draw (Sam Ellis, Apache-2.0), in the page, the browser included; each name is read back with OPSIN and compared with the drawing. Name it (openclatura, in the apps) stays as it was; each has its own line under the buttons
+- Catalytic cycle (arrow menu, clockwise or anticlockwise): an oval arrow (Shift: a circle). A structure or text put on it cuts it, each arc with its head; the gaps go with the structures. Right-click a structure or text near it: into the cycle (an arc from it merging into the cycle), out of the cycle (an arc peeling off the cycle, its head pointing at the structure's middle), remove the arrow, or detach it (it stays where it is as an ordinary arrow and the structure moves freely); several on one arc; they follow the structure when it is moved
+- Bonds: quadruple (four lines, $ in SMILES), double bond with E/Z not known (crossed; no E/Z in SMILES, stereo 3 in molfiles), dative (an arrow from the donor to the acceptor; not counted in the valence; click again to turn it round). Dative and quadruple bonds are drawn longer when set, so they read clearly. Dative bonds in CDXML and CDX files are read as dative; one drawn as a wedge keeps its wedge
+- Allenes: a dot on the middle carbon, in a small break of the two double bonds; right-click it to take it off or put it back
+- Bridged rings (norbornane, norbornene, adamantane…) dock as templates do: clicked on a bond they are fused onto it, on an atom they make a spiro junction (or are bonded to it). Right-click a bridged ring's button or one of your templates to choose, on a big drawing, the bond it is fused by and the atom it is put on by; the choice is kept
+- NMR prediction: a spectrum with Lorentzian lines and first-order multiplets at the frequency chosen (60–800 MHz; ¹³C, ¹⁹F and ³¹P at their own frequencies, shown beside it), residual solvent and water peaks (named), line width in Hz, colours for the signals (filled peaks, and at the atoms), zoom and pan, a bigger view; the spectrum and the table of signals go under the structure as pictures, and Data under structure writes the shifts there as text, as an experimental section gives them (each structure its own)
+- Lone pairs keep off the H of NH, OH… on whichever side it is written (above and below too)
+- Clean Up and laying out structures a good deal faster, with the very same result (the same places for every atom, checked on 55 test structures and big ones): a 110-residue peptide 93 → 9 s, a 1000-atom chain 104 → 21 s, PEG 11 → 1.6 s, codeine 6.4 → 3.2 s. From the editor the layout shows at once and which crossing bond is in front comes a moment later
+- Clean Up: much faster on long chains and big structures (a 20-residue peptide 6.9 → 1.7 s, the same layout). For a structure of more than 40 atoms, which of its crossing bonds is in front is worked out after the layout in the background, with a bar and a Stop button; the page can be used meanwhile
+- Texts above and below a straight arrow stick to it (a text typed or dragged there, or an arrow drawn or dragged under texts; drawings opened from files and pasted stay as they were): they stay centred over it with equal gaps above and below, go with it when it is moved, and the arrow grows to fit a long text (what is to the right moves along). Right-click the arrow: Texts stick to the arrow / free
+- Alternative name also names coordination compounds, by Octet Draw's namer of complexes (unchanged, Sam Ellis, Apache-2.0): chloridotris(triphenylphosphane)rhodium(I), tris(ethane-1,2-diamine-κ2N,N')cobalt(3+), diamminedichloridoplatinum(II), with κ, μ, η, cis/trans, fac/mer and Δ/Λ where the drawing fixes them. A name is given only when every part of it checks out against the drawing: each ligand read back by OPSIN, the donor atoms, the metal and the charge
+- Condensed formulas: CH3CH2OH, PhCH2OH, Me3SiCl, (CH3)3COH, CH3COOEt, HC≡CCH2OH typed in Paste name, or written as a text and turned into a structure, are read as the structures they stand for (a molecular formula such as C2H6O is not: it has more than one). Octet Draw's reader, unchanged (Sam Ellis, Apache-2.0)
+- Find a command (Ctrl+K, ⌘K on a Mac; a test): type a few letters of any command of the Hotkeys list or any button of the toolbars and the panel, Enter runs it. The key can be changed in Settings → Hotkeys
+- Axial chirality: Show R/S and E/Z also shows (M) and (P) for allenes drawn with a wedge at one end and for hindered biaryls (BINOL, BINAP…) drawn with a wedge at the axis, as IUPAC 2013 gives them (P-93.5.1.3)
+
+## Fixed
+
+- A template or bridged ring clicked onto an atom or bond of a selected structure docks there; it moved the selection instead, so two norbornenes could not be joined one after the other
+
 # Reactio Draw 1.7.1
 
 ## Changed
