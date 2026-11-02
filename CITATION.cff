@@ -23,3 +23,29 @@ keywords:
   - cheminformatics
   - NMR prediction
   - CDXML
+references:
+  - type: software
+    title: "Octet Draw"
+    authors:
+      - family-names: "Ellis"
+        given-names: "Sam"
+    repository-code: "https://github.com/SamChemMan/Octet-Draw"
+    license: Apache-2.0
+    notes: "Its structure-to-name module (with the namer of coordination compounds), condensed formula reader, name tables and OPSIN build are used unchanged."
+  - type: article
+    title: "Chemical Name to Structure: OPSIN, an Open Source Solution"
+    authors:
+      - family-names: "Lowe"
+        given-names: "Daniel M."
+      - family-names: "Corbett"
+        given-names: "Peter T."
+      - family-names: "Murray-Rust"
+        given-names: "Peter"
+      - family-names: "Glen"
+        given-names: "Robert C."
+    journal: "Journal of Chemical Information and Modeling"
+    volume: 51
+    start: 739
+    end: 753
+    year: 2011
+    doi: "10.1021/ci100384d"

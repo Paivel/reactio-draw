@@ -69,8 +69,10 @@ NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; th
 
 ### How it was written
 
-Reactio Draw is written from scratch for this project. No program was decompiled or disassembled, and no code from
-commercial chemistry software is used. File formats are implemented from published descriptions and open-source
+Reactio Draw is written from scratch for this project, apart from the open-source parts named in Credits and
+`THIRD-PARTY-NOTICES.md`, which are used unchanged under their own licences (the name reader and namer of Octet Draw,
+OPSIN, OpenChemLib, InChI). No program was decompiled or disassembled, and no code from commercial chemistry software
+is used. File formats are implemented from published descriptions and open-source
 projects, each named in Credits and `THIRD-PARTY-NOTICES.md`:
 
 - CDX and CDXML: the CDX property table from ReShiki, which takes it from the published CDX documentation of
@@ -126,6 +128,13 @@ Drawings, files and schemes you make with the program are yours; the licence doe
 Third-party components and their licences: `THIRD-PARTY-NOTICES.md` and the `LICENSES/` folder.
 
 ## Credits
+
+- [Octet Draw](https://github.com/SamChemMan/Octet-Draw) by Sam Ellis (Apache-2.0): its structure → name module with
+  the namer of coordination compounds (Alternative name), its reader of condensed formulas, its name tables, and the
+  OPSIN build and Wikidata dictionary it made, used unchanged (`names/`, see `names/README.md`).
+- [OPSIN](https://github.com/dan2097/opsin) by Daniel Lowe (MIT): reading systematic names.
+- [Wikidata](https://www.wikidata.org) (CC0): the dictionary of common and trade names, CAS numbers and InChIKeys.
+- Every other part and its licence: `THIRD-PARTY-NOTICES.md`.
 
 Made with the help of Claude (Anthropic).
 Questions, ideas and bug reports: [Issues](https://github.com/Paivel/reactio-draw/issues).
