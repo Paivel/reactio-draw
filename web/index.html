@@ -24958,7 +24958,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const m = document.querySelector('meta[name="rd-names-pkg"]');
     return m ? { url: m.getAttribute('content'), size: m.dataset.size || '' } : null;
   };
-  /* keys compare names without regard to case, spaces, hyphens and apostrophes (as Octet Draw's commonKey) */
+  /* keys compare names without regard to case, spaces, hyphens and apostrophes, so that every spelling of a name in the tables is found */
   const nreadKey = s => String(s).toLowerCase().replace(/[\s‐-―'’ʼ-]/g, '').replace(/[.•∙⋅]/g, '·');
   async function namesPackBytes(ask) {
     const el = document.getElementById('namesPack');
