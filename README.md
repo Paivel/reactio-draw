@@ -70,8 +70,9 @@ NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; th
 ### How it was written
 
 Reactio Draw is written from scratch for this project, apart from the open-source parts named in Credits and
-`THIRD-PARTY-NOTICES.md`, which are used unchanged under their own licences (the name reader and namer of Octet Draw,
-OPSIN, OpenChemLib, InChI). No program was decompiled or disassembled, and no code from commercial chemistry software
+`THIRD-PARTY-NOTICES.md`, which are used unchanged under their own licences (OPSIN, OpenChemLib, InChI, and from Octet
+Draw only its chemical names: making a name for a structure, and reading names and condensed formulas into structures;
+nothing of its drawing, layout, Clean Up or file code). No program was decompiled or disassembled, and no code from commercial chemistry software
 is used. File formats are implemented from published descriptions and open-source
 projects, each named in Credits and `THIRD-PARTY-NOTICES.md`:
 
