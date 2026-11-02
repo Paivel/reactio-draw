@@ -3243,6 +3243,7 @@ html {
         <h3 class="shead">Hotkeys</h3>
         <div class="row" style="justify-content:space-between;align-items:center"><span class="note">Every command and tool can have its own key.</span><button class="btn ghost sm" id="keysReset" title="Every hotkey back to its default; other settings stay">Reset hotkeys</button></div>
         <p class="note">Click a key, then press the new key (Shift allowed). Esc cancels, Backspace removes the key. Saved in this browser.</p>
+        <div class="row" style="justify-content:space-between;align-items:center"><span class="tlabel" title="On a keyboard other than the US one (AZERTY, QWERTZ…). The letters printed on them: Z is the key marked Z. Their place on a US keyboard: Z is the key where a US keyboard has Z. Keyboards whose letters are not Latin (Russian, Greek…) always use the place.">Keys follow</span><select id="keysBy" aria-label="Keys follow"><option value="letters">the letters printed on them</option><option value="place">their place on a US keyboard</option></select></div>
         <div style="display:flex;gap:4px;align-items:center;margin:2px 0 6px"><input id="keySearch" type="search" placeholder="Search actions or keys, e.g. undo, benzene, Ctrl Z" aria-label="Search hotkeys" style="flex:1;min-width:0"><button class="tb" id="keyByKey" type="button" title="Search by pressing the keys themselves" aria-pressed="false" style="font-size:16px;line-height:1">⌨</button></div>
         <div id="keyEdit" class="keyedit"></div>
         <span class="tlabel khead">Fixed keys</span>
@@ -3309,6 +3310,59 @@ html {
   </section>
 </div>
 
+<script>
+/* keyboards other than the US one (AZERTY, QWERTZ…): a hotkey follows the letter printed on the key, not the place of the
+   key, so Z is the key marked Z on a French keyboard too. The page reads keys by their place (KeyboardEvent.code, named
+   after a US keyboard); here, before anything else sees a key, its code becomes the one of the letter (or of the
+   , . ; / - = [ ] ' ` \ sign) printed on it. What a key prints comes from the system where the browser tells it
+   (navigator.keyboard) and from the key presses themselves. Keyboards whose letters are not Latin (Russian, Greek…) keep
+   the place, as do digits and all other keys. Settings → Hotkeys → Keys follow: their place on a US keyboard turns it off. */
+(function () {
+  const PUNCT = { ',': 'Comma', '.': 'Period', ';': 'Semicolon', '/': 'Slash', '-': 'Minus', '=': 'Equal', '[': 'BracketLeft', ']': 'BracketRight', "'": 'Quote', '`': 'Backquote', '\\': 'Backslash' };
+  const PCODES = new Set(Object.values(PUNCT).concat(['IntlBackslash']));
+  const LAYOUT = {}; /* code → the character the key prints without Shift */
+  let byPlace = false;
+  try {
+    byPlace = localStorage.getItem('rd-keys-by') === 'place';
+  } catch (e) {}
+  window.__rdKeysBy = v => {
+    if (v !== undefined) {
+      byPlace = v === 'place';
+      try {
+        localStorage.setItem('rd-keys-by', byPlace ? 'place' : 'letters');
+      } catch (e) {}
+    }
+    return byPlace ? 'place' : 'letters';
+  };
+  try {
+    if (navigator.keyboard && navigator.keyboard.getLayoutMap)
+      navigator.keyboard
+        .getLayoutMap()
+        .then(m => m.forEach((v, k) => (LAYOUT[k] = String(v).toLowerCase())))
+        .catch(() => {});
+  } catch (e) {}
+  window.addEventListener(
+    'keydown',
+    e => {
+      const c = e.code;
+      if (!c || !(/^Key[A-Z]$/.test(c) || PCODES.has(c))) return;
+      const k = e.key;
+      /* a plain press tells what the key prints */
+      if (k && k.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) LAYOUT[c] = k.toLowerCase();
+      if (byPlace) return;
+      let ch = LAYOUT[c];
+      if (!ch && k && k.length === 1 && !e.altKey) ch = k.toLowerCase();
+      if (!ch) return;
+      const to = /^[a-z]$/.test(ch) ? 'Key' + ch.toUpperCase() : PUNCT[ch];
+      if (!to || to === c) return;
+      try {
+        Object.defineProperty(e, 'code', { value: to, configurable: true });
+      } catch (err) {}
+    },
+    true
+  );
+})();
+</script>
 <script>
 /* the command line (reactio) runs this page unseen beside the open app: it must never change what the app keeps (open
    documents, settings, the local API's port), so in that mode nothing is written to the browser storage */
@@ -4038,7 +4092,7 @@ function kdOf(st) {
     ANG = 1.54 / L;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.7';
+  const RD_VERSION = '1.7.1';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -24634,6 +24688,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     true
   );
+  /* Keys follow: the letters printed on the keys (the default) or their place on a US keyboard (the first script) */
+  if ($('keysBy') && window.__rdKeysBy) {
+    $('keysBy').value = window.__rdKeysBy();
+    $('keysBy').onchange = () => {
+      window.__rdKeysBy($('keysBy').value);
+      toast($('keysBy').value === 'place' ? 'Keys follow their place on a US keyboard' : 'Keys follow the letters printed on them');
+    };
+  }
   $('keysReset').onclick = () => {
     KEYS = {};
     try {

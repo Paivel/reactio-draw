@@ -1,3 +1,9 @@
+# Reactio Draw 1.7.1
+
+## Changed
+
+- Hotkeys follow the letters printed on the keys: on French (AZERTY), German (QWERTZ) and other Latin keyboards the key marked Z is Z, also with Ctrl or Cmd (Ctrl+Z undoes), and the same for A, Q, W, Y, M and the , . ; / - = keys. Digits and other keys stay where they are; keyboards whose letters are not Latin (Russian, Greek…) use the place of the key, as before. Settings → Hotkeys → Keys follow: their place on a US keyboard brings the old way back (reported by Ranini)
+
 # Reactio Draw 1.7
 
 ## New
