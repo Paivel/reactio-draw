@@ -1,4 +1,4 @@
-# Reactio Draw, next version (not released yet)
+# Reactio Draw 1.9
 
 ## New
 
