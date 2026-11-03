@@ -1,3 +1,10 @@
+# Reactio Draw, next version (not released yet)
+
+## Changed
+
+- **Clearer wedges.** A wedge or hash no longer runs from one stereocentre to another: the centre's H is drawn with the wedge on it (as at ring junctions), or the wedge moves to a bond out to an atom that is no stereocentre; the same where InChI found the wedges ambiguous. The configuration is checked after every move. Strychnine and paclitaxel come out as they are usually drawn.
+- Clean Up turns a chain end (a methyl, an OH) off another bond it lay on.
+
 # Reactio Draw 1.8.1
 
 ## Changed

@@ -9601,6 +9601,12 @@ function kdOf(st) {
       if (t == null) t = 0;
       h.x = q.x + Math.cos(t) * L;
       h.y = q.y + Math.sin(t) * L;
+      /* that place crowded by atoms or bonds that are not its own (a congested ring system): the freest place near it */
+      if (hCrowd(h, q) < L * 0.45) {
+        const p = hPlace(q, h);
+        h.x = p.x;
+        h.y = p.y;
+      }
       delete h.__par;
     }
   }
@@ -9986,6 +9992,7 @@ function kdOf(st) {
         if (!cleanFlat && !cleanFragments.noRegular) for (const f of frs) if (f.length >= 5 && whole(f)) cleanRegularRings(f);
         cleanSkipped = sk0;
         cleanStereoKept = kp0;
+        cleanEndsOffBonds(frs);
         return;
       }
       if (out.length) {
@@ -9996,9 +10003,76 @@ function kdOf(st) {
       }
       cleanSkipped = skH;
       cleanStereoKept = keptH;
+      cleanEndsOffBonds(frs);
       return;
     }
     return cleanFragmentsH(frs);
+  }
+  /* a chain end (a methyl, an OH) laid on top of another bond of its atom (under 20° from it, as in a crowded bridged
+     system): turned into the widest gap between that atom's bonds, at the same length, if it lands clear of the other atoms;
+     a wedge or hash on it is turned over where the new place needs it, and nothing is moved if the configuration (R/S, E/Z)
+     would change */
+  function cleanEndsOffBonds(frs) {
+    try {
+      const O = oclLoad(),
+        M = O.Molecule;
+      for (const f0 of frs) {
+        const fr = fragments().find(g => g.some(a => a === f0[0])) || f0;
+        if (fr.length < 4 || fr.some(a => a.label || a.multi || a.z !== undefined)) continue;
+        const ids = new Set(fr.map(a => a.id)),
+          bs = () => mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
+        const idOf = () =>
+          M.fromMolfile(molBlock(fr, bs(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000')).getIDCode();
+        let want = null;
+        for (const a of fr) {
+          const nb = neighbors(a);
+          if (nb.length !== 1 || a.el === 'H') continue;
+          const p = nb[0],
+            others = neighbors(p).filter(o => o !== a);
+          if (others.length < 2) continue;
+          const t0 = Math.atan2(a.y - p.y, a.x - p.x),
+            close = others.some(o => {
+              const d = Math.atan2(o.y - p.y, o.x - p.x) - t0;
+              return Math.abs(Math.atan2(Math.sin(d), Math.cos(d))) < 0.35;
+            });
+          if (!close) continue;
+          const ang = others.map(o => Math.atan2(o.y - p.y, o.x - p.x)).sort((x, y) => x - y);
+          let mid = 0,
+            gap = -1;
+          ang.forEach((x, i) => {
+            const y = i + 1 < ang.length ? ang[i + 1] : ang[0] + 2 * Math.PI;
+            if (y - x > gap) {
+              gap = y - x;
+              mid = (x + y) / 2;
+            }
+          });
+          if (gap < 0.9) continue;
+          const r = Math.hypot(a.x - p.x, a.y - p.y) || L,
+            nx = p.x + Math.cos(mid) * r,
+            ny = p.y + Math.sin(mid) * r;
+          if (mol.atoms.some(o => o !== a && o !== p && Math.hypot(o.x - nx, o.y - ny) < L * 0.5)) continue;
+          if (want === null) want = idOf();
+          const ox = a.x,
+            oy = a.y,
+            bd = bs().find(b => (b.a === a.id && b.b === p.id) || (b.a === p.id && b.b === a.id)),
+            st = bd && bd.stereo;
+          a.x = nx;
+          a.y = ny;
+          let ok = idOf() === want;
+          if (!ok && (st === 'wedge' || st === 'hash')) {
+            bd.stereo = st === 'wedge' ? 'hash' : 'wedge';
+            ok = idOf() === want;
+          }
+          if (!ok) {
+            a.x = ox;
+            a.y = oy;
+            if (bd) bd.stereo = st;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('cleanEndsOffBonds', e);
+    }
   }
   function cleanFragmentsH(frs) {
     let sk = 0;
@@ -22193,8 +22267,256 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         b.b = B.id;
         b.stereo = t === M.cBondTypeUp ? 'wedge' : 'hash';
       }
+      wedgeTidy(map.slice());
     } catch (e) {
       console.warn('stereo', e);
+    }
+  }
+  /* wedges that say clearly which centre they belong to: a wedge or hash from a stereocentre to another stereocentre (its
+     wide end on a centre of its own) is moved off it. A centre with a hydrogen gets that H drawn, with the wedge on it (as at
+     ring junctions); a centre with none takes the wedge on a bond to an atom that is no stereocentre (out of a ring first).
+     Each move is kept only if the configuration of the whole structure is the same (OpenChemLib, R/S and E/Z) */
+  /* where a centre's drawn H goes: the direction, in 10° steps, that keeps it farthest from the other atoms and bonds near
+     it (a little toward the middle of the widest gap between its bonds), 0.85 bond lengths out */
+  /* how near the drawn H h on atom A comes to the other atoms and bonds (not its own bond) */
+  function hCrowd(h, A) {
+    let m = Infinity;
+    for (const o of mol.atoms) if (o !== h && o !== A) m = Math.min(m, Math.hypot(o.x - h.x, o.y - h.y));
+    for (const b of mol.bonds) {
+      const p = atomById(b.a),
+        q = atomById(b.b);
+      if (!p || !q || p === h || q === h || p === A || q === A) continue;
+      const dx = q.x - p.x,
+        dy = q.y - p.y,
+        t = Math.max(0, Math.min(1, ((h.x - p.x) * dx + (h.y - p.y) * dy) / (dx * dx + dy * dy || 1)));
+      m = Math.min(m, Math.hypot(h.x - p.x - t * dx, h.y - p.y - t * dy));
+    }
+    return m;
+  }
+  function hPlace(A, skip) {
+    const ang = neighbors(A)
+      .filter(o => o !== skip)
+      .map(o => Math.atan2(o.y - A.y, o.x - A.x))
+      .sort((p, q) => p - q);
+    let mid = -Math.PI / 2,
+      gap = -1;
+    ang.forEach((p, i) => {
+      const q = i + 1 < ang.length ? ang[i + 1] : ang[0] + 2 * Math.PI;
+      if (q - p > gap) {
+        gap = q - p;
+        mid = (p + q) / 2;
+      }
+    });
+    const r = L * 0.85,
+      near = mol.atoms.filter(o => o !== A && o !== skip && Math.hypot(o.x - A.x, o.y - A.y) < L * 2.2),
+      segs = mol.bonds
+        .map(b => [atomById(b.a), atomById(b.b)])
+        .filter(([p, q]) => p && q && p !== A && q !== A && p !== skip && q !== skip && (near.includes(p) || near.includes(q)));
+    const dseg = (x, y, p, q) => {
+      const dx = q.x - p.x,
+        dy = q.y - p.y,
+        t = Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x - p.x - t * dx, y - p.y - t * dy);
+    };
+    let best = null;
+    for (let k = 0; k < 36; k++) {
+      const d = (k * Math.PI) / 18,
+        x = A.x + Math.cos(d) * r,
+        y = A.y + Math.sin(d) * r;
+      /* away from its own bonds by at least 40° */
+      if (ang.some(p => Math.abs(Math.atan2(Math.sin(d - p), Math.cos(d - p))) < 0.7)) continue;
+      let m = Infinity;
+      for (const o of near) m = Math.min(m, Math.hypot(o.x - x, o.y - y));
+      for (const [p, q] of segs) m = Math.min(m, dseg(x, y, p, q) * 1.2);
+      const sc = Math.min(m, L * 1.2) - Math.abs(Math.atan2(Math.sin(d - mid), Math.cos(d - mid))) * L * 0.05;
+      if (!best || sc > best.sc) best = { sc, x, y };
+    }
+    return best || { x: A.x + Math.cos(mid) * r, y: A.y + Math.sin(mid) * r };
+  }
+  function wedgeTidy(fr) {
+    try {
+      if (!fr || fr.length < 3 || fr.some(a => a.label || a.multi || a.z !== undefined)) return 0;
+      const ids = new Set(fr.map(a => a.id)),
+        O = oclLoad(),
+        M = O.Molecule;
+      const bondsNow = () => mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
+      if (!bondsNow().some(b => b.stereo === 'wedge' || b.stereo === 'hash')) return 0;
+      const atomsNow = () => mol.atoms.filter(a => ids.has(a.id));
+      const molOf = () => {
+        const A = atomsNow(),
+          m = M.fromMolfile(molBlock(A, bondsNow(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'));
+        m.ensureHelperArrays(M.cHelperParities);
+        return { m, A };
+      };
+      const idOf = () => molOf().m.getIDCode();
+      const want = idOf();
+      const { m: m0, A: A0 } = molOf();
+      const centre = new Set();
+      A0.forEach((a, i) => {
+        const p = m0.getAtomParity(i);
+        if (p === M.cAtomParity1 || p === M.cAtomParity2 || p === M.cAtomParityUnknown) centre.add(a.id);
+      });
+      const ringBond = b => {
+        /* in a ring: another path between its two atoms */
+        const seen = new Set([b.a]),
+          st = [b.a];
+        while (st.length) {
+          const x = st.pop();
+          for (const c of bondsNow()) {
+            if (c === b) continue;
+            const y = c.a === x ? c.b : c.b === x ? c.a : null;
+            if (y == null || seen.has(y)) continue;
+            if (y === b.b) return true;
+            seen.add(y);
+            st.push(y);
+          }
+        }
+        return false;
+      };
+      let moved = 0;
+      const bad = bondsNow().filter(
+        b => (b.stereo === 'wedge' || b.stereo === 'hash') && centre.has(b.a) && centre.has(b.b) && b.order === 1
+      );
+      for (const b of bad) {
+        const A = atomById(b.a),
+          was = b.stereo;
+        if (!A) continue;
+        /* the other stereo bonds that start at this centre stay as they are */
+        const tryOn = bd => {
+          for (const t of ['wedge', 'hash']) {
+            bd.stereo = t;
+            if (idOf() === want) return true;
+          }
+          bd.stereo = null;
+          return false;
+        };
+        b.stereo = null;
+        let ok = false;
+        /* 1. a centre with a hydrogen: draw the H and put the wedge on it */
+        if (implicitH(A) >= 1 && A.el === 'C') {
+          const hp = hPlace(A),
+            H = { id: mol.next++, x: hp.x, y: hp.y, el: 'H', chg: 0 },
+            hb = { id: mol.next++, a: A.id, b: H.id, order: 1, stereo: null };
+          mol.atoms.push(H);
+          mol.bonds.push(hb);
+          ids.add(H.id);
+          fr.push(H);
+          ok = tryOn(hb);
+          if (!ok) {
+            mol.bonds.splice(mol.bonds.indexOf(hb), 1);
+            mol.atoms.splice(mol.atoms.indexOf(H), 1);
+            ids.delete(H.id);
+            fr.splice(fr.indexOf(H), 1);
+          }
+        }
+        /* 2. a bond to an atom that is no stereocentre and carries no wedge of its own, out of a ring first */
+        if (!ok) {
+          const cands = bondsNow()
+            .filter(c => c !== b && (c.a === A.id || c.b === A.id) && c.order === 1 && !c.stereo && !isDative(c))
+            .filter(c => {
+              const o = c.a === A.id ? c.b : c.a;
+              return !centre.has(o) && !bondsNow().some(x => x.a === o && (x.stereo === 'wedge' || x.stereo === 'hash'));
+            })
+            .sort((p, q) => ringBond(p) - ringBond(q));
+          for (const c of cands) {
+            const o = c.a === A.id ? c.b : c.a;
+            c.a = A.id;
+            c.b = o;
+            if (tryOn(c)) {
+              ok = true;
+              break;
+            }
+          }
+        }
+        if (ok) moved++;
+        else b.stereo = was;
+      }
+      /* 3. a wedge InChI still finds ambiguous (a centre whose drawn bonds leave its configuration open to two readings):
+         a CH centre shows it on its H instead, kept only where that clears the ambiguity (InChI, when it has started) */
+      if (INCHI) {
+        const amb = () => {
+          try {
+            const r = INCHI(molBlock(atomsNow(), bondsNow(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'), '');
+            return /ambiguous stereo/i.test((r && r.message) || '');
+          } catch (e) {
+            return false;
+          }
+        };
+        const others = (A, skip) =>
+          bondsNow().filter(c => c !== skip && (c.a === A.id || c.b === A.id) && c.order === 1 && !c.stereo && !isDative(c));
+        const tryStereo = bd => {
+          for (const t of ['wedge', 'hash']) {
+            bd.stereo = t;
+            if (idOf() === want && !amb()) return true;
+          }
+          bd.stereo = null;
+          return false;
+        };
+        if (amb())
+          outer: for (const b of bondsNow().filter(x => (x.stereo === 'wedge' || x.stereo === 'hash') && x.order === 1)) {
+            const A = atomById(b.a),
+              B = atomById(b.b);
+            if (!A || !B || B.el === 'H') continue;
+            const was = b.stereo;
+            /* (i) a CH centre: its H, with the wedge on it */
+            if (A.el === 'C' && implicitH(A) >= 1) {
+              const hp = hPlace(A),
+                H = { id: mol.next++, x: hp.x, y: hp.y, el: 'H', chg: 0 },
+                hb = { id: mol.next++, a: A.id, b: H.id, order: 1, stereo: null };
+              mol.atoms.push(H);
+              mol.bonds.push(hb);
+              ids.add(H.id);
+              b.stereo = null;
+              if (tryStereo(hb)) {
+                fr.push(H);
+                moved++;
+                break outer;
+              }
+              mol.bonds.splice(mol.bonds.indexOf(hb), 1);
+              mol.atoms.splice(mol.atoms.indexOf(H), 1);
+              ids.delete(H.id);
+              b.stereo = was;
+            }
+            /* (ii) the wedge on another bond of the centre, to an atom that is no stereocentre */
+            b.stereo = null;
+            for (const c of others(A, b)) {
+              const o = c.a === A.id ? c.b : c.a;
+              if (centre.has(o)) continue;
+              const ca = c.a,
+                cb = c.b;
+              c.a = A.id;
+              c.b = o;
+              if (tryStereo(c)) {
+                moved++;
+                break outer;
+              }
+              c.a = ca;
+              c.b = cb;
+            }
+            b.stereo = was;
+            /* (iii) a second one, wedge with hash, on another bond of the centre */
+            for (const c of others(A, b)) {
+              const o = c.a === A.id ? c.b : c.a;
+              if (centre.has(o)) continue;
+              const ca = c.a,
+                cb = c.b;
+              c.a = A.id;
+              c.b = o;
+              if (tryStereo(c)) {
+                moved++;
+                break outer;
+              }
+              c.a = ca;
+              c.b = cb;
+            }
+          }
+      }
+      /* the whole structure once more: anything that does not say the same is put back by the caller's check */
+      if (moved && idOf() !== want) return -1;
+      return moved;
+    } catch (e) {
+      console.warn('wedgeTidy', e);
+      return 0;
     }
   }
   let cageOnce = null;
@@ -63097,6 +63419,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    molBlock,
+    wedgeTidy,
     stereoSig,
     wedges3D,
     get cleanStereoKept() {
