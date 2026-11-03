@@ -37720,16 +37720,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         await job.pause();
         if (job.stopped) throw { stopped: true };
       }
+      const dims = () => {
+        const m = /width="([\d.]+)[a-z]*" height="([\d.]+)/.exec(svgOf(true));
+        return m ? [+m[1], +m[2]] : null;
+      };
       const got = await withDrawing(it, async () => {
+        const d0 = dims();
         for (const t of cmpdTexts()) {
           if (!t.ctpl) t.ctpl = t.text;
+          /* a compound number (and a mark) is no formula: S1 stays S1, not S with a subscript 1 */
+          t.nochem = true;
+          t.fs = false;
           const cx = t.x + textW(t) / 2;
           t.text = marks ? t.ctpl : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
           t.x = cx - textW(t) / 2;
         }
         const kd = JSON.stringify(it.kd && it.kd.clip && !it.kd.state ? { rd: 1, state: S } : { ...(it.kd || { rd: 1 }), state: S }),
           svg = svgFileOf(),
+          d1 = dims(),
           r = { kd, svg };
+        /* the picture in Word grows or shrinks with the drawing (a mark is wider than its number), at the same scale */
+        r.k = d0 && d1 && d0[0] > 0 && d0[1] > 0 ? [d1[0] / d0[0], d1[1] / d0[1]] : [1, 1];
         if (it.pic) {
           r.tag = await rdTag(kd);
           r.png = (await pngSized(false)).png;
@@ -37743,6 +37754,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       });
       if (!got) continue;
       let x = items[it.idx];
+      const [kx, ky] = got.k;
+      if (Math.abs(kx - 1) > 0.002 || Math.abs(ky - 1) > 0.002) {
+        const sc = (v, f) => String(Math.round(+v * f));
+        x = x
+          .replace(/(<wp:extent\b[^>]*\bcx=")(\d+)("[^>]*\bcy=")(\d+)"/, (m0, a, w, b, h) => a + sc(w, kx) + b + sc(h, ky) + '"')
+          .replace(/(<a:ext\b[^>]*\bcx=")(\d+)("[^>]*\bcy=")(\d+)"/g, (m0, a, w, b, h) => a + sc(w, kx) + b + sc(h, ky) + '"')
+          .replace(/(\bw:dxaOrig=")(\d+)"/, (m0, a, w) => a + sc(w, kx) + '"')
+          .replace(/(\bw:dyaOrig=")(\d+)"/, (m0, a, h) => a + sc(h, ky) + '"')
+          .replace(/(<v:shape\b[^>]*\bstyle="[^"]*?\bwidth:)([\d.]+)(pt)/, (m0, a, w, u) => a + (+w * kx).toFixed(2) + u)
+          .replace(/(<v:shape\b[^>]*\bstyle="[^"]*?\bheight:)([\d.]+)(pt)/, (m0, a, h, u) => a + (+h * ky).toFixed(2) + u);
+      }
       if (it.pic) {
         const tagEsc = got.tag.replace(/\+/g, '&#43;').replace(/=/g, '&#61;');
         x = x.replace(/(\s(?:descr|title)=")([^"]*RDRAW1:[^"]*)"/g, (m0, a) => a + tagEsc + '"');
