@@ -29,6 +29,21 @@ on |rd|(p)
 				return "There are no Reactio Draw drawings in this document."
 			end try
 			do shell script "open -a 'Microsoft Word' " & quoted form of out
+		else if cmd is "number" or cmd is "marks" then
+			-- the compounds numbered from their [[key]] marks, in place: Word has closed the document; the version before
+			-- is kept in Reactio Draw's folder
+			do shell script "mkdir -p " & quoted form of xdir
+			set tmp to xdir & "numbered.docx"
+			set opt to ""
+			if cmd is "marks" then set opt to " --marks"
+			do shell script "rm -f " & quoted form of tmp
+			do shell script quoted form of cli & " word-number " & quoted form of src & " -o " & quoted form of tmp & opt
+			try
+				do shell script "test -f " & quoted form of tmp
+			on error
+				return "There are no [[key]] marks in this document: write [[name]] where a compound's number goes."
+			end try
+			do shell script "cp -p " & quoted form of src & " " & quoted form of (xdir & "before numbering.docx") & " && cat " & quoted form of tmp & " > " & quoted form of src & " && rm -f " & quoted form of tmp
 		else if cmd is "table" then
 			-- Excel's tab: src the SMILES table, out the folder for the pictures and properties, then the options
 			set opts to ""

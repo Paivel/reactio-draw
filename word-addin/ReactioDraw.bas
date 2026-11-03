@@ -6,6 +6,9 @@ Attribute VB_Name = "ReactioDraw"
 '   Edit drawing          the selected drawing in Reactio Draw; Save there puts it back (Mac: also a double-click on the picture; keys: Tools > Customize Keyboard > Macros > ReactioDrawEdit; on Windows, double-click the object)
 '   Update                puts drawings saved in Reactio Draw back into Word (Reactio Draw asks Word to do it by itself)
 '   Mark drawings         a hidden mark beside every Reactio Draw drawing, shown on screen, never printed; the button stays pressed while they are on
+'   Number compounds      numbers the compounds of this document from their marks ([[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1),
+'                         in the text and in Reactio Draw drawings; the document is saved, numbered in place and opened again
+'   Show marks            the same document with the marks shown instead of the numbers, to see which key is which
 ' Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
 Option Explicit
 
@@ -28,6 +31,28 @@ Public Sub RD_Cdxml(control As Object)
     If p = "" Then Exit Sub
     o = Left$(p, Len(p) - 5) & ".cdxml"
     If RunRD("cdxml", p, o) Then MsgBox "All structures of the document, one under another, are saved in" & vbCr & o, vbInformation, TTL
+End Sub
+
+' ---------- compound numbers ----------
+Public Sub RD_Number(control As Object)
+    NumberDoc False
+End Sub
+
+Public Sub RD_ShowMarks(control As Object)
+    NumberDoc True
+End Sub
+
+' saved, closed, numbered by Reactio Draw in place (the version before goes to Reactio Draw's own folder) and opened again
+Private Sub NumberDoc(marks As Boolean)
+    Listen
+    Dim p As String, cmd As String
+    p = DocPath()
+    If p = "" Then Exit Sub
+    cmd = "number"
+    If marks Then cmd = "marks"
+    ActiveDocument.Close SaveChanges:=False
+    RunRD cmd, p, p
+    Documents.Open p
 End Sub
 
 Public Sub RD_Open(control As Object)
@@ -378,7 +403,7 @@ End Sub
 #Else
 ' ReactioDraw.exe writes its folder (and its own path) here when it starts
 Private Function RunRD(cmd As String, p As String, o As String) As Boolean
-    Dim f As String, sh As Object, code As Long
+    Dim f As String, sh As Object, code As Long, t As String, a As String
     f = GetSetting("ReactioDraw", "App", "Folder", "")
     If f = "" Then
         MsgBox "Reactio Draw was not found. Start ReactioDraw.exe once: it connects itself to Word.", vbExclamation, TTL
@@ -391,6 +416,26 @@ Private Function RunRD(cmd As String, p As String, o As String) As Boolean
     Set sh = CreateObject("WScript.Shell")
     If cmd = "open" Then
         sh.Run """" & GetSetting("ReactioDraw", "App", "Exe", f & "\ReactioDraw.exe") & """ """ & p & """", 1, False
+        RunRD = True
+        Exit Function
+    End If
+    If cmd = "number" Or cmd = "marks" Then
+        t = Environ$("TEMP") & "\ReactioDraw numbered.docx"
+        If Dir$(t) <> "" Then Kill t
+        a = ""
+        If cmd = "marks" Then a = " --marks"
+        code = sh.Run("""" & f & "\reactio.exe"" word-number """ & p & """ -o """ & t & """" & a, 0, True)
+        If code <> 0 Then
+            MsgBox "Reactio Draw could not number this document (exit code " & code & ").", vbExclamation, TTL
+            Exit Function
+        End If
+        If Dir$(t) = "" Then
+            MsgBox "There are no [[key]] marks in this document: write [[name]] where a compound's number goes.", vbInformation, TTL
+            Exit Function
+        End If
+        FileCopy p, Environ$("TEMP") & "\ReactioDraw before numbering.docx"
+        FileCopy t, p
+        Kill t
         RunRD = True
         Exit Function
     End If

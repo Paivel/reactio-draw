@@ -122,6 +122,16 @@ def icons():
     im = Image.new('RGBA', (S, S)); d = ImageDraw.Draw(im); d.rounded_rectangle((10, 48, 168, 208), 16, outline=ink, width=12); hexagon(d, 89, 128, 46, 10, ink)  # marks: a pilcrow beside a picture
     d.ellipse((184, 76, 232, 124), fill=acc); d.rectangle((212, 76, 222, 212), fill=acc); d.rectangle((234, 76, 244, 212), fill=acc); d.rectangle((208, 76, 248, 86), fill=acc)
     out['rdMark'] = im
+    im = Image.new('RGBA', (S, S)); d = ImageDraw.Draw(im); hexagon(d, 92, 104, 58, 11, ink)  # number: a ring with its number under it
+    d.rounded_rectangle((132, 150, 244, 244), 14, fill=acc)
+    d.line([(178, 166), (196, 160), (196, 230)], fill=(255, 255, 255, 255), width=14)
+    out['rdNumber'] = im
+    im = Image.new('RGBA', (S, S)); d = ImageDraw.Draw(im); hexagon(d, 128, 92, 52, 11, ink)  # marks: a ring over [[ ]]
+    for x0, k in ((40, 1), (216, -1)):
+        for j in (0, 22):
+            xa = x0 + k * j
+            d.line([(xa + k * 18, 160), (xa, 160), (xa, 236), (xa + k * 18, 236)], fill=acc, width=10)
+    out['rdMarks'] = im
     app = os.path.join(HERE, '..', 'linux-app', 'reactiodraw.png')
     out['rdOpen'] = Image.open(app).convert('RGBA')
     res = {}
@@ -142,6 +152,12 @@ CUSTOM_UI = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             screentip="Export to CDXML" supertip="Saves all structures of the document in one CDXML file next to it, one under another (Reactio Draw and ChemDraw drawings)."/>
           <button id="rdOpen" label="Open in Reactio Draw" size="large" image="rdOpen" onAction="RD_Open"
             screentip="Open in Reactio Draw" supertip="Opens all structures of the document on one sheet in Reactio Draw."/>
+        </group>
+        <group id="rdNumbers" label="Compound numbers">
+          <button id="rdNumber" label="Number compounds" size="large" image="rdNumber" onAction="RD_Number"
+            screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance. [[#format S{n}]] and [[#start 5]] in the document set the style. The document is saved, numbered and opened again; the marks stay, so press again after adding compounds."/>
+          <button id="rdMarks" label="Show marks" size="large" image="rdMarks" onAction="RD_ShowMarks"
+            screentip="Show marks" supertip="Shows the marks ([[aldehyde]]) instead of the numbers, in the text and in the drawings, to see which mark to write. Number compounds puts the numbers back."/>
         </group>
         <group id="rdDrawing" label="Drawing">
           <button id="rdEdit" label="Edit drawing" size="large" image="rdEdit" onAction="RD_Edit"

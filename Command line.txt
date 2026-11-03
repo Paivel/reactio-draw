@@ -22,6 +22,8 @@ Where it is:
   reactio name    <input…>     IUPAC name (needs Python with openclatura)
   reactio smiles  <name…>      SMILES from a name (common names built in; others need Java for OPSIN)
   reactio word-clean <file.docx> [-o <out.docx>]                   the Word file with plain vector pictures (no Reactio Draw data)
+  reactio word-number <file.docx> [-o <out.docx>] [--number S{n}] [--start 1] [--marks]
+                               the compounds numbered from their marks: [[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1
   reactio op <command> ['{"json": "args"}'] [-i <input>]           any command of the local API (see Local API.txt)
 
   <input> is a file (.reactio .mol .sdf .rxn .smi .cdxml .cdx .json) or a SMILES in quotes. A Word file (.docx) gives all its

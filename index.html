@@ -17257,7 +17257,7 @@ function kdOf(st) {
     const d = document.createElement('div');
     d.id = 'repAsk';
     d.className = 'pop';
-    d.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:60;max-width:420px;padding:12px 14px';
+    d.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:60;max-width:420px;padding:12px 14px;display:block';
     const atoms = (rep.unit.match(SMI_ATOM) || []).length * rep.k;
     d.innerHTML = `<div style="margin-bottom:8px">This SMILES repeats <b>${esc(rep.unit)}</b> ${rep.k} times (${atoms} atoms in the repeats). Draw it as one repeat unit in brackets, with n = ${rep.k}, or the whole chain?</div><div class="row" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn sm" data-r="unit">Repeat unit</button><button type="button" class="btn ghost sm" data-r="full">Whole chain${atoms > 400 ? ' (slow)' : ''}</button><button type="button" class="btn ghost sm" data-r="no">Cancel</button></div>`;
     document.body.appendChild(d);
@@ -37480,6 +37480,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       API_SCRATCH = sc;
       clearSel();
       render();
+      try {
+        updateInfo();
+      } catch (e) {}
     }
   }
   /* the texts of the sheet now that carry marks, in reading order (rows top to bottom, left to right) */
@@ -37504,7 +37507,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const wT = (rPr, t) => (t ? `<w:r>${rPr}<w:t xml:space="preserve">${t}</w:t></w:r>` : '');
   const wSdt = (rPr, spec, num) =>
     `<w:sdt><w:sdtPr>${rPr}<w:alias w:val="Compound ${spec}"/><w:tag w:val="rdcmpd:${spec}"/></w:sdtPr><w:sdtContent><w:r>${rPr}<w:t xml:space="preserve">${num}</w:t></w:r></w:sdtContent></w:sdt>`;
-  async function wordNumber(u, tpl, start, job) {
+  /* marks: the marks shown instead of numbers ([[aldehyde]] in the text and on the drawings), to see which key is which;
+     numbering again puts the numbers back */
+  async function wordNumber(u, tpl, start, job, marks) {
     const z = await unzipAll(u),
       td = new TextDecoder(),
       te = new TextEncoder(),
@@ -37696,7 +37701,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .join('')
       .replace(/\u0000M(\d+)\u0000/g, (m0, i) => {
         const t = textMarks[+i];
-        return wSdt(t.rPr, t.spec, N.text(t.key, t.sub, t.fmt));
+        return wSdt(t.rPr, t.spec, marks ? '[[' + t.spec + ']]' : N.text(t.key, t.sub, t.fmt));
       });
     /* the drawings: their texts show the numbers, the marks kept; drawn again */
     let k = 0,
@@ -37719,7 +37724,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         for (const t of cmpdTexts()) {
           if (!t.ctpl) t.ctpl = t.text;
           const cx = t.x + textW(t) / 2;
-          t.text = t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
+          t.text = marks ? t.ctpl : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
           t.x = cx - textW(t) / 2;
         }
         const kd = JSON.stringify(it.kd && it.kd.clip && !it.kd.state ? { rd: 1, state: S } : { ...(it.kd || { rd: 1 }), state: S }),
@@ -37799,12 +37804,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const d = document.createElement('div');
     d.id = 'wnumAsk';
     d.className = 'pop';
-    d.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 32px));padding:12px 14px';
+    d.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 32px));padding:12px 14px;display:block';
     d.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Number the compounds of ${esc(f.name)}</div>
 <div class="note" style="margin-bottom:8px">Marks in the text and in Reactio Draw drawings: <b>[[key]]</b> → 7, <b>[[key.sub.letter]]</b> → 7a, <b>[[key.sub.num]]</b> → 7.1. Numbers go by first appearance. A copy of the file is written; the marks stay in it, so it can be numbered again.</div>
-<div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap"><span class="note">Number</span><input id="wnumTpl" style="width:96px" aria-label="Number style"><span class="note">from</span><input id="wnumStart" style="width:52px" aria-label="First number"><span class="note" style="flex:1">{n} the number, e.g. S{n}</span></div>
+<div style="display:flex;gap:6px;align-items:center"><span class="note">Number</span><input id="wnumTpl" style="width:96px" aria-label="Number style"><span class="note">from</span><input id="wnumStart" style="width:52px" aria-label="First number"><span class="note" style="flex:1">{n} the number, e.g. S{n}</span></div>
 <div class="note" id="wnumFrom" style="margin-top:4px"></div>
-<div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
+<div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="marks" title="A copy that shows [[key]] instead of each number, in the text and on the drawings: to see which mark to write. Number it again for the numbers">Show the marks</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
     document.body.appendChild(d);
     const T = d.querySelector('#wnumTpl'),
       Sx = d.querySelector('#wnumStart');
@@ -37820,7 +37825,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!b) return;
       if (b.dataset.w === 'no') return d.remove();
       const tpl = T.value.trim() || '{n}',
-        st = parseInt(Sx.value, 10) || 1;
+        st = parseInt(Sx.value, 10) || 1,
+        mk = b.dataset.w === 'marks';
       d.remove();
       try {
         localStorage.setItem('rd-wnum', JSON.stringify({ tpl, start: String(st) }));
@@ -37828,17 +37834,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const job = busyBar('Numbering the compounds of ' + f.name);
       try {
         await job.pause();
-        const r = await wordNumber(u, tpl, st, job);
+        const r = await wordNumber(u, tpl, st, job, mk);
         if (!r.compounds) {
           toast('No [[key]] marks in ' + f.name, true);
           return;
         }
         offerFile(
-          f.name.replace(/\.docx$/i, '') + ' (numbered).docx',
+          f.name.replace(/\.docx$/i, '').replace(/ \((numbered|marks)\)$/, '') + (mk ? ' (marks).docx' : ' (numbered).docx'),
           new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
         );
         toast(
-          r.compounds + ' compound' + (r.compounds > 1 ? 's' : '') + ' numbered: ' + r.marks + ' mark(s) in the text, ' + r.drawings + ' drawing(s)' +
+          r.compounds + ' compound' + (r.compounds > 1 ? 's' : '') + (mk ? ' with their marks shown: ' : ' numbered: ') + r.marks + ' mark(s) in the text, ' + r.drawings + ' drawing(s)' +
             (r.once.length ? '. Met only once (a typing slip?): ' + r.once.slice(0, 6).join(', ') : '')
         );
       } catch (er) {
@@ -62811,6 +62817,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   reactio name    <input…>     IUPAC name (needs Python with openclatura)
   reactio smiles  <name…>      SMILES from a name (common names built in; others need Java for OPSIN)
   reactio word-clean <file.docx> [-o <out.docx>]                   the Word file with plain vector pictures (no Reactio Draw data)
+  reactio word-number <file.docx> [-o <out.docx>] [--number S{n}] [--start 1]
+                               the compounds numbered from their marks: [[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1
+                               (--marks: the marks shown instead of the numbers, to see which key is which)
   reactio op <command> ['{"json": "args"}'] [-i <input>]           any command of the local API (see Local API.txt)
 
   <input> is a file (.reactio .mol .sdf .rxn .smi .cdxml .cdx .json) or a SMILES in quotes. A Word file (.docx) gives all its
@@ -62870,6 +62879,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '--dpi',
       '--style',
       '--nucleus',
+      '--number',
+      '--start',
       '-i',
       '--input'
     ]);
@@ -62887,7 +62898,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         opt.json = true;
         continue;
       }
-      if (a === '--png' || a === '--props' || a === '--colors' || a === '--inchikey' || a === '--name' || a === '--nmr' || a === '--smiles') {
+      if (a === '--png' || a === '--props' || a === '--colors' || a === '--inchikey' || a === '--name' || a === '--nmr' || a === '--smiles' || a === '--marks') {
         opt[a.slice(2)] = true;
         continue;
       }
@@ -63016,6 +63027,34 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           res.writes.push({ path, b64: window.rdNative ? window.rdNative.b64(u) : '' });
           res.err += 'wrote ' + path + '\n';
         }
+        return res;
+      }
+      /* the compounds of a Word file numbered from their [[key]] marks (see wordNumber); --number S{n} and --start N, else
+         what the file says ([[#format …]], [[#start …]]) or {n} from 1 */
+      if (cmd === 'word-number') {
+        if (pos.length !== 1 || !files[pos[0]] || !/\.docx$/i.test(pos[0]))
+          return fail('reactio word-number: give one Word file (.docx)', 2);
+        const f = files[pos[0]],
+          u = Uint8Array.from(atob(f.b64), c => c.charCodeAt(0));
+        let set = {};
+        try {
+          set = cmpdSettings(new TextDecoder().decode((await unzipAll(u)).get('word/document.xml')));
+        } catch (e) {}
+        const r = await wordNumber(u, String(opt.number || set.format || '{n}'), parseInt(opt.start || set.start || '1', 10) || 1, null, !!opt.marks);
+        if (!r.compounds) {
+          say('nothing to number: no [[key]] marks in ' + f.name);
+          return res;
+        }
+        const path = outp
+            ? isDir(outp)
+              ? outp.replace(/[\\/]?$/, '/') + base(pos[0]) + ' (numbered).docx'
+              : outp
+            : String(pos[0]).replace(/\.docx$/i, ' (numbered).docx'),
+          bu = r.bytes instanceof Blob ? new Uint8Array(await r.bytes.arrayBuffer()) : r.bytes;
+        res.writes.push({ path, b64: window.rdNative ? window.rdNative.b64(bu) : '' });
+        res.err +=
+          'wrote ' + path + ' (' + r.compounds + ' compounds: ' + r.marks + ' marks in the text, ' + r.drawings + ' drawings)' +
+          (r.once.length ? '; met only once: ' + r.once.join(', ') : '') + '\n';
         return res;
       }
       if (cmd === 'word-clean') {
