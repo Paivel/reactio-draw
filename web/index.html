@@ -19128,7 +19128,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function editText(t, p, hint) {
     const isNew = !t;
     ovlFor = isNew ? { newText: true } : { text: t };
-    openOverlay(isNew ? p.x : t.x, isNew ? p.y : t.y - 12, isNew ? '' : t.text, v => {
+    /* a text numbered in a Word file shows its compound marks again while it is edited ([[key]] for 7) */
+    openOverlay(isNew ? p.x : t.x, isNew ? p.y : t.y - 12, isNew ? '' : t.ctpl || t.text, v => {
       const s = v.replace(/^\s+|\s+$/g, '');
       /* a group typed with the Text tool just off a chain end (OEt beside the last carbon) goes on that atom as its label */
       if (isNew && s && !hint && knownLabel(s)) {
@@ -19170,11 +19171,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             50
           );
       } else {
-        if (s === t.text) return;
+        if (s === (t.ctpl || t.text)) return;
         snap();
         if (!s) mol.texts = mol.texts.filter(x => x !== t);
         else {
           t.text = s;
+          delete t.ctpl;
           delete t.ana;
         }
       }
@@ -37347,7 +37349,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['pic', 'Insert picture… (or paste / drop one onto the sheet)'],
     ['h', 'Word files'],
     ['w-all', 'All structures of a Word file on one sheet, one under another (then Save as CDXML)…'],
-    ['w-clean', 'Copy of a Word file with plain vector pictures, without Reactio Draw data…']
+    ['w-clean', 'Copy of a Word file with plain vector pictures, without Reactio Draw data…'],
+    ['w-num', 'Number the compounds of a Word file ([[key]] marks in the text and drawings)…']
   ];
   const filePop = document.createElement('div');
   filePop.className = 'pop filepop';
@@ -37384,6 +37387,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const u = new Uint8Array(await f.arrayBuffer()),
       nm = f.name.replace(/\.docx$/i, '');
     try {
+      if (wordIn.dataset.mode === 'w-num') {
+        await wordNumberAsk(f);
+        return;
+      }
       if (wordIn.dataset.mode === 'w-clean') {
         const r = await wordClean(u);
         if (!r.bytes) {
@@ -37405,6 +37412,460 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast('Could not read ' + f.name + ': ' + ((e && e.message) || e), true);
     }
   });
+  /* ===== compound numbers in a Word file =====
+     Marks in the text and in Reactio Draw's drawings: [[key]] (the compound's number, 7), [[key.sub.letter]] (7a, 7b… in the
+     order the subs first come), [[key.sub.num]] (7.1, 7.2…); [[#format S{n}]] and [[#start 5]] anywhere set the style.
+     Numbers go by first appearance, text and drawings in reading order. In the text a mark becomes a content control (tag
+     rdcmpd:<mark>) holding the number, so a second run finds it again; in a drawing the text keeps its marks (t.ctpl) and
+     shows the numbers. The file written is a copy. */
+  const CMPD_RX = /\[\[([A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num))?)?\]\]/g,
+    CMPD_SET = /\[\[#(format|start)\s+([^\]]+?)\s*\]\]/g;
+  function cmpdNumberer(tpl, start) {
+    const main = new Map(),
+      subs = new Map();
+    let next = start;
+    const keyNo = key => {
+      if (!main.has(key)) main.set(key, next++);
+      return main.get(key);
+    };
+    return {
+      main,
+      subs,
+      reset() {
+        main.clear();
+        subs.clear();
+        next = start;
+      },
+      take(key, sub) {
+        keyNo(key);
+        if (sub) {
+          if (!subs.has(key)) subs.set(key, new Map());
+          const m = subs.get(key);
+          if (!m.has(sub)) m.set(sub, m.size + 1);
+        }
+      },
+      text(key, sub, fmt) {
+        const n = cnumText(tpl, keyNo(key));
+        if (!sub) return n;
+        const m = subs.get(key),
+          i = m && m.get(sub);
+        if (!i) return n;
+        return fmt === 'num' ? n + '.' + i : n + cnumLetter(i);
+      }
+    };
+  }
+  /* the settings written in a Word file ([[#format …]], [[#start …]]) */
+  function cmpdSettings(docXml) {
+    const plain = docXml.replace(/<[^>]+>/g, ''),
+      o = {};
+    for (const m of plain.matchAll(CMPD_SET)) if (!(m[1] in o)) o[m[1]] = m[2];
+    return o;
+  }
+  /* a drawing of the file as sheet data, loaded for a moment so it can be measured and drawn (fn may wait) */
+  async function withDrawing(it, fn) {
+    const keep = JSON.stringify(S),
+      u = undoSt.length,
+      r = redoSt.slice(),
+      sc = API_SCRATCH;
+    API_SCRATCH = true;
+    try {
+      let st;
+      if (it.kd && it.kd.state) st = JSON.parse(JSON.stringify(it.kd.state));
+      else {
+        const M = wordItemMol(it);
+        if (!M) return null;
+        st = JSON.parse(keep);
+        st.mol = JSON.parse(JSON.stringify(M));
+        for (const k of ['arrows', 'texts', 'fills']) st.mol[k] = st.mol[k] || [];
+      }
+      for (const k of Object.keys(S)) delete S[k];
+      Object.assign(S, st);
+      mol = S.mol;
+      clearSel();
+      return await fn();
+    } finally {
+      const st = JSON.parse(keep);
+      for (const k of Object.keys(S)) delete S[k];
+      Object.assign(S, st);
+      mol = S.mol;
+      undoSt.length = u;
+      redoSt.length = 0;
+      redoSt.push(...r);
+      API_SCRATCH = sc;
+      clearSel();
+      render();
+    }
+  }
+  /* the texts of the sheet now that carry marks, in reading order (rows top to bottom, left to right) */
+  function cmpdTexts() {
+    const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    T.sort((a, b) => a.y - b.y);
+    const rows = [];
+    for (const t of T) {
+      const r = rows.find(r => Math.abs(r.y - t.y) < 20);
+      if (r) r.t.push(t);
+      else rows.push({ y: t.y, t: [t] });
+    }
+    return rows.flatMap(r => r.t.sort((a, b) => a.x - b.x));
+  }
+  /* the text runs of Word XML between two places: each run with its properties and text (raw XML), or null when it is no
+     plain text run */
+  function wRun(x) {
+    const m = /^<w:r(?:\s[^>]*)?>((?:<w:rPr>[\s\S]*?<\/w:rPr>)?)((?:<w:t(?:\s[^>]*)?>[^<]*<\/w:t>|<w:t\/>)+)<\/w:r>$/.exec(x);
+    if (!m) return null;
+    return { rPr: m[1], text: (m[2].match(/<w:t(?:\s[^>]*)?>([^<]*)<\/w:t>/g) || []).map(t => t.replace(/<[^>]+>/g, '')).join('') };
+  }
+  const wT = (rPr, t) => (t ? `<w:r>${rPr}<w:t xml:space="preserve">${t}</w:t></w:r>` : '');
+  const wSdt = (rPr, spec, num) =>
+    `<w:sdt><w:sdtPr>${rPr}<w:alias w:val="Compound ${spec}"/><w:tag w:val="rdcmpd:${spec}"/></w:sdtPr><w:sdtContent><w:r>${rPr}<w:t xml:space="preserve">${num}</w:t></w:r></w:sdtContent></w:sdt>`;
+  async function wordNumber(u, tpl, start, job) {
+    const z = await unzipAll(u),
+      td = new TextDecoder(),
+      te = new TextEncoder(),
+      relP = 'word/_rels/document.xml.rels';
+    let doc = td.decode(z.get('word/document.xml')),
+      rels = td.decode(z.get(relP) || new Uint8Array());
+    const R = relsMap(rels);
+    /* drawings aside (their own runs and text boxes), each a placeholder in the text */
+    const items = [];
+    doc = doc.replace(WORD_ITEM, x => {
+      items.push(x);
+      return '\u0000D' + (items.length - 1) + '\u0000';
+    });
+    /* the plain text runs of each paragraph, with the marks in them: [[…]] in a run (or across runs) becomes a content control */
+    const N = cmpdNumberer(tpl, start),
+      order = [];
+    const PIECE = /<w:sdt>(?:(?!<\/w:sdt>)[\s\S])*?<w:tag w:val="rdcmpd:([^"]+)"\/>[\s\S]*?<\/w:sdt>|<w:r(?:\s[^>]*)?>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>|<\/w:p>|\u0000D\d+\u0000|<w:(?:proofErr|bookmarkStart|bookmarkEnd)\b[^>]*\/>/g;
+    /* first pass: what comes where (marks, existing content controls, drawings), to number by first appearance */
+    const pieces = [];
+    let last = 0;
+    for (const m of doc.matchAll(PIECE)) {
+      if (m.index > last) pieces.push({ xml: doc.slice(last, m.index), other: true });
+      pieces.push({ xml: m[0], sdt: m[1] || null });
+      last = m.index + m[0].length;
+    }
+    if (last < doc.length) pieces.push({ xml: doc.slice(last), other: true });
+    const spec = (k, s, f) => k + (s ? '.' + s + (f ? '.' + f : '') : '');
+    const parseSpec = x => {
+      const m = /^([A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num))?)?$/.exec(x);
+      return m ? { key: m[1], sub: m[2] || '', fmt: m[3] || (m[2] ? 'letter' : '') } : null;
+    };
+    /* groups of plain runs (a mark can run across runs Word split) between other pieces */
+    const out = [];
+    let group = [];
+    const textMarks = [];
+    const flush = () => {
+      if (!group.length) return;
+      const runs = group.filter(g => g.run),
+        full = runs.map(g => g.run.text).join('');
+      if (!/\[\[/.test(full)) {
+        out.push(...group.map(g => ({ xml: g.xml })));
+        group = [];
+        return;
+      }
+      /* where each run's text starts */
+      let pos = 0;
+      for (const g of runs) {
+        g.at = pos;
+        pos += g.run.text.length;
+      }
+      const marks = [];
+      for (const m of full.matchAll(CMPD_RX)) marks.push({ s: m.index, e: m.index + m[0].length, key: m[1], sub: m[2] || '', fmt: m[3] || (m[2] ? 'letter' : '') });
+      for (const m of full.matchAll(CMPD_SET)) marks.push({ s: m.index, e: m.index + m[0].length, set: true });
+      marks.sort((a, b) => a.s - b.s);
+      for (const mk of marks) if (!mk.set) N.take(mk.key, mk.sub);
+      /* written again: the runs cut at the marks; a mark takes the properties of the run it starts in */
+      const rPrAt = i => {
+        for (let k = runs.length - 1; k >= 0; k--) if (runs[k].at <= i) return runs[k].run.rPr;
+        return '';
+      };
+      let xml = '',
+        cur = 0;
+      const textUpTo = (a, b) => {
+        let o = '';
+        for (const g of runs) {
+          const s0 = Math.max(a, g.at),
+            e0 = Math.min(b, g.at + g.run.text.length);
+          if (e0 > s0) o += wT(g.run.rPr, g.run.text.slice(s0 - g.at, e0 - g.at));
+        }
+        return o;
+      };
+      for (const mk of marks) {
+        xml += textUpTo(cur, mk.s);
+        const rp = rPrAt(mk.s);
+        if (mk.set) {
+          /* a setting stays, as hidden text */
+          const hp = rp ? rp.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>';
+          xml += wT(hp, full.slice(mk.s, mk.e));
+        } else {
+          const sp = spec(mk.key, mk.sub, mk.sub ? mk.fmt : '');
+          xml += '\u0000M' + textMarks.length + '\u0000';
+          textMarks.push({ rPr: rp, spec: sp, key: mk.key, sub: mk.sub, fmt: mk.fmt });
+        }
+        cur = mk.e;
+      }
+      xml += textUpTo(cur, full.length);
+      /* the other pieces of the group (bookmarks, spelling marks) after it */
+      xml += group.filter(g => !g.run).map(g => g.xml).join('');
+      out.push({ xml });
+      group = [];
+    };
+    for (const p of pieces) {
+      if (p.sdt) {
+        flush();
+        const q = parseSpec(p.sdt);
+        if (q) {
+          N.take(q.key, q.sub);
+          const rp = (/<w:sdtContent>[\s\S]*?<w:r(?:\s[^>]*)?>(<w:rPr>[\s\S]*?<\/w:rPr>)?/.exec(p.xml) || [])[1] || '';
+          out.push({ xml: '\u0000M' + textMarks.length + '\u0000' });
+          textMarks.push({ rPr: rp, spec: p.sdt, key: q.key, sub: q.sub, fmt: q.fmt });
+        } else out.push({ xml: p.xml });
+        continue;
+      }
+      const d = /\u0000D(\d+)\u0000/.exec(p.xml);
+      if (d) {
+        flush();
+        out.push({ xml: p.xml, item: +d[1] });
+        order.push(+d[1]);
+        continue;
+      }
+      const run = !p.other && p.xml.startsWith('<w:r') ? wRun(p.xml) : null;
+      if (run) {
+        group.push({ xml: p.xml, run });
+        continue;
+      }
+      if (!p.other && /^<w:(proofErr|bookmark)/.test(p.xml)) {
+        group.push({ xml: p.xml });
+        continue;
+      }
+      flush();
+      out.push({ xml: p.xml });
+    }
+    flush();
+    /* the drawings: their marks taken in the same pass, in document order (a drawing's marks count where the drawing is) */
+    const its = [];
+    for (const o of out) {
+      if (o.item == null) continue;
+      const x = items[o.item];
+      let it = null;
+      try {
+        if (x.startsWith('<w:object')) {
+          const ole = /<o:OLEObject\b[^>]*>/.exec(x),
+            rid = ole && /r:id="([^"]+)"/.exec(ole[0]),
+            part = rid && R[rid[1]] && wordPart(R[rid[1]]),
+            bin = part && z.get(part);
+          if (bin && /ProgID="ReactioDraw\./.test(ole[0])) {
+            const st = cfbRead(bin);
+            it = kdOf(st) ? { kd: JSON.parse(td.decode(kdOf(st))) } : st.CONTENTS ? { cdx: st.CONTENTS } : null;
+            if (it) it.ole = { part, st };
+          }
+        } else if (TAGRX.test(x)) {
+          const kd = await rdUntag(x.replace(/&#43;/g, '+').replace(/&#61;/g, '='));
+          if (kd) it = { kd, pic: true };
+        }
+      } catch (e) {
+        it = null;
+      }
+      if (!it) continue;
+      it.idx = o.item;
+      /* its marks, in reading order */
+      const marks = await withDrawing(it, async () =>
+        cmpdTexts().flatMap(t => [...(t.ctpl || t.text).matchAll(CMPD_RX)].map(m => [m[1], m[2] || ''])),
+      );
+      if (!marks || !marks.length) continue;
+      it.order = out.indexOf(o);
+      its.push(it);
+    }
+    /* numbering: text marks and drawing marks by their place in the document */
+    const uses = new Map();
+    {
+      const seq = [];
+      out.forEach((o, i) => {
+        for (const m of o.xml.matchAll(/\u0000M(\d+)\u0000/g)) seq.push([i, textMarks[+m[1]]]);
+        if (o.item != null) {
+          const it = its.find(t => t.idx === o.item);
+          if (it) seq.push([i, it]);
+        }
+      });
+      /* taken again from the start, now in document order (the first pass above only collected them) */
+      N.reset();
+      for (const [, x] of seq) {
+        if (x.spec) {
+          N.take(x.key, x.sub);
+          uses.set(x.key, (uses.get(x.key) || 0) + 1);
+        } else
+          await withDrawing(x, async () => {
+            for (const t of cmpdTexts())
+              for (const m of (t.ctpl || t.text).matchAll(CMPD_RX)) {
+                N.take(m[1], m[2] || '');
+                uses.set(m[1], (uses.get(m[1]) || 0) + 1);
+              }
+          });
+      }
+    }
+    if (job) job.set('Numbering ' + N.main.size + ' compounds');
+    /* the text */
+    let body = out
+      .map(o => o.xml)
+      .join('')
+      .replace(/\u0000M(\d+)\u0000/g, (m0, i) => {
+        const t = textMarks[+i];
+        return wSdt(t.rPr, t.spec, N.text(t.key, t.sub, t.fmt));
+      });
+    /* the drawings: their texts show the numbers, the marks kept; drawn again */
+    let k = 0,
+      nDraw = 0;
+    const addRel = (target, type) => {
+      const id = 'rIdRN' + ++k;
+      rels = rels.replace(
+        '</Relationships>',
+        `<Relationship Id="${id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/${type}" Target="${target}"/></Relationships>`
+      );
+      return id;
+    };
+    for (const it of its) {
+      if (job) {
+        job.set('Drawing ' + (nDraw + 1) + ' of ' + its.length + ' with its numbers');
+        await job.pause();
+        if (job.stopped) throw { stopped: true };
+      }
+      const got = await withDrawing(it, async () => {
+        for (const t of cmpdTexts()) {
+          if (!t.ctpl) t.ctpl = t.text;
+          const cx = t.x + textW(t) / 2;
+          t.text = t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
+          t.x = cx - textW(t) / 2;
+        }
+        const kd = JSON.stringify(it.kd && it.kd.clip && !it.kd.state ? { rd: 1, state: S } : { ...(it.kd || { rd: 1 }), state: S }),
+          svg = svgFileOf(),
+          r = { kd, svg };
+        if (it.pic) {
+          r.tag = await rdTag(kd);
+          r.png = (await pngSized(false)).png;
+        } else {
+          r.cdx = cdxOfCdxml(exportFormats().cdxml);
+          try {
+            r.emf = await emfOf(svgOf(true));
+          } catch (e) {}
+        }
+        return r;
+      });
+      if (!got) continue;
+      let x = items[it.idx];
+      if (it.pic) {
+        const tagEsc = got.tag.replace(/\+/g, '&#43;').replace(/=/g, '&#61;');
+        x = x.replace(/(\s(?:descr|title)=")([^"]*RDRAW1:[^"]*)"/g, (m0, a) => a + tagEsc + '"');
+        const bl = /<a:blip\b[^>]*r:embed="([^"]+)"/.exec(x);
+        if (bl && R[bl[1]]) z.set(wordPart(R[bl[1]]), pngTagged(got.png, got.tag));
+        const sb = /<asvg:svgBlip\b[^>]*r:embed="([^"]+)"/.exec(x);
+        if (sb && R[sb[1]]) z.set(wordPart(R[sb[1]]), te.encode(got.svg));
+      } else {
+        const st = it.ole.st,
+          streams = Object.keys(st)
+            .filter(n => n !== 'CONTENTS' && n !== 'RDData')
+            .map(n => ({ name: n, data: st[n] }));
+        streams.push({ name: 'CONTENTS', data: got.cdx }, { name: 'RDData', data: te.encode(got.kd) });
+        z.set(it.ole.part, cfbOf(streams, RD_OLE.clsid));
+        const im = /<v:imagedata\b[^>]*r:id="([^"]+)"/.exec(x);
+        if (im && got.emf) {
+          const nm = 'media/rdnum' + (k + 1) + '.emf';
+          z.set('word/' + nm, got.emf);
+          x = x.replace(im[0], im[0].replace(im[1], addRel(nm, 'image')));
+        }
+      }
+      items[it.idx] = x;
+      nDraw++;
+    }
+    body = body.replace(/\u0000D(\d+)\u0000/g, (m0, i) => items[+i]);
+    let ct = td.decode(z.get('[Content_Types].xml'));
+    if (!/Extension="emf"/i.test(ct)) ct = ct.replace('<Override', '<Default Extension="emf" ContentType="image/x-emf"/><Override');
+    z.set('[Content_Types].xml', te.encode(ct));
+    z.set('word/document.xml', te.encode(body));
+    z.set(relP, te.encode(rels));
+    /* keys met only once in the whole file: perhaps a typing slip */
+    const once = [...N.main.keys()].filter(key => (uses.get(key) || 0) <= 1);
+    return {
+      bytes: zipOf([...z].filter(([, v]) => v)),
+      compounds: N.main.size,
+      marks: textMarks.length,
+      drawings: nDraw,
+      list: [...N.main].map(([key]) => [key, N.text(key, '', '')]),
+      once
+    };
+  }
+  /* File → Word files → Number the compounds: the file, then its style (from the file when it says, else the last one) */
+  async function wordNumberAsk(f) {
+    const u = new Uint8Array(await f.arrayBuffer());
+    let set = {};
+    try {
+      const z = await unzipAll(u);
+      set = cmpdSettings(new TextDecoder().decode(z.get('word/document.xml')));
+    } catch (e) {
+      toast('Could not read ' + f.name + ': ' + ((e && e.message) || e), true);
+      return;
+    }
+    let last = {};
+    try {
+      last = JSON.parse(localStorage.getItem('rd-wnum') || '{}');
+    } catch (e) {}
+    const old = document.getElementById('wnumAsk');
+    if (old) old.remove();
+    const d = document.createElement('div');
+    d.id = 'wnumAsk';
+    d.className = 'pop';
+    d.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 32px));padding:12px 14px';
+    d.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Number the compounds of ${esc(f.name)}</div>
+<div class="note" style="margin-bottom:8px">Marks in the text and in Reactio Draw drawings: <b>[[key]]</b> → 7, <b>[[key.sub.letter]]</b> → 7a, <b>[[key.sub.num]]</b> → 7.1. Numbers go by first appearance. A copy of the file is written; the marks stay in it, so it can be numbered again.</div>
+<div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap"><span class="note">Number</span><input id="wnumTpl" style="width:96px" aria-label="Number style"><span class="note">from</span><input id="wnumStart" style="width:52px" aria-label="First number"><span class="note" style="flex:1">{n} the number, e.g. S{n}</span></div>
+<div class="note" id="wnumFrom" style="margin-top:4px"></div>
+<div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
+    document.body.appendChild(d);
+    const T = d.querySelector('#wnumTpl'),
+      Sx = d.querySelector('#wnumStart');
+    T.value = set.format || last.tpl || '{n}';
+    Sx.value = set.start || last.start || '1';
+    d.querySelector('#wnumFrom').textContent =
+      set.format || set.start ? 'Style set in the file ([[#format …]], [[#start …]]); change it here for this copy only' : 'In the file, [[#format S{n}]] and [[#start 5]] set the style for it';
+    d.addEventListener('keydown', e => {
+      if (e.key === 'Escape') d.remove();
+    });
+    d.addEventListener('click', async e => {
+      const b = e.target.closest('[data-w]');
+      if (!b) return;
+      if (b.dataset.w === 'no') return d.remove();
+      const tpl = T.value.trim() || '{n}',
+        st = parseInt(Sx.value, 10) || 1;
+      d.remove();
+      try {
+        localStorage.setItem('rd-wnum', JSON.stringify({ tpl, start: String(st) }));
+      } catch (er) {}
+      const job = busyBar('Numbering the compounds of ' + f.name);
+      try {
+        await job.pause();
+        const r = await wordNumber(u, tpl, st, job);
+        if (!r.compounds) {
+          toast('No [[key]] marks in ' + f.name, true);
+          return;
+        }
+        offerFile(
+          f.name.replace(/\.docx$/i, '') + ' (numbered).docx',
+          new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
+        );
+        toast(
+          r.compounds + ' compound' + (r.compounds > 1 ? 's' : '') + ' numbered: ' + r.marks + ' mark(s) in the text, ' + r.drawings + ' drawing(s)' +
+            (r.once.length ? '. Met only once (a typing slip?): ' + r.once.slice(0, 6).join(', ') : '')
+        );
+      } catch (er) {
+        if (!(er && er.stopped)) {
+          console.error(er);
+          toast('Could not number ' + f.name + ': ' + ((er && er.message) || er), true);
+        } else toast('Stopped: no file written');
+      } finally {
+        job.end();
+      }
+    });
+    T.focus();
+  }
   /* a Word file opened, dropped or sent from Word: its drawings on a new sheet, one under another */
   async function wordOpen(u, name) {
     const its = await wordDrawings(u);
@@ -37427,7 +37888,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       openFile();
       return;
     }
-    if (k === 'w-all' || k === 'w-clean') {
+    if (k === 'w-all' || k === 'w-clean' || k === 'w-num') {
       wordIn.dataset.mode = k;
       wordIn.value = '';
       wordIn.click();
@@ -65773,6 +66234,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    wordNumber,
+    rdUntag,
     molBlock,
     nmrPredict,
     smilesRepeat,
