@@ -23,3 +23,12 @@ How Reactio Draw uses them: `tools/make_names_pack.py` puts the four files into 
 after asking. A name is read in this order: Reactio Draw's own list of about 600 names; Octet Draw's tables; the
 dictionary's names marked to be read before OPSIN; OPSIN; the rest of the dictionary (names, CAS numbers,
 InChIKeys); in the apps, the OPSIN Java program as before.
+
+`depictions.txt`: drawings of 83 natural products and drugs (strychnine, paclitaxel, morphine, quinine, artemisinin, the
+steroids, the opioids, penicillins, statins and others from the tables) as ChEBI (EMBL-EBI, CC BY 4.0) draws them: per
+line the OpenChemLib idcode of the structure (and of the drawing, where it reads a tautomer or a bridgehead N
+differently), the ChEBI number, the atoms (element, x and y × 100, charge), the bonds (atoms, order, MDL stereo) and the
+charge lines. Each was taken from the entry found by the InChIKey of the table's structure, and its InChIKey (stereo
+included) was checked to be that one. A structure added from a name or a SMILES that is one of them takes the drawing's
+places, wedges and drawn H; the configuration is checked again when it is used. Adamantanes (amantadine, memantine)
+keep Reactio Draw's own drawing.

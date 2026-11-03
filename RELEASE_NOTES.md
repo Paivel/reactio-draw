@@ -3,7 +3,13 @@
 ## Changed
 
 - **Clearer wedges.** A wedge or hash no longer runs from one stereocentre to another: the centre's H is drawn with the wedge on it (as at ring junctions), or the wedge moves to a bond out to an atom that is no stereocentre; the same where InChI found the wedges ambiguous. The configuration is checked after every move. Strychnine and paclitaxel come out as they are usually drawn.
+- **Known molecules drawn as chemists draw them.** 83 natural products and drugs from the name tables (strychnine, paclitaxel, morphine, quinine, artemisinin, the steroids, opioids, penicillins, statins…), added from a name or a SMILES, take ChEBI's drawing (EMBL-EBI, CC BY 4.0) with its wedges and the H at ring junctions; each drawing was checked against its InChIKey. Clean Up draws them that way again. The local API's addSmiles does too (depiction: false keeps the computed layout).
 - Clean Up turns a chain end (a methyl, an OH) off another bond it lay on.
+
+## Fixed
+
+- CDXML and CDX keep the side of an atom's H: HN (H to the left) and an H above or below the symbol are written as drawn and stay there when the file is opened again.
+- The name reader could not start where a page may not import a module (some previews and embedded views): it now runs there too.
 
 # Reactio Draw 1.8.1
 
