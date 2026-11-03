@@ -12218,7 +12218,21 @@ function kdOf(st) {
     }
     return w;
   }
-  const textW = t => Math.max(...tLines(t).map(l => lineW(t, l)));
+  const textW = t => {
+    const L = tLines(t);
+    /* a formula with a charge (BH4-, Mg^2+) is drawn as its formula and a small raised charge (textHTML): measured so */
+    if (t.fs && L.length === 1 && !hasRich(t.text) && !t.align) {
+      const n = /^(\d+ )(.+)$/.exec(t.text),
+        sc = splitCharge(n ? n[2] : t.text);
+      if (sc.q !== 0 && /[A-Z]/.test(sc.base) && !/[\s,;:°%]/.test(sc.base))
+        return (
+          (n ? lineW(t, n[1]) : 0) +
+          lineW(t, sc.base) +
+          measureW(`${t.italic ? 'italic ' : ''}${t.bold ? 700 : STYo(t).weight === 400 ? 400 : 500} ${tSize(t) * 0.7}px ${txtFont(t)}`, chgStr(sc.q))
+        );
+    }
+    return Math.max(...L.map(l => lineW(t, l)));
+  };
   /* a text that counts as a compound, and the label it becomes when a bond is drawn to it (its styles kept); such a label (a.fl) is counted by its formula */
   const chemTxt = t => !!t && !t.nochem && !!textCounts(t);
   /* a reagent written as text, as a SMILES: a known name first (nBuLi, TMSCl, AIBN, K2CO3, the Beilstein reagent list), then an
@@ -13244,11 +13258,13 @@ function kdOf(st) {
       }).join('');
     }
     if (!t.fs) return esc(t.text);
-    const sc = splitCharge(t.text);
+    /* a number before an ion (2 Na+, ions left over in a reaction's agents) stays before it */
+    const cnt = /^(\d+ )(.+)$/.exec(t.text),
+      sc = splitCharge(cnt ? cnt[2] : t.text);
     const chem = sc.q !== 0 && /[A-Z]/.test(sc.base) && !/[\s,;:°%]/.test(sc.base);
     const body = chem ? sc.base : t.text;
     const fz = tSize(t);
-    let s = subTs(esc(body), fz);
+    let s = (chem && cnt ? cnt[1] : '') + subTs(esc(body), fz);
     if (chem) s += `<tspan dy="${-(fz * 0.38).toFixed(2)}" font-size="70%">${chgStr(sc.q)}</tspan>`;
     return s;
   }
@@ -17655,6 +17671,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (st && a.label === plain) {
         a.lsty = st;
         commit();
+      } else if (st && a.label && a.label === revLabel(plain)) {
+        /* typed back to front (\i{t}BuO → OtBu): each part keeps its own styles */
+        const k = labTokens(plain);
+        if (k && k.join('') === plain) {
+          const parts = [];
+          let o = 0;
+          for (const x of k) {
+            parts.push(st.slice(o, o + x.length));
+            o += x.length;
+          }
+          a.lsty = parts.reverse().flat();
+          commit();
+        }
       }
     });
   }
@@ -17751,7 +17780,42 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     applyLabel0(a, t);
     if (pfxMode() !== 'plain' && a.label && !a.lsty && pfxStyle(a, pfxMode())) commit();
   }
+  /* a group typed back to front (MeO, BnO, MeO2C, tBuO, HO): kept the usual way round (OMe, OBn, CO2Me, OtBu, OH), so the atom
+     that bonds is at the bond and the label turns with its side; only when both ways mean the same group (NC, the isocyanide,
+     stays NC) */
+  function labelFrontFirst(t) {
+    const k = labTokens(t);
+    if (!k || k.length < 2) return t;
+    const r = revLabel(t),
+      tok0 = x => (x || '').replace(/\d+$/, ''),
+      at0 = g => (/^\[?([A-Z][a-z]?)/.exec(g || '') || [])[1],
+      key = g => idOf('[*]' + String(g).replace(/\[(Cl|Br|[BCNOPSFI])\]/g, '$1')),
+      gt = resolveLabel(t),
+      gr = resolveLabel(r),
+      r0 = tok0(labTokens(r)[0]);
+    if (!(r0 in AW)) return t;
+    if (gt) {
+      if (tok0(k[0]) === at0(gt) || !gr || at0(gr) !== r0) return t;
+      const a1 = key(gt),
+        a2 = key(gr);
+      return a1 && a1 === a2 ? r : t;
+    }
+    /* unknown this way round, known the other (tBuO, BocHN, HO, H2N, F3CO, HOH2C, H2NOC): bonded by C, by S with no N after it, or by O or N
+       with only H, C, halogens and abbreviations after it and no C before an O, N or S, so that turning it round cannot make
+       another group (MeOCO, H2NCO, CNO stay as typed); no halide (HCl) */
+    const after = labTokens(r).slice(1).map(tok0),
+      rawAfter = labTokens(r).slice(1),
+      safe =
+        /* bonded by C: not C then a single O or S and nothing but H or a group after it (EtOC, HOC, MeSC are no COEt; ClOC is COCl) */
+        (r0 === 'C' && !(/^[OS]$/.test(rawAfter[0] || '') && !/^(N|O|F|Cl|Br|I)\d*$/.test(rawAfter[1] || ''))) ||
+        (r0 === 'S' && after.every(x => /^(H|C|O|F|Cl|Br|I)$/.test(x) || !(x in AW))) ||
+        (after.every(x => /^(H|D|C|Si|Ge|Sn|B|F|Cl|Br|I)$/.test(x) || !(x in AW)) &&
+          !after.some((x, i) => x === 'C' && /^(O|N|S)$/.test(after[i + 1] || '')));
+    if (!safe || /^(F|Cl|Br|I)$/.test(r0)) return t;
+    return (gr && at0(gr) === r0) || knownLabel(r) ? r : t;
+  }
   function applyLabel0(a, t) {
+    t = labelFrontFirst(t);
     lastLabel = t;
     {
       /* element with its hydrogens and charge as typed: NH2, N (no H), NH2+, O−; the hydrogens typed are kept as given */
@@ -30267,10 +30331,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return out;
     }
     if (!t.fs) return run(t.text, base);
-    const sc = splitCharge(t.text),
+    /* a number before an ion (2 Na+) stays before it, as on the sheet */
+    const cnt = /^(\d+ )(.+)$/.exec(t.text),
+      sc = splitCharge(cnt ? cnt[2] : t.text),
       chem = sc.q !== 0 && /[A-Z]/.test(sc.base) && !/[\s,;:°%]/.test(sc.base),
       body = chem ? sc.base : t.text;
-    let out = '',
+    let out = chem && cnt ? run(cnt[1], base) : '',
       last = 0;
     const re = /([A-Za-z\)\]])(\d+)/g;
     let mm;
@@ -48661,9 +48727,174 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         .map(p => ({ mz: +p.mz.toFixed(4), rel: +p.rel.toFixed(1) }))
     };
   }
+  /* the agents of a reaction SMILES (A>agents>B) as chemists write them over the arrow: a known reagent by its usual short name
+     (NaBH4, K2CO3, Et3N, THF), the ions of one salt together (Na+ and BH4− as NaBH4), anything else as its formula with its charge */
+  /* the names, indexed by the heavy atoms of their SMILES (cheap to count), so that only a few candidates are compared by
+     their canonical code (OpenChemLib) when a reaction is read */
+  let AGENT_IDX = null;
+  const agentHeavy = smi => {
+    const c = {};
+    for (const m of String(smi).matchAll(/\[([^\]]+)\]|Cl|Br|[BCNOPSFI]|[bcnops]/g)) {
+      let e = m[1] ? (/^\d*([A-Z][a-z]?|[a-z]{1,2})/.exec(m[1]) || [])[1] : m[0];
+      if (!e) continue;
+      e = e[0].toUpperCase() + e.slice(1);
+      if (e !== 'H') c[e] = (c[e] || 0) + 1;
+    }
+    return Object.keys(c)
+      .sort()
+      .map(k => k + c[k])
+      .join('');
+  };
+  /* a short name: no word of four or more small letters (MeOH, Et3N, THF, NaBH4, nBuLi), unlike toluene or water */
+  const agentAbbr = n => !/[a-z]{4,}/.test(n.replace(/^[a-z]{1,3}(?=[A-Z])/, ''));
+  function agentIndex() {
+    if (AGENT_IDX) return AGENT_IDX;
+    AGENT_IDX = new Map();
+    let ord = 0;
+    const add = (n, s, pri) => {
+      const k = agentHeavy(s);
+      if (!AGENT_IDX.has(k)) AGENT_IDX.set(k, []);
+      AGENT_IDX.get(k).push({ n, s, pri, ord: ord++, id: undefined });
+    };
+    /* our own list first, each entry by its best name: a formula-like one (Et3N before TEA), else its first short one */
+    TRIVIAL.forEach(([al, s]) => {
+      const a = al.split('|'),
+        best = a.find(n => agentAbbr(n) && /\d/.test(n)) || a.find(agentAbbr);
+      a.forEach(n => add(n, s, n === best ? 0 : agentAbbr(n) ? 2 : 3));
+    });
+    for (const [n, s] of Object.entries(BCL.r)) add(n, s, agentAbbr(n) ? 1 : 3);
+    /* and the reagents Octet Draw's tables give as SMILES (MeMgBr, PhLi, Et3N·HCl) */
+    const oct = document.getElementById('octetNamerLib');
+    if (oct)
+      for (const m of oct.textContent.matchAll(/(?:"([^"\n]{1,24})"|\b([A-Za-z0-9()·]{2,24})):\s*"smiles:([^"\n]+)"/g)) {
+        const n = m[1] || m[2];
+        add(n, m[3], agentAbbr(n) ? 1 : 3);
+      }
+    return AGENT_IDX;
+  }
+  /* a metal bonded to O, N, halogens… (Pd(OAc)2 written CC(=O)O[Pd]OC(C)=O) is looked up as its salt too */
+  function ionicId(smi) {
+    try {
+      const O = oclLoad(),
+        M = O.Molecule.fromSmiles(smi);
+      let cut = 0;
+      for (let b = M.getAllBonds() - 1; b >= 0; b--) {
+        const x = M.getBondAtom(0, b),
+          y = M.getBondAtom(1, b),
+          mx = M.isMetalAtom(x),
+          my = M.isMetalAtom(y);
+        if (mx === my || M.getBondOrder(b) !== 1) continue;
+        const met = mx ? x : y,
+          lig = mx ? y : x;
+        if (M.getAtomicNo(lig) === 6 || M.getAtomicNo(lig) === 1) continue;
+        M.deleteBond(b);
+        M.setAtomCharge(met, M.getAtomCharge(met) + 1);
+        M.setAtomCharge(lig, M.getAtomCharge(lig) - 1);
+        cut++;
+      }
+      return cut ? M.getIDCode() : null;
+    } catch (e) {
+      return null;
+    }
+  }
+  function agentName(smi) {
+    const list = agentIndex().get(agentHeavy(smi));
+    if (!list) return null;
+    const k = idOf(smi);
+    if (!k) return null;
+    let ki;
+    const hits = list.filter(e => {
+      if (e.id === undefined) e.id = idOf(e.s);
+      if (e.id === k) return true;
+      if (ki === undefined) ki = ionicId(smi);
+      return !!ki && e.id === ki;
+    });
+    if (!hits.length) return null;
+    hits.sort((a, b) => a.pri - b.pri || a.ord - b.ord);
+    return hits[0].n;
+  }
+  /* an ion's formula as chemists write it: OH, HSO4, NO3 (the O last, an acidic H first), NH4, BH4 (the H after the
+     central atom); with carbon in Hill order (C2H5) */
+  function ionFormula(f) {
+    if (/^C(?![a-z])/.test(f)) return f;
+    const el = [...f.matchAll(/([A-Z][a-z]?)(\d*)/g)].map(m => [m[1], m[2]]),
+      g = e => el.filter(x => x[0] === e).map(x => x[0] + x[1]).join(''),
+      rest = el.filter(x => x[0] !== 'H' && x[0] !== 'O').map(x => x[0] + x[1]).join('');
+    if (!rest) return g('O') + g('H');
+    return el.some(x => x[0] === 'O') ? g('H') + rest + g('O') : rest + g('H');
+  }
+  function agentTexts(m) {
+    const parts = String(m).split('.').filter(Boolean);
+    if (!parts.length) return [];
+    const whole = agentName(parts.join('.'));
+    if (whole) return [whole];
+    let O;
+    try {
+      O = oclLoad();
+    } catch (e) {
+      return parts;
+    }
+    const info = parts.map(s => {
+      try {
+        const M = O.Molecule.fromSmiles(s);
+        let q = 0;
+        for (let i = 0; i < M.getAllAtoms(); i++) q += M.getAtomCharge(i);
+        const f0 = M.getMolecularFormula().formula.replace(/[+-]\d*$/, '');
+        return { s, q, f: q ? ionFormula(f0) : f0, key: M.getIDCode() };
+      } catch (e) {
+        return { s, q: 0, f: null, key: s };
+      }
+    });
+    /* Mg^2+ (a charge of 2 or more after ^, as texts write it), Na+ */
+    const ionText = (f, q) => f + (Math.abs(q) > 1 ? '^' + Math.abs(q) : '') + (q > 0 ? '+' : '-');
+    const out = [],
+      seen = new Set();
+    /* an organic compound with no short name is drawn over the arrow ({smiles}), as its formula would say little; a compound
+       given twice is written once */
+    for (const p of info.filter(p => !p.q)) {
+      if (seen.has(p.key)) continue;
+      seen.add(p.key);
+      const n = agentName(p.s);
+      out.push(n || (p.f && /^C(?![a-z])/.test(p.f) ? { smiles: p.s } : p.f || p.s));
+    }
+    const ions = info.filter(p => p.q);
+    if (ions.length) {
+      const kinds = new Map();
+      ions.forEach(p => (kinds.has(p.key) ? kinds.get(p.key).n++ : kinds.set(p.key, { ...p, n: 1 })));
+      const ks = [...kinds.values()],
+        cat = ks.filter(p => p.q > 0),
+        an = ks.filter(p => p.q < 0),
+        gcd = (x, y) => (y ? gcd(y, x % y) : x);
+      /* salts: each cation with the anions that balance it, as far as there are (Na+ and BH4− as NaBH4, Mg2+ and two Br− as
+         MgBr2, two NaCl as NaCl), by its usual name if it has one, else cation and anion with their numbers, polyatomic ones in
+         brackets (K2CO3, Ca(OH)2); ions left over keep their number (2 Na+) */
+      const poly = /[A-Z].*[A-Z]|[A-Z][a-z]?\d/,
+        part = (p, n) => (n > 1 && poly.test(p.f) ? '(' + p.f + ')' + n : p.f + (n > 1 ? n : ''));
+      ks.forEach(p => (p.rem = p.n));
+      for (const c of cat)
+        for (const a of an) {
+          if (!c.f || !a.f || !c.rem || !a.rem) continue;
+          /* the smallest whole salt (c cations to a anions), then as many of it as both have */
+          const g = gcd(c.q, -a.q),
+            uc = -a.q / g,
+            ua = c.q / g,
+            times = Math.min(Math.floor(c.rem / uc), Math.floor(a.rem / ua));
+          if (times < 1) continue;
+          c.rem -= uc * times;
+          a.rem -= ua * times;
+          out.push(
+            agentName([...Array(uc).fill(c.s), ...Array(ua).fill(a.s)].join('.')) || part(c, uc) + part(a, ua)
+          );
+        }
+      for (const p of ks)
+        if (p.rem) out.push((p.rem > 1 ? p.rem + ' ' : '') + (p.f ? ionText(p.f, p.q) : p.s));
+    }
+    return out;
+  }
   function apiAddReaction(a) {
     let R = a.reactants || [],
-      P = a.products || [];
+      P = a.products || [],
+      agentStructs = [];
     if (a.smiles) {
       const [l, m, r] = String(a.smiles)
         .replace(/\s+\|[^|]*\|\s*$/, '')
@@ -48671,7 +48902,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (r === undefined) throw new Error('Reaction SMILES needs ">>"');
       R = l ? l.split('.').filter(Boolean) : [];
       P = r ? r.split('.').filter(Boolean) : [];
-      if (m) a.above = (a.above || []).concat(m.split('.').filter(Boolean));
+      if (m) {
+        const ag = agentTexts(m);
+        a.above = (a.above || []).concat(ag.filter(x => typeof x === 'string'));
+        agentStructs = ag.filter(x => typeof x !== 'string').map(x => x.smiles);
+      }
     }
     if (!P.length) throw new Error('Give at least one product');
     /* a sheet that already holds a drawing: the new reaction goes under it and its clean up is left out, as it would take the
@@ -48728,6 +48963,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     /* the arrow as long as its widest text (arrowLength: a length of its own), what follows it moved along */
     apiFitArrow(ar, a.arrowLength, a.textMargin);
+    /* agents with no short name drawn over the arrow, above its texts, one over the other; the arrow as wide as they need */
+    if (agentStructs.length) {
+      const drawn = agentStructs.map(smi => {
+        const g = parseSmiles(smi);
+        if (!g) return null;
+        const at = placeGraph(g, { x: 0, y: 0 });
+        applySmilesStereo(smi, at);
+        return at;
+      }).filter(Boolean);
+      if (drawn.length) {
+        const bx = at => fragBox(at),
+          wMax = Math.max(...drawn.map(at => bx(at).x1 - bx(at).x0));
+        if (!a.arrowLength && wMax + 2 * (a.textMargin ?? 14) > ar.x2 - ar.x1) apiFitArrow(ar, wMax + 2 * (a.textMargin ?? 14));
+        const mx = (ar.x1 + ar.x2) / 2,
+          tops = mol.texts.filter(t => !t.plus && t.y < ar.y1 && t.x < ar.x2 && t.x + textW(t) > ar.x1 && ar.y1 - t.y < tSize(t) * 8);
+        let yb = (tops.length ? Math.min(...tops.map(t => t.y - tSize(t))) : ar.y1) - 14;
+        for (const at of drawn) {
+          const b = bx(at),
+            dx = mx - (b.x0 + b.x1) / 2,
+            dy = yb - b.y1;
+          at.forEach(q => ((q.x += dx), (q.y += dy)));
+          yb -= b.y1 - b.y0 + 14;
+        }
+      }
+    }
     /* labels: lines under each compound, in order (reactants, then products), centred, on one baseline */
     if (Array.isArray(a.labels)) {
       const frs = placed.map(ids => ids.map(id => atomById(id)).filter(Boolean)).filter(f => f.length);
@@ -59310,7 +59570,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       snap();
       for (const [q, o] of todo) {
         if (o.label != null) {
-          const t = String(o.label).trim(),
+          /* MeO, BnO written back to front: the usual way round (OMe), unless it is to stay as written (direction keep) */
+          const t0 = String(o.label).trim(),
+            t = o.direction === 'keep' ? t0 : labelFrontFirst(t0),
             e = /^([A-Z][a-z]?)$/.exec(t);
           if (!t) setEl(q, 'C');
           else if (e && e[1] in AW) setEl(q, e[1]);
@@ -63701,6 +63963,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   window.__rd = {
     molBlock,
+    agentTexts,
+    labelFrontFirst,
     useDepiction,
     cleanDepiction,
     wedgeTidy,

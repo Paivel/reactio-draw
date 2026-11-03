@@ -1,3 +1,11 @@
+# Reactio Draw, next version (not released yet)
+
+## Fixed
+
+- **Reagents of a reaction SMILES are written as chemists write them** over the arrow, not as SMILES: a known reagent by its usual short name (NaBH4, K2CO3, Et3N, THF, Pd(OAc)2, MeMgBr), each cation with the anion that balances it as one salt (Na+ and BH4− as NaBH4, Mg2+ and two Br− as MgBr2; K2CO3, Ca(OH)2, (NH4)2SO4), other ions with their charge (Na+, Cl−), and an organic compound with no short name drawn over the arrow. The reagent table counts each of them.
+- **A group typed back to front** (MeO, BnO, MeO2C, TBSO, tBuO, AcHN, HO) is kept the usual way round (OMe, OBn, CO2Me…), so the atom that bonds stays at the bond on either side of a ring and the label turns with its side; NC (isocyanide) and MeS (mesityl) stay as typed. Through the local API, direction: keep still writes a label as given.
+- A formula with a charge (BH4−, Mg2+) over an arrow is centred as drawn.
+
 # Reactio Draw 1.9
 
 ## New
