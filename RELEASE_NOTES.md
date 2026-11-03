@@ -1,3 +1,15 @@
+# Reactio Draw 1.8.1
+
+## Changed
+
+- **Narrow windows** (701–1060 px) keep the sheet large: the left tools in one column, with Bonds, Symbols, Atoms and Rings as one button each (the last used, the rest in its menu); the compact top bar; the side panel opens over the sheet. The left tools scroll when they do not fit.
+- **Very narrow windows** (up to 700 px): the tools in two compact rows, the sheet as tall as the window allows, and the panel folded to its tabs under the sheet (the arrow opens it as a window on the right).
+
+## Fixed
+
+- In the compact top bar, the ⋮ of the File buttons folds them too.
+- In a narrow window the side panel kept its labels hidden (SMILES, InChI, Name, NMR prediction).
+
 # Reactio Draw 1.8
 
 ## New

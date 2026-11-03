@@ -522,7 +522,7 @@ html.maxi aside.info {
   min-height: 0;
 }
 /* desktop: use the whole window width, and let the sheet fill the window height */
-@media (min-width: 1061px) and (min-height: 600px) {
+@media (min-width: 701px) and (min-height: 480px) {
   .wrap {
     max-width: none;
     padding-inline: 12px;
@@ -551,7 +551,7 @@ html.maxi aside.info {
     min-height: 0;
   }
 }
-@media (max-width: 1060px) {
+@media (max-width: 700px) {
   html.maxi .sheet.editor {
     height: auto;
   }
@@ -1496,12 +1496,8 @@ svg#mol.pan {
   width: 14px;
   height: 14px;
 }
-@media (max-width: 1060px) {
-  .sidefold {
-    display: none;
-  }
-}
-@media (min-width: 1061px) {
+/* (in a phone-wide window it folds the panel under the sheet: see below) */
+@media (min-width: 701px) {
   html.side-folded .editor {
     grid-template-columns: auto minmax(0, 1fr) 34px;
   }
@@ -1527,6 +1523,134 @@ svg#mol.pan {
   }
   html.side-folded .sidefold svg {
     transform: scaleX(-1);
+  }
+}
+/* the left tools scroll when they do not fit the window's height, with a thin scroll bar */
+.tools {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+/* the left tools in a narrow window (701–1060 px): one column; Bonds, Symbols, Atoms and Rings one button each (the tool
+   used last), the others in its menu */
+@media (min-width: 701px) and (max-width: 1060px) {
+  .tools .tgroup:not(.flypop),
+  .tools .flyrow {
+    grid-template-columns: 36px;
+  }
+  .tools .flyrow > .tb.fly:not(:first-child) {
+    display: none;
+  }
+  .tools .tbg {
+    max-width: 40px;
+  }
+  /* Atoms folded under its heading: its one button goes too */
+  .tlabel.fold.closed + .tgroup + .flyrow {
+    display: none;
+  }
+}
+/* Rings and Atoms in a wide window: all the buttons, as before (the one-button row is for narrower windows) */
+@media (min-width: 1061px) {
+  .flyrow.ringflyrow,
+  .flyrow.atomflyrow {
+    display: none;
+  }
+  /* !important: the page hides every [hidden] with !important, and the narrow menu sets hidden; a group folded under
+     its heading (Atoms) stays folded */
+  .tgroup.flypop.ringfly:not(.folded),
+  .tgroup.flypop.ringfly[hidden]:not(.folded),
+  .tgroup.flypop.atomfly:not(.folded),
+  .tgroup.flypop.atomfly[hidden]:not(.folded) {
+    display: grid !important;
+    position: static;
+    z-index: auto;
+    background: none;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    grid-template-columns: repeat(3, 36px);
+    align-content: start;
+  }
+  .topbar .mvwrap .tgroup.flypop.ringfly:not(.folded),
+  .topbar .mvwrap .tgroup.flypop.ringfly[hidden]:not(.folded),
+  .topbar .mvwrap .tgroup.flypop.atomfly:not(.folded),
+  .topbar .mvwrap .tgroup.flypop.atomfly[hidden]:not(.folded) {
+    display: flex !important;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+}
+/* a phone-wide window (up to 700 px), tools above the sheet: every button in one flowing row, Bonds, Symbols, Atoms and
+   Rings one button each (the tool used last, the others in its menu); the panel under the sheet folds to its tabs */
+@media (max-width: 700px) {
+  .tools {
+    gap: 4px;
+    padding: 8px;
+  }
+  .tools > .tgroup:not(.flypop):not(.folded),
+  .tools > .flyrow,
+  .tools > .tbg {
+    display: contents;
+  }
+  .tools .flyrow > .tb.fly:not(:first-child) {
+    display: none;
+  }
+  .sidefold {
+    display: grid;
+  }
+  .sidefold svg {
+    transform: rotate(90deg);
+  }
+  html.side-folded aside.info > :not(.tabs) {
+    display: none !important;
+  }
+  html.side-folded .sidefold svg {
+    transform: rotate(-90deg);
+  }
+  /* opened, the panel lies over the right of the editor as its own window (folded, it is the row of tabs under the sheet) */
+  html:not(.side-folded) .editor {
+    position: relative;
+  }
+  html:not(.side-folded) aside.info {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 88vw);
+    z-index: 60;
+    overflow-y: auto;
+    background: var(--panel);
+    border-top: 0;
+    border-left: 1px solid var(--line);
+    box-shadow: -10px 0 28px rgb(0 0 0 / 0.18);
+  }
+  html:not(.side-folded) .sidefold svg {
+    transform: none;
+  }
+  /* the sheet takes the height the tools and the tabs leave (in the apps too, html.maxi) */
+  svg#mol,
+  html.maxi svg#mol {
+    aspect-ratio: auto;
+    flex: none;
+    height: max(260px, calc(100vh - var(--sheet-top, 250px) - 70px));
+  }
+}
+/* a narrow window (701–1060 px): the side panel, when opened, lies over the right of the sheet instead of narrowing it */
+@media (min-width: 701px) and (max-width: 1060px) {
+  html:not(.side-folded) .editor {
+    grid-template-columns: auto minmax(0, 1fr) 34px;
+    position: relative;
+  }
+  html:not(.side-folded) aside.info {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(380px, 62vw);
+    z-index: 60;
+    background: var(--panel);
+    border-left: 1px solid var(--line);
+    box-shadow: -10px 0 28px rgb(0 0 0 / 0.16);
   }
 }
 /* Analysis tab: three groups that open and close (remembered) */
@@ -2518,7 +2642,7 @@ tr.grp th.solv {
 .flash:empty {
   display: none;
 }
-@media (max-width: 1060px) {
+@media (max-width: 700px) {
   .editor {
     grid-template-columns: 1fr;
   }
@@ -2531,7 +2655,8 @@ tr.grp th.solv {
   .tgroup {
     grid-template-columns: repeat(9, 36px);
   }
-  .tlabel {
+  /* the tools' headings only: the panel's own labels (SMILES, InChI, Name…) stay */
+  .tools .tlabel {
     display: none;
   }
   .info {
@@ -2837,10 +2962,11 @@ html {
 .topbar > .tbg.rhide {
   display: none;
 }
-.topbar.compact > .tbg.folded > .tgrip {
+/* in Compact the menus have no ⋮, but the File group keeps it, to open it again */
+.topbar.compact > .tbg.folded:not([aria-label='General']) > .tgrip {
   display: none;
 }
-.topbar.compact > .tbg.folded {
+.topbar.compact > .tbg.folded:not([aria-label='General']) {
   padding-left: 6px;
 }
 </style>
@@ -3220,7 +3346,7 @@ html {
           <p class="note">On: Esc finishes a text or an atom label you are typing and keeps it, the same as Enter. Off: Esc throws the typing away.</p></div>
         <div class="setg"><label class="tlabel" for="topbarMode">Top bar</label>
           <select id="topbarMode" style="width:100%;padding:4px 6px;font-size:13px"><option value="full">Full: every button visible</option><option value="compact">Compact: File, then four menus</option></select>
-          <p class="note">Full shows every group of buttons; a click on a group's ⋮ folds it into one menu, and another click unfolds it. Compact keeps the File buttons and puts the rest into four menus in one row: Arrange, Structure, Style and Text.</p></div>
+          <p class="note">Full shows every group of buttons; a click on a group's ⋮ folds it into one menu, and another click unfolds it. Compact keeps the File buttons (their ⋮ folds them too) and puts the rest into four menus in one row: Arrange, Structure, Style and Text. A narrow window always has the compact bar, and the side panel opens over the sheet.</p></div>
         <h3 class="shead">Drawing</h3>
         <div class="setg"><label class="tlabel" for="elGrpSel">NMe, NBoc, SiMe2 typed on an atom in a chain or ring</label>
           <select id="elGrpSel" style="width:100%;padding:4px 6px;font-size:13px"><option value="label">One label: the group beside the atom (N over Me)</option><option value="bond">On a bond: the group on its own bond (N–Me)</option></select>
@@ -4108,7 +4234,7 @@ function kdOf(st) {
     ANG = 1.54 / L;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.8';
+  const RD_VERSION = '1.8.1';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -62204,17 +62330,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
    Atoms and Bridged fold away under their headings ===== */
   const FLY = [];
   /* defs: one entry per button on the row (its default tool); pick(b): which of those buttons a hotkey-chosen tool belongs to */
-  function makeFly(label, key, defs, pick) {
+  /* a narrow window (up to 1060 px): each flyout one button showing the tool used last */
+  const NARROW_LEFT = window.matchMedia('(max-width: 1060px)');
+  function makeFly(label, key, defs, pick, opt) {
+    opt = opt || {};
     const lab = [...document.querySelectorAll('#tools > .tlabel')].find(l => l.textContent.trim() === label);
     if (!lab) return;
     const grp = lab.nextElementSibling;
     if (!grp || !grp.classList.contains('tgroup')) return;
     const row = document.createElement('div');
-    row.className = 'flyrow';
-    grp.before(row);
+    row.className = 'flyrow' + (opt.cls ? ' ' + opt.cls + 'row' : '');
+    /* after: the row goes after the group, so the heading's fold (Atoms) still finds the group next to it */
+    if (opt.after) grp.after(row);
+    else grp.before(row);
     grp.classList.add('flypop');
+    if (opt.cls) grp.classList.add(opt.cls);
     grp.hidden = true;
-    grp.setAttribute('aria-label', label);
+    /* Rings keep their group key (saved button layouts), so no name of their own */
+    if (!opt.cls) grp.setAttribute('aria-label', label);
     const members = () => [...grp.querySelectorAll('.tb')].filter(b => b.id !== 'freeBond');
     const F = {
       grp,
@@ -62243,7 +62376,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         this.mains.forEach((m, i) => {
           const b = this.cur(i);
           if (!b) return;
-          m.el.innerHTML = b.innerHTML;
+          m.el.innerHTML = b.innerHTML.replace(/ id="[^"]*"/g, '');
           m.el.title = label + ': ' + (b.title || '') + ' (click again to choose another)';
           m.el.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true');
         });
@@ -62297,7 +62430,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const b = e.target.closest('.tb');
       if (!b || grp.hidden) return;
       if (b.id !== 'freeBond') {
-        F.setLast(F.opener, b);
+        F.setLast(NARROW_LEFT.matches ? 0 : F.opener, b);
         grp.hidden = true;
       }
       setTimeout(() => F.draw(), 0);
@@ -62311,7 +62444,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           setTimeout(() => F.draw(), 0);
           return;
         }
-        F.setLast(pick ? pick(b) : 0, b);
+        F.setLast(pick && !NARROW_LEFT.matches ? pick(b) : 0, b);
         setTimeout(() => F.draw(), 0);
       })
     );
@@ -62325,6 +62458,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   makeFly('Symbols', 'symbols2', ['chg:p1', 'chg:p-1'], b =>
     /-/.test(b.dataset.chg || '') || b.dataset.chg === 'ra' ? 1 : 0
   );
+  /* Rings: every button in a wide window (the CSS shows the group as it was); in a narrow one a single button, benzene
+     or the ring used last, with the others in its menu */
+  makeFly('Rings', 'rings', ['ring:6a'], null, { cls: 'ringfly' });
+  makeFly('Atoms', 'atoms', ['el:C'], null, { cls: 'atomfly', after: true });
   function syncFlyouts() {
     FLY.forEach(F => F.draw());
   }
@@ -62436,6 +62573,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     label: 'Show / hide the stoichiometry grid',
     def: ''
   });
+  /* a phone-wide window: the sheet is as tall as the window leaves under the tools (CSS --sheet-top) */
+  {
+    const PHONE = window.matchMedia('(max-width: 700px)');
+    let last = '';
+    const top = () => {
+      if (!PHONE.matches) return;
+      const v = Math.round($('mol').getBoundingClientRect().top + window.scrollY) + 'px';
+      if (v === last) return;
+      last = v;
+      document.documentElement.style.setProperty('--sheet-top', v);
+      window.dispatchEvent(new Event('resize'));
+    };
+    window.addEventListener('resize', () => requestAnimationFrame(top));
+    if (window.ResizeObserver) {
+      const ro = new ResizeObserver(() => requestAnimationFrame(top));
+      ['tools', 'topbar'].forEach(id => $(id) && ro.observe($(id)));
+    }
+    requestAnimationFrame(top);
+  }
   /* the side panel folds to a thin strip at the right and opens again (remembered on this computer) */
   {
     const fb = document.querySelector('[data-act=sideFold]');
@@ -62444,15 +62600,34 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fb.setAttribute('aria-expanded', String(!on));
       fb.title = on ? 'Show the side panel' : 'Hide the side panel (the sheet gets wider)';
     };
-    try {
-      set(localStorage.getItem('rd.sidefold') === '1');
-    } catch (e) {}
+    /* in a narrow window (up to 1060 px) the panel starts folded, so the sheet keeps its room; opened there, it stays open
+       until the window is made wide again. In a wide window it is as last set */
+    const narrow = window.matchMedia('(max-width: 1060px)');
+    let narrowOpen = false;
+    const stored = () => {
+      try {
+        return localStorage.getItem('rd.sidefold') === '1';
+      } catch (e) {
+        return false;
+      }
+    };
+    const fit = () => set(narrow.matches ? !narrowOpen : stored());
+    fit();
+    const onNarrow = () => {
+      narrowOpen = false;
+      fit();
+      window.dispatchEvent(new Event('resize'));
+    };
+    if (narrow.addEventListener) narrow.addEventListener('change', onNarrow);
+    else if (narrow.addListener) narrow.addListener(onNarrow);
     fb.addEventListener('click', () => {
       const on = !document.documentElement.classList.contains('side-folded');
       set(on);
-      try {
-        localStorage.setItem('rd.sidefold', on ? '1' : '0');
-      } catch (e) {}
+      if (narrow.matches) narrowOpen = !on;
+      else
+        try {
+          localStorage.setItem('rd.sidefold', on ? '1' : '0');
+        } catch (e) {}
       window.dispatchEvent(new Event('resize'));
     });
   }
@@ -62756,9 +62931,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       });
       $('topbar').classList.remove('compact');
     }
+    /* a narrow window (up to 1060 px) gets the compact bar whatever the setting, so the sheet keeps its height */
+    const NARROW = window.matchMedia('(max-width: 1060px)');
+    const compactNow = () => MODE === 'compact' || NARROW.matches;
+    if (NARROW.addEventListener) NARROW.addEventListener('change', () => apply());
+    else if (NARROW.addListener) NARROW.addListener(() => apply());
     function apply() {
       reset();
-      if (MODE !== 'compact') {
+      if (!compactNow()) {
         grps().forEach(g => {
           if (FOLD.includes(name(g))) fold(g);
         });
@@ -62769,7 +62949,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const prim = m => grps().find(x => m[1].includes(name(x)));
       grps().forEach(g => {
         const n = name(g);
-        if (n === 'General') return;
+        /* the File buttons stay open in Compact unless their ⋮ folded them */
+        if (n === 'General') {
+          if (FOLD.includes(n)) fold(g);
+          return;
+        }
         const m = MENUS.find(x => x[1].includes(n));
         if (!m || prim(m) === g) fold(g, m && m[0]);
       });
@@ -62810,7 +62994,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return;
       }
       const gr = e.target.closest('#topbar > .tbg > .tgrip');
-      if (gr && MODE !== 'compact') {
+      /* Full: every group's ⋮ folds and unfolds it; Compact: the File group's (the others are menus already) */
+      if (gr && (!compactNow() || name(gr.parentElement) === 'General')) {
         const g = gr.parentElement,
           n = name(g);
         if (g.classList.contains('folded')) {
