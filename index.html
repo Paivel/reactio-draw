@@ -4908,9 +4908,19 @@ function kdOf(st) {
     return g;
   }
   /* the hydrogen a hypervalent atom takes: P with four bonds → PH (valence 5), S with five → SH (valence 6) */
+  /* P or As with three bonds and one to a metal (PPh3 on Au, Pd(PPh3)4): a ligand, its bond to the metal a coordinate one,
+     so no H; P with four bonds to non-metals stays HP(O)(OH)2 */
+  let HYPER_METAL = null;
   function hyperH(a, u) {
     const m = effGroup(a);
     if (!m || m[1] < 3 || u !== Math.floor(u)) return 0;
+    if (m[0] === 5 && u === 4 && !a.chg && (a.el === 'P' || a.el === 'As' || a.el === 'Sb')) {
+      if (!HYPER_METAL)
+        HYPER_METAL = new Set(
+          'Li Na K Rb Cs Be Mg Ca Sr Ba Sc Ti V Cr Mn Fe Co Ni Cu Zn Y Zr Nb Mo Tc Ru Rh Pd Ag Cd Hf Ta W Re Os Ir Pt Au Hg Al Ga In Tl Sn Pb Bi La Ce Pr Nd Sm Eu Gd Tb Dy Ho Er Tm Yb Lu U'.split(' ')
+        );
+      if (neighbors(a).some(o => HYPER_METAL.has(o.el) && !o.label)) return 0;
+    }
     return (m[0] === 5 && u === 4) || (m[0] === 6 && u === 5) ? 1 : 0;
   }
   const GC = {};
@@ -6174,6 +6184,8 @@ function kdOf(st) {
   }
 
   /* ===== SMILES out ===== */
+  /* the normal valences by which SMILES gives an atom outside brackets its H */
+  const SMI_VAL = { B: [3], C: [4], N: [3, 5], O: [2], P: [3, 5], S: [2, 4, 6], F: [1], Cl: [1], Br: [1], I: [1] };
   function atomSmi(a) {
     if (a.label) return a.grp || '*';
     const h = implicitH(a),
@@ -6181,7 +6193,10 @@ function kdOf(st) {
       cr = mol.rings && mol.rings.find(r => r.ids.includes(a.id) && r.sty !== 'none'),
       q = (a.chg || 0) + (cr && cr.ids[0] === a.id ? cr.q || 0 : 0);
     if (a.el === 'D') return '[2H]';
-    if (ORGANIC.includes(a.el) && !q && !a.rad && !a.hap && !(cr && cr.q) && !a.iso) return a.el;
+    /* an atom with other H than SMILES gives it by default (PPh3 on a metal: no H on its four bonds) goes in brackets */
+    const u = usedVal(a),
+      std = SMI_VAL[a.el] && u === Math.floor(u) ? (SMI_VAL[a.el].find(v => v >= u) ?? u) - u : h;
+    if (ORGANIC.includes(a.el) && !q && !a.rad && !a.hap && !(cr && cr.q) && !a.iso && std === h) return a.el;
     return (
       '[' +
       (a.iso || '') +
@@ -8762,6 +8777,134 @@ function kdOf(st) {
     }
     return false;
   }
+  /* a metal whose ligands are separate branches ([PdCl4]2−, Pd(PPh3)4, W(CO)6, Cl–Au–PPh3): the branches set out evenly
+     round it, four as a +, two in a line, three at 120°, five or six spaced the same (the first upright), each branch turned
+     as a whole about the metal; nothing is moved if the turned branches would come closer than half a bond to each other */
+  const STAR_METALS = new Set(
+    'Li Na K Rb Cs Be Mg Ca Sr Ba Sc Ti V Cr Mn Fe Co Ni Cu Zn Y Zr Nb Mo Tc Ru Rh Pd Ag Cd Hf Ta W Re Os Ir Pt Au Hg Al Ga In Tl Sn Pb Bi La Ce Pr Nd Sm Eu Gd Tb Dy Ho Er Tm Yb Lu U'.split(' ')
+  );
+  let METAL_PREV = null;
+  function metalStar(atoms) {
+    if (!atoms || !atoms.length) return;
+    const idsAll = new Set(atoms.map(a => a.id));
+    for (const m of atoms) {
+      if (!STAR_METALS.has(m.el) || m.label || m.multi || m.z !== undefined) continue;
+      const nb = neighbors(m).filter(o => idsAll.has(o.id));
+      const n = nb.length;
+      if (n < 2 || n > 6 || nb.length !== neighbors(m).length) continue;
+      /* each neighbour's branch, found without passing the metal; a ring through the metal (a chelate) joins two: left alone */
+      const branch = [],
+        seen = new Set([m.id]);
+      let ok = true;
+      for (const s of nb) {
+        if (seen.has(s.id)) {
+          ok = false;
+          break;
+        }
+        const b = [],
+          st = [s];
+        seen.add(s.id);
+        while (st.length) {
+          const x = st.pop();
+          b.push(x);
+          for (const y of neighbors(x))
+            if (y !== m && !seen.has(y.id)) {
+              seen.add(y.id);
+              st.push(y);
+            } else if (y === m && x !== s) ok = false;
+        }
+        branch.push(b);
+      }
+      if (!ok) continue;
+      const prevA = s => METAL_PREV && METAL_PREV.get(m.id + ':' + s.id),
+        ang = s => (prevA(s) ?? Math.atan2(s.y - m.y, s.x - m.x)),
+        now = s => Math.atan2(s.y - m.y, s.x - m.x),
+        step = (2 * Math.PI) / n,
+        start = n === 4 || n === 2 ? 0 : -Math.PI / 2;
+      /* the branches keep their order round the metal; the turn of the whole set that moves them least */
+      const order = nb.map((s, i) => i).sort((i, j) => ang(nb[i]) - ang(nb[j]));
+      let best = null;
+      for (let k = 0; k < n; k++) {
+        let cost = 0;
+        const tg = order.map((i, r) => start + (r + k) * step);
+        order.forEach((i, r) => {
+          const d = tg[r] - ang(nb[i]);
+          cost += Math.abs(Math.atan2(Math.sin(d), Math.cos(d)));
+        });
+        if (!best || cost < best.cost) best = { cost, tg };
+      }
+      const saved = branch.map(b => b.map(a => [a, a.x, a.y]));
+      order.forEach((i, r) => {
+        const d = best.tg[r] - now(nb[i]),
+          c = Math.cos(d),
+          sn = Math.sin(d);
+        for (const a of branch[i]) {
+          const x = a.x - m.x,
+            y = a.y - m.y;
+          a.x = m.x + x * c - y * sn;
+          a.y = m.y + x * sn + y * c;
+        }
+      });
+      /* a linear ligand (C≡O, N≡C–CH3) straight out from the metal: each atom bonded through a triple bond, or between two
+         double bonds, has the next one on the same line (what hangs beyond goes along) */
+      order.forEach(i => {
+        let prev = m,
+          cur = nb[i];
+        const inB = new Set(branch[i].map(a => a.id));
+        for (let guard = 0; guard < 6; guard++) {
+          const nx = neighbors(cur).filter(o => o !== prev && inB.has(o.id));
+          if (nx.length !== 1) break;
+          const t = nx[0],
+            b1 = bondBetween(prev, cur),
+            b2 = bondBetween(cur, t),
+            sp = (b2 && b2.order === 3) || (b1 && b1.order === 3) || (b1 && b2 && b1.order === 2 && b2.order === 2);
+          if (!sp) break;
+          const d0 = Math.hypot(cur.x - prev.x, cur.y - prev.y) || 1,
+            ux = (cur.x - prev.x) / d0,
+            uy = (cur.y - prev.y) / d0,
+            dt = Math.hypot(t.x - cur.x, t.y - cur.y),
+            dx = cur.x + ux * dt - t.x,
+            dy = cur.y + uy * dt - t.y;
+          /* t and everything beyond it */
+          const beyond = [],
+            st = [t],
+            vis = new Set([cur.id, t.id]);
+          while (st.length) {
+            const x = st.pop();
+            beyond.push(x);
+            for (const y of neighbors(x)) if (inB.has(y.id) && !vis.has(y.id)) (vis.add(y.id), st.push(y));
+          }
+          beyond.forEach(a => ((a.x += dx), (a.y += dy)));
+          prev = cur;
+          cur = t;
+        }
+      });
+      /* a ligand that is written as letters too (Cl, Br, a CO or NH3 label) a little farther out, so its bond is seen between
+         the two labels */
+      order.forEach(i => {
+        const s = nb[i];
+        if ((s.el === 'C' && !s.label) || s.el === 'H') return;
+        const d = Math.hypot(s.x - m.x, s.y - m.y) || 1,
+          want = L * 1.35;
+        if (d >= want) return;
+        const ux = (s.x - m.x) / d,
+          uy = (s.y - m.y) / d;
+        for (const a of branch[i]) {
+          a.x += ux * (want - d);
+          a.y += uy * (want - d);
+        }
+      });
+      let clash = false;
+      for (let i = 0; i < n && !clash; i++)
+        for (let j = i + 1; j < n && !clash; j++)
+          for (const a of branch[i])
+            if (branch[j].some(b => Math.hypot(a.x - b.x, a.y - b.y) < L * 0.5)) {
+              clash = true;
+              break;
+            }
+      if (clash) saved.flat().forEach(([a, x, y]) => ((a.x = x), (a.y = y)));
+    }
+  }
   function placeGraph(g, anchor) {
     const pos = Array(g.nodes.length).fill(null);
     let ox = 0,
@@ -8856,6 +8999,7 @@ function kdOf(st) {
         stereo: e.stereo || null
       })
     );
+    metalStar(map);
     return map;
   }
   function graft(center, smiles, attach) {
@@ -9954,6 +10098,13 @@ function kdOf(st) {
     return changed;
   }
   function cleanFragments(frs) {
+    /* where each metal's ligands pointed before (metalStar keeps them on those sides, so a second Clean Up moves nothing) */
+    if (!cleanFragments.inH) {
+      METAL_PREV = new Map();
+      for (const fr of frs)
+        for (const m of fr)
+          if (STAR_METALS.has(m.el)) for (const o of neighbors(m)) METAL_PREV.set(m.id + ':' + o.id, Math.atan2(o.y - m.y, o.x - m.x));
+    }
     /* a known molecule (names/depictions.txt) is drawn again as chemists draw it, in place */
     if (!cleanFragments.inH && !cleanFlat) {
       frs = frs.filter(fr => !cleanDepiction(fr));
@@ -10031,6 +10182,8 @@ function kdOf(st) {
         cleanSkipped = sk0;
         cleanStereoKept = kp0;
         cleanEndsOffBonds(frs);
+        frs.forEach(metalStar);
+        METAL_PREV = null;
         return;
       }
       if (out.length) {
@@ -10042,9 +10195,14 @@ function kdOf(st) {
       cleanSkipped = skH;
       cleanStereoKept = keptH;
       cleanEndsOffBonds(frs);
+      frs.forEach(metalStar);
+      METAL_PREV = null;
       return;
     }
-    return cleanFragmentsH(frs);
+    const res = cleanFragmentsH(frs);
+    frs.forEach(metalStar);
+    METAL_PREV = null;
+    return res;
   }
   /* a chain end (a methyl, an OH) laid on top of another bond of its atom (under 20° from it, as in a crowded bridged
      system): turned into the widest gap between that atom's bonds, at the same length, if it lands clear of the other atoms;
@@ -28576,11 +28734,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (root ? A.el !== root : !A.h) return;
         if (nuc === '1H' && A.el === 'X') return;
         const codes = RDNMR.codesFor(P, i);
+        /* the deepest sphere that rests on three spectra or more; a deeper one on fewer (one or two spectra, where a single
+           misassigned peak decides: paracetamol's H next to the OH at 5.5 for 6.7) only when it agrees with it as far as that
+           sphere's usual error allows (a small molecule's own spectrum, acetone at 2.2, is kept) */
         let r = null,
-          L;
+          L,
+          thin = null;
         for (L = RDNMR.MAXL - 1; L >= 0; L--) {
-          r = nmrFind(T, L, RDNMR.hash(codes[L]));
-          if (r) break;
+          const f = nmrFind(T, L, RDNMR.hash(codes[L]));
+          if (!f) continue;
+          /* (for 1H, where OH, NH and solvent make single spectra spread; 13C keeps its deepest match) */
+          if (f.n >= 3 || L === 0 || nuc !== '1H') {
+            r = f;
+            break;
+          }
+          if (!thin) thin = { f, L };
+        }
+        /* agrees: within twice the usual error of the supported sphere (0.46 ppm for 1H at sphere 3, 1.4 at sphere 1) */
+        const tol = r ? 2 * (E[L + 1] || E[1] || 0) * S : 0;
+        /* only the sphere right next to it can overrule a thin one, and never the first (the atom type alone) */
+        if (thin && (!r || L < 1 || thin.L !== L + 1 || Math.abs(thin.f.val - r.val) <= tol)) {
+          r = thin.f;
+          L = thin.L;
+        } else if (!r && thin) {
+          r = thin.f;
+          L = thin.L;
         }
         const key = codes[RDNMR.MAXL - 1];
         let g = groups.get(key);
@@ -63963,6 +64141,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   window.__rd = {
     molBlock,
+    nmrPredict,
     agentTexts,
     labelFrontFirst,
     useDepiction,
