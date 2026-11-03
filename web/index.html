@@ -4236,6 +4236,10 @@ function kdOf(st) {
     BW = 900,
     BH = 440,
     ANG = 1.54 / L;
+  /* the size from which a structure from a SMILES is drawn in steps, with Stop between them (BIG_PASTE), and from which the
+     SMILES in the panel is made only when asked for (BIG_INFO) */
+  const BIG_PASTE = 600,
+    BIG_INFO = 800;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
   const RD_VERSION = '1.9';
@@ -6430,16 +6434,23 @@ function kdOf(st) {
       startAt && fr.includes(startAt)
         ? startAt
         : pool.reduce((m, a) => (R.get(a.id) < R.get(m.id) ? a : m), pool[0]);
-    (function d1(a) {
-      vis.add(a.id);
-      for (const b of bondsOf(a)) {
-        const n = other(b, a);
-        if (!vis.has(n.id)) {
-          tree.add(b.id);
-          d1(n);
-        }
+    /* the spanning tree, depth first (with a stack of its own: a chain of thousands of atoms is deeper than the call stack) */
+    {
+      vis.add(start.id);
+      const st = [[start, bondsOf(start), 0]];
+      while (st.length) {
+        const f = st[st.length - 1];
+        if (f[2] < f[1].length) {
+          const b = f[1][f[2]++],
+            n = other(b, f[0]);
+          if (!vis.has(n.id)) {
+            vis.add(n.id);
+            tree.add(b.id);
+            st.push([n, bondsOf(n), 0]);
+          }
+        } else st.pop();
       }
-    })(start);
+    }
     const open = new Map(),
       free = [];
     let nextN = 1;
@@ -6476,7 +6487,8 @@ function kdOf(st) {
       }
       return m[1] + m[2] + head + (r ? '(' + r + ')' : '');
     };
-    function d2(a, from) {
+    /* the atom's own part (symbol and ring closures) and its branches still to write */
+    function enter(a, from) {
       done.add(a.id);
       let s = a.label && a.grp ? linkSmi(atomSmi(a)) : atomSmi(a);
       if (arA.has(a.id)) s = s.replace(/^(\[?)([A-Z][a-z]?)/, (m, p, e) => p + e.toLowerCase());
@@ -6495,13 +6507,23 @@ function kdOf(st) {
         }
       }
       const kids = bondsOf(a).filter(b => tree.has(b.id) && b !== from && !done.has(other(b, a).id));
-      kids.forEach((b, i) => {
-        const sub = sym(b) + d2(other(b, a), b);
-        s += i < kids.length - 1 ? '(' + sub + ')' : sub;
-      });
-      return s;
+      return { a, s, kids, i: 0 };
     }
-    return d2(start, null);
+    /* written depth first with a stack of its own; each branch but the last in parentheses */
+    const stk = [enter(start, null)];
+    for (;;) {
+      const f = stk[stk.length - 1];
+      if (f.i < f.kids.length) {
+        stk.push(enter(other(f.kids[f.i], f.a), f.kids[f.i]));
+        continue;
+      }
+      stk.pop();
+      if (!stk.length) return f.s;
+      const p = stk[stk.length - 1],
+        sub = sym(p.kids[p.i]) + f.s;
+      p.s += p.i < p.kids.length - 1 ? '(' + sub + ')' : sub;
+      p.i++;
+    }
   }
 
   /* ===== SMILES in ===== */
@@ -7354,7 +7376,7 @@ function kdOf(st) {
     for (let i = 0; i < n; i++) if (pos[i]) ids.push(i);
     if (ids.length < 4) return 0;
     const E = g.edges.filter(e => pos[e.a] && pos[e.b]),
-      bonded = new Set(E.map(e => e.a * 4096 + e.b).concat(E.map(e => e.b * 4096 + e.a)));
+      bonded = new Set(E.map(e => e.a * 1048576 + e.b).concat(E.map(e => e.b * 1048576 + e.a)));
     const R0 = L * 0.8,
       obs = (obstacles || []).slice(0, 400);
     const cross = (p, q, r, t) => {
@@ -7372,7 +7394,7 @@ function kdOf(st) {
           a = P[i];
         for (let y = x + 1; y < ids.length; y++) {
           const j = ids[y];
-          if (bonded.has(i * 4096 + j)) continue;
+          if (bonded.has(i * 1048576 + j)) continue;
           const b = P[j],
             d = Math.hypot(a.x - b.x, a.y - b.y);
           if (d < R0) sc += (R0 - d) * (R0 - d);
@@ -7439,7 +7461,7 @@ function kdOf(st) {
       for (const i of ids) {
         const a = pos[i];
         near(AG, a.x, a.y, j => {
-          if (j > i && !bonded.has(i * 4096 + j) && Math.hypot(a.x - pos[j].x, a.y - pos[j].y) < R0) pairs.push([i, j]);
+          if (j > i && !bonded.has(i * 1048576 + j) && Math.hypot(a.x - pos[j].x, a.y - pos[j].y) < R0) pairs.push([i, j]);
         });
         if (OG.size) {
           let hit = false;
@@ -7501,10 +7523,10 @@ function kdOf(st) {
         const a0 = pos[i],
           a1 = P[i];
         near(AG, a0.x, a0.y, j => {
-          if (!S.has(j) && !bonded.has(i * 4096 + j)) dv -= pen(Math.hypot(a0.x - pos[j].x, a0.y - pos[j].y));
+          if (!S.has(j) && !bonded.has(i * 1048576 + j)) dv -= pen(Math.hypot(a0.x - pos[j].x, a0.y - pos[j].y));
         });
         near(AG, a1.x, a1.y, j => {
-          if (!S.has(j) && !bonded.has(i * 4096 + j)) dv += pen(Math.hypot(a1.x - pos[j].x, a1.y - pos[j].y));
+          if (!S.has(j) && !bonded.has(i * 1048576 + j)) dv += pen(Math.hypot(a1.x - pos[j].x, a1.y - pos[j].y));
         });
         if (OG.size) {
           near(OG, a0.x, a0.y, o => (dv -= pen(Math.hypot(a0.x - o.x, a0.y - o.y))));
@@ -8418,13 +8440,14 @@ function kdOf(st) {
           queue.push(v);
         }
     }
-    untangleG(
-      g,
-      pos,
-      adj,
-      pinned.map((p, i) => p || fixed[i]),
-      obstacles
-    );
+    if (!layoutG.noUntangle)
+      untangleG(
+        g,
+        pos,
+        adj,
+        pinned.map((p, i) => p || fixed[i]),
+        obstacles
+      );
     const idx = [];
     pos.forEach((p, i) => {
       if (p) idx.push(i);
@@ -8783,9 +8806,9 @@ function kdOf(st) {
      bonds out of rings) laid in rows that turn back at the ends, like lines of text, instead of the curl the general
      layout gives it; each side group keeps the shape it had, turned with the atom it hangs on. Kept only when no two
      atoms come closer than the layout had them (or than 0.6 of a bond) */
-  function serpentineChain(g, pos) {
+  function serpentineChain(g, pos, strict) {
     const n = g.nodes.length;
-    if (n < 40 || pos.some(p => !p)) return false;
+    if (n < 40 || (pos && pos.some(p => !p))) return false;
     const adj = Array.from({ length: n }, () => []);
     g.edges.forEach((e, i) => {
       adj[e.a].push([e.b, i]);
@@ -8839,6 +8862,8 @@ function kdOf(st) {
         }
       }
     if (owner.some(o => o < 0) || side.some(s => s.length > 30)) return false;
+    /* asked only whether the chain is one for rows (no places yet) */
+    if (!pos) return true;
     /* each side atom in the frame of its path atom: along the chain and out from it */
     const frame = (P, A, B) => {
       let ox = -((A.x - P.x) / (Math.hypot(A.x - P.x, A.y - P.y) || 1) + (B.x - P.x) / (Math.hypot(B.x - P.x, B.y - P.y) || 1)),
@@ -9068,7 +9093,8 @@ function kdOf(st) {
       if (c > c1) ((out = o), (c1 = c));
       if (c1 >= 0.8) break;
     }
-    if (c1 < 0.6 && c1 < closest(pos)) return false;
+    /* strict: the layout before was not untangled, so it is no measure */
+    if (c1 < 0.6 && (strict || c1 < closest(pos))) return false;
     for (let v = 0; v < n; v++) pos[v] = out[v];
     return true;
   }
@@ -9244,15 +9270,37 @@ function kdOf(st) {
           sp = Array(comp.length).fill(null),
           st = layoutStart(sg, sc) ?? 0;
         sp[st] = { x: 0, y: 0 };
-        layoutG(sg, sp, st, []);
-        /* a ring system the own layout cannot draw well (porphyrins and other large macrocycles): OpenChemLib's
-           layout is taken when it is clearly better */
-        try {
-          if (!sp.tplCage) oclLayoutIfBetter(sg, sp, sc);
-        } catch (e) {}
-        try {
-          if (!sp.tplCage && !sp.cages) serpentineChain(sg, sp);
-        } catch (e) {}
+        /* a long open chain goes in rows: its first layout only gives the shapes of its side groups, so the slow untangling
+           of the whole chain is left out (and done after all when the rows do not fit) */
+        let rows = false;
+        if (serpentineChain(sg, null)) {
+          layoutG.noUntangle = true;
+          try {
+            layoutG(sg, sp, st, []);
+          } finally {
+            layoutG.noUntangle = false;
+          }
+          try {
+            rows = !sp.tplCage && !sp.cages && serpentineChain(sg, sp, true);
+          } catch (e) {}
+          if (!rows) {
+            sp.fill(null);
+            delete sp.tplCage;
+            delete sp.cages;
+            sp[st] = { x: 0, y: 0 };
+          }
+        }
+        if (!rows) {
+          layoutG(sg, sp, st, []);
+          /* a ring system the own layout cannot draw well (porphyrins and other large macrocycles): OpenChemLib's
+             layout is taken when it is clearly better */
+          try {
+            if (!sp.tplCage) oclLayoutIfBetter(sg, sp, sc);
+          } catch (e) {}
+          try {
+            if (!sp.tplCage && !sp.cages) serpentineChain(sg, sp);
+          } catch (e) {}
+        }
         fixEZ(sg, sp);
         /* a cage laid from a template that keeps its orientation (adamantane upright, a morphinan): turned to it */
         if (sp.cages) cageToTemplate(sp);
@@ -10562,7 +10610,7 @@ function kdOf(st) {
         const ids = new Set(fr.map(a => a.id)),
           bs = () => mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
         const idOf = () =>
-          M.fromMolfile(molBlock(fr, bs(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000')).getIDCode();
+          M.fromMolfile(molBlock(fr, bs(), '').replace(CHIRAL_RX, CHIRAL_ON)).getIDCode();
         let want = null;
         for (const a of fr) {
           const nb = neighbors(a);
@@ -15772,7 +15820,7 @@ function kdOf(st) {
         if (f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
         const fb = fragBonds(m, f);
         if (!fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
-        const mb = molBlock(f, fb, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000');
+        const mb = molBlock(f, fb, '').replace(CHIRAL_RX, CHIRAL_ON);
         const M = O.Molecule.fromMolfile(mb);
         M.ensureHelperArrays(O.Molecule.cHelperCIP);
         const n = Math.min(f.length, M.getAllAtoms());
@@ -16015,7 +16063,25 @@ function kdOf(st) {
           })
           .join('');
     }
-    $('smiles').textContent = currentSmiles(false, true);
+    /* a very large structure (a polymer written out): its SMILES with stereo takes long to work out, so it is made when asked
+       for (Copy, export, or a click here), not on every change */
+    {
+      const big = mol.atoms.length > BIG_INFO,
+        box = $('smiles');
+      if (!big) box.textContent = currentSmiles(false, true);
+      else {
+        box.textContent = '';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ghost sm';
+        b.textContent = 'Show the SMILES (' + mol.atoms.length + ' atoms: takes a while)';
+        b.onclick = () => {
+          b.textContent = 'Working…';
+          setTimeout(() => (box.textContent = currentSmiles(false, true)), 30);
+        };
+        box.appendChild(b);
+      }
+    }
     $('anaIns').hidden = !frs.length;
     try {
       syncNameBox();
@@ -16624,10 +16690,7 @@ function kdOf(st) {
         M = O.Molecule;
       let fb;
       [f, fb] = hLast(f, fragBonds(ex, f));
-      const mb = molBlock(f, fb, '').replace(
-        '  0  0  0  0  0  0  0  0999 V2000',
-        '  0  0  1  0  0  0  0  0999 V2000'
-      );
+      const mb = molBlock(f, fb, '').replace(CHIRAL_RX, CHIRAL_ON);
       const om = M.fromMolfile(mb);
       if (!oclSame(om, f, fb)) return '';
       for (let i = 0; i < om.getAllAtoms(); i++) om.setAtomMapNo(i, i + 1, false);
@@ -16894,7 +16957,7 @@ function kdOf(st) {
         mol = m;
         try {
           const fr = fragments().find(f => f.some(a => ids.has(a.id)));
-          const mb = molBlock(fr, fragBonds(m, fr), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000');
+          const mb = molBlock(fr, fragBonds(m, fr), '').replace(CHIRAL_RX, CHIRAL_ON);
           return O.Molecule.fromMolfile(mb).getIDCode();
         } finally {
           mol = saved;
@@ -23415,6 +23478,85 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   /* R/S from a SMILES (@, @@): OpenChemLib reads the parities, takes the coordinates as drawn here and picks wedge and hash bonds */
+  /* the pieces of smilesPieces all read: each one with centres written in its own part has the wedges of at least one of
+     them (a piece that could not be matched to the drawing sets none) */
+  function piecesRead(cut, got, map) {
+    return cut.every(([, , a0, a1]) => {
+      const own = cut.centres.filter(i => i >= a0 && i < a1);
+      return !own.length || own.some(i => got.has(map[i].id));
+    });
+  }
+  /* a long SMILES cut into pieces for applySmilesStereo: [piece, its atoms (indices of the whole, in the piece's order)] each
+     (with the atom on the other side of each cut written again at its ends), and .centres: the atoms written with @; null when it cannot be cut or the atoms do not
+     come out as many as drawn */
+  function smilesPieces(smi, nAtoms) {
+    const toks = [],
+      re = /\[[^\]]*\]|Br|Cl|[BCNOPSFI]|[bcnops]|\*|%\d\d|\d|[()=#$:/\\\-.~]/g;
+    let m,
+      last = 0;
+    while ((m = re.exec(smi))) {
+      if (m.index !== last) return null;
+      last = re.lastIndex;
+      toks.push(m[0]);
+    }
+    if (last !== smi.length) return null;
+    const isAtom = t => /^(\[|Br|Cl|[BCNOPSFI]|[bcnops]|\*)/.test(t) && !/^%/.test(t);
+    const atoms = [],
+      centres = [];
+    let depth = 0,
+      top = -1;
+    const open = new Set(),
+      cuts = [];
+    toks.forEach((t, k) => {
+      if (t === '(') depth++;
+      else if (t === ')') depth--;
+      else if (/^(%\d\d|\d)$/.test(t)) open.has(t) ? open.delete(t) : open.add(t);
+      else if (isAtom(t)) {
+        const i = atoms.length;
+        atoms.push(k);
+        if (t.includes('@')) centres.push(i);
+        /* a cut before this atom: bonded straight to the atom before it on the main chain (after that atom's closed branches),
+           outside branches and rings, not both of them centres, neither aromatic (the copy of an atom beyond a cut is
+           written without its @, so it is a centre only in its own piece) */
+        const p = toks[k - 1],
+          P = top >= 0 ? toks[atoms[top]] : null;
+        if (depth === 0 && P && (isAtom(p) || p === ')') && !open.size && !(/@/.test(P) && /@/.test(t)) && !/^[bcnops]$|^\[[a-z]/.test(P) && !/^[bcnops]$|^\[[a-z]/.test(t))
+          cuts.push([i, top]);
+        if (depth === 0) top = i;
+      }
+    });
+    if (atoms.length !== nAtoms || depth !== 0 || open.size) return null;
+    const pick = [];
+    let from = 0;
+    for (const c of cuts) if (c[0] - from >= 150 && nAtoms - c[0] >= 60) (pick.push(c), (from = c[0]));
+    if (!pick.length) return null;
+    /* each piece: its atoms with eight or more atoms of the chain on either side (from the cut nearest beyond them), those
+       written without their @, so a centre next to a cut keeps neighbours that tell its branches apart */
+    const at = cuts.map(c => c[0]),
+      range = (x, y, strip) => {
+        if (x >= y) return '';
+        const s = toks.slice(atoms[x], y < nAtoms ? atoms[y] : toks.length);
+        return (strip ? s.map(t => t.replace(/@+/g, '')) : s).join('');
+      },
+      bounds = [0, ...pick.map(c => c[0]), nAtoms],
+      out = [];
+    for (let q = 0; q + 1 < bounds.length; q++) {
+      const a0 = bounds[q],
+        a1 = bounds[q + 1];
+      let L0 = 0,
+        R0 = nAtoms;
+      for (const c of at) {
+        if (c <= a0 - 8) L0 = c;
+        if (c >= a1 + 8 && R0 === nAtoms) R0 = c;
+      }
+      const pc = range(L0, a0, true) + range(a0, a1, false) + range(a1, R0, true),
+        list = [];
+      for (let i = L0; i < R0; i++) list.push(i);
+      out.push([pc, list, a0, a1]);
+    }
+    out.centres = centres;
+    return out;
+  }
   function applySmilesStereo(smi0, map, clear) {
     const cxs = cxSplit(smi0),
       smi = cxs.smi;
@@ -23443,6 +23585,34 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (subs.length > 1 && off === map.length) {
         for (const [pc, o, n] of subs) if (/@/.test(pc)) applySmilesStereo(pc, map.slice(o, o + n));
         return;
+      }
+    }
+    /* one long chain (a peptide or polymer written out, hundreds of atoms): read in pieces of about 150 atoms, cut between two
+       atoms that are no stereocentres where no branch or ring is open; each piece takes the atom beyond the cut on either
+       side, so every centre keeps its neighbours in the order written. Kept when every centre written with @ got its wedge */
+    if (!applySmilesStereo.inPiece && map.length > 300) {
+      const cut = smilesPieces(smi, map.length);
+      if (cut) {
+        const ids = new Set(map.map(a => a.id)),
+          was = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)).map(b => [b, b.stereo, b.a, b.b]),
+          nAt = mol.atoms.length;
+        applySmilesStereo.inPiece = true;
+        try {
+          for (const [pc, list] of cut) if (/@/.test(pc)) applySmilesStereo(pc, list.map(i => map[i]));
+        } finally {
+          applySmilesStereo.inPiece = false;
+        }
+        const got = new Set(
+          mol.bonds.filter(b => (b.stereo === 'wedge' || b.stereo === 'hash') && ids.has(b.a)).map(b => b.a)
+        );
+        if (piecesRead(cut, got, map)) return;
+        /* not all: back as it was, and the whole SMILES read at once */
+        was.forEach(([b, st, x, y]) => ((b.stereo = st), (b.a = x), (b.b = y)));
+        const extra = new Set(mol.atoms.slice(nAt).map(a => a.id));
+        if (extra.size) {
+          mol.atoms = mol.atoms.filter(a => !extra.has(a.id));
+          mol.bonds = mol.bonds.filter(b => !extra.has(b.a) && !extra.has(b.b));
+        }
       }
     }
     try {
@@ -23592,7 +23762,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const atomsNow = () => mol.atoms.filter(a => ids.has(a.id));
       const molOf = () => {
         const A = atomsNow(),
-          m = M.fromMolfile(molBlock(A, bondsNow(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'));
+          m = M.fromMolfile(molBlock(A, bondsNow(), '').replace(CHIRAL_RX, CHIRAL_ON));
         m.ensureHelperArrays(M.cHelperParities);
         return { m, A };
       };
@@ -23684,7 +23854,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (INCHI) {
         const amb = () => {
           try {
-            const r = INCHI(molBlock(atomsNow(), bondsNow(), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'), '');
+            const r = INCHI(molBlock(atomsNow(), bondsNow(), '').replace(CHIRAL_RX, CHIRAL_ON), '');
             return /ambiguous stereo/i.test((r && r.message) || '');
           } catch (e) {
             return false;
@@ -23714,7 +23884,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               at.push({ id: o.id, x: o.x, y: o.y, el: o.el === 'H' ? 'H' : subst[i] });
               bs.push({ id: c.id, a: c.a, b: c.b, order: 1, stereo: c.stereo });
             });
-            const r = INCHI(molBlock(at, bs, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'), '');
+            const r = INCHI(molBlock(at, bs, '').replace(CHIRAL_RX, CHIRAL_ON), '');
             return /ambiguous stereo/i.test((r && r.message) || '');
           } catch (e) {
             return true;
@@ -23837,7 +24007,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         fb = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
         O = oclLoad(),
         want = O.Molecule.fromMolfile(
-          molBlock(fr, fb, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000')
+          molBlock(fr, fb, '').replace(CHIRAL_RX, CHIRAL_ON)
         ).getIDCode();
       if (!depictTable().get(want)) return false;
       const hs = fr.filter(a => a.el === 'H' && !a.iso && fb.filter(b => b.a === a.id || b.b === a.id).length === 1),
@@ -23970,7 +24140,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* the configuration the SMILES gives, or nothing is changed */
       const all = mol.atoms.filter(a => ids.has(a.id) || added.includes(a)),
         allB = mol.bonds.filter(b => all.some(a => a.id === b.a) && all.some(a => a.id === b.b)),
-        got = O.Molecule.fromMolfile(molBlock(all, allB, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000')).getIDCode();
+        got = O.Molecule.fromMolfile(molBlock(all, allB, '').replace(CHIRAL_RX, CHIRAL_ON)).getIDCode();
       /* the SMILES's configuration, or the drawing's own where OpenChemLib reads a bridgehead N of it as a centre (both
          were checked to have the same InChIKey) */
       if (!d.keys.includes(got)) {
@@ -23993,6 +24163,143 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   let cageOnce = null;
   let REP_SKIP = false;
+  /* a bar at the top with what is being done, the time it has taken and Stop (shown after half a second) */
+  function busyBar(what) {
+    const el = document.createElement('div'),
+      t0 = Date.now(),
+      job = { stopped: false, what };
+    el.className = 'busyBar';
+    el.style.cssText =
+      'position:fixed;top:8px;left:50%;transform:translateX(-50%);z-index:9999;background:#1f2937;color:#fff;font:13px system-ui,sans-serif;padding:6px 8px 6px 14px;border-radius:8px;box-shadow:0 2px 10px rgba(0,0,0,.25);display:none;align-items:center;gap:10px';
+    el.innerHTML =
+      '<span></span><button type="button" style="font:inherit;background:#dc2626;color:#fff;border:0;border-radius:6px;padding:3px 10px;cursor:pointer">Stop</button>';
+    const span = el.querySelector('span'),
+      tick = () => {
+        const sec = Math.round((Date.now() - t0) / 1000);
+        span.textContent = job.what + ' · ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+      };
+    tick();
+    const iv = setInterval(tick, 1000),
+      sh = setTimeout(() => (el.style.display = 'flex'), 500);
+    el.querySelector('button').onclick = () => {
+      job.stopped = true;
+      span.textContent = 'Stopping…';
+    };
+    const esc = e => {
+      if (e.key === 'Escape') job.stopped = true;
+    };
+    document.addEventListener('keydown', esc, true);
+    document.body.appendChild(el);
+    job.set = t => {
+      job.what = t;
+      tick();
+    };
+    job.end = () => {
+      clearInterval(iv);
+      clearTimeout(sh);
+      document.removeEventListener('keydown', esc, true);
+      el.remove();
+    };
+    /* a pause for the page to draw the bar and take a click on Stop */
+    job.pause = () => new Promise(r => setTimeout(r, 0));
+    return job;
+  }
+  let bigPasting = false;
+  async function pasteBigSmiles(text, g) {
+    if (bigPasting) {
+      toast('A large structure is being drawn already', true);
+      return;
+    }
+    bigPasting = true;
+    const n = g.nodes.length,
+      job = busyBar('Laying out ' + n + ' atoms');
+    let m = null;
+    try {
+      await job.pause();
+      await new Promise(r => setTimeout(r, 30));
+      if (job.stopped) return toast('Stopped: nothing was added');
+      const inView =
+        lastPtr && lastPtr.x >= view.x && lastPtr.x <= view.x + view.w && lastPtr.y >= view.y && lastPtr.y <= view.y + view.h;
+      snap();
+      m = placeGraph(g, inView ? lastPtr : null);
+      render();
+      if (/@/.test(cxSplit(text).smi)) {
+        job.set('Setting the wedges of ' + n + ' atoms');
+        await job.pause();
+        await new Promise(r => setTimeout(r, 30));
+        if (job.stopped) throw { stopped: true };
+        const ok = await applySmilesStereoSteps(text, m, job);
+        if (!ok && job.stopped) throw { stopped: true };
+      }
+      clearSel();
+      m.forEach(a => sel.add(a.id));
+      setTool('select', true);
+      job.set('Counting ' + n + ' atoms');
+      await job.pause();
+      commit();
+      toast('Added ' + formulaText(countsOf(m)));
+    } catch (e) {
+      if (e && e.stopped && m) {
+        /* stopped part way: the structure taken off again */
+        const ids = new Set(m.map(a => a.id));
+        mol.atoms = mol.atoms.filter(a => !ids.has(a.id));
+        mol.bonds = mol.bonds.filter(b => !ids.has(b.a) && !ids.has(b.b));
+        if (undoSt.length) undoSt.pop();
+        clearSel();
+        render();
+        toast('Stopped: nothing was added');
+      } else if (!(e && e.stopped)) {
+        console.warn('pasteBig', e);
+        toast('Could not draw this structure: ' + ((e && e.message) || e), true);
+      }
+    } finally {
+      job.end();
+      bigPasting = false;
+    }
+  }
+  /* applySmilesStereo for a long chain, piece by piece with a pause between (Stop works there); true when done */
+  async function applySmilesStereoSteps(smi0, map, job) {
+    const cxs = cxSplit(smi0),
+      smi = cxs.smi;
+    const cut = !smi.includes('.') && map.length > 300 ? smilesPieces(smi, map.length) : null;
+    if (!cut) {
+      applySmilesStereo(smi0, map);
+      return true;
+    }
+    if (cxs.groups.length) for (const [lab, ix] of cxs.groups) for (const i of ix) if (map[i]) map[i].esr = lab;
+    const ids = new Set(map.map(a => a.id)),
+      was = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)).map(b => [b, b.stereo, b.a, b.b]),
+      nAt = mol.atoms.length;
+    let k = 0;
+    applySmilesStereo.inPiece = true;
+    try {
+      for (const [pc, list] of cut) {
+        if (/@/.test(pc)) applySmilesStereo(pc, list.map(i => map[i]));
+        job.set('Setting the wedges: part ' + ++k + ' of ' + cut.length);
+        await job.pause();
+        if (job.stopped) return false;
+      }
+    } finally {
+      applySmilesStereo.inPiece = false;
+    }
+    const got = new Set(mol.bonds.filter(b => (b.stereo === 'wedge' || b.stereo === 'hash') && ids.has(b.a)).map(b => b.a));
+    if (piecesRead(cut, got, map)) return true;
+    was.forEach(([b, st, x, y]) => ((b.stereo = st), (b.a = x), (b.b = y)));
+    const extra = new Set(mol.atoms.slice(nAt).map(a => a.id));
+    if (extra.size) {
+      mol.atoms = mol.atoms.filter(a => !extra.has(a.id));
+      mol.bonds = mol.bonds.filter(b => !extra.has(b.a) && !extra.has(b.b));
+    }
+    job.set('Setting the wedges of the whole chain at once');
+    await job.pause();
+    applySmilesStereo.inPiece = true;
+    try {
+      applySmilesStereo(smi0, map);
+    } finally {
+      applySmilesStereo.inPiece = false;
+    }
+    return true;
+  }
   function pasteSmilesNow(text) {
     /* a SMILES with a piece repeated ten times or more: asked first whether to draw one repeat unit or the whole chain */
     {
@@ -24041,6 +24348,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!g) {
       toast('Could not read that SMILES' + (parseSmiles.why ? ': ' + parseSmiles.why : ''), true);
       return false;
+    }
+    if (g.nodes.length > BIG_PASTE) {
+      pasteBigSmiles(text, g);
+      return true;
     }
     const inView =
       lastPtr &&
@@ -24106,6 +24417,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!g) {
       toast('Could not read that SMILES' + (parseSmiles.why ? ': ' + parseSmiles.why : ''), true);
       return false;
+    }
+    /* a very large structure is put on the sheet at once (with Stop), not carried under the pointer first */
+    if (g.nodes.length > BIG_PASTE) {
+      pasteBigSmiles(text, g);
+      return true;
     }
     curCage = text.trim();
     cageOnce = { label: label || '' };
@@ -29439,7 +29755,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const gs = new Set(at.filter(a => esrOk(a.esr) && a.esr !== 'abs').map(a => a.esr[0]));
     const opts = gs.size === 1 && !at.some(a => a.esr === 'abs') ? (gs.has('&') ? '-SRac' : '-SRel') : '';
     return {
-      mb: wedged ? mb.replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000') : mb,
+      mb: wedged ? mb.replace(CHIRAL_RX, CHIRAL_ON) : mb,
       opts,
       mixed: gs.size > 1 || (gs.size && at.some(a => a.esr === 'abs'))
     };
@@ -29482,6 +29798,30 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   function syncInchi() {
+    /* a very large structure: InChI when asked for (it takes long), as its SMILES */
+    if (mol.atoms.length > BIG_INFO && !syncInchi.now) {
+      inchiFor = null;
+      const I = $('inchi');
+      $('inchiKey').textContent = $('inchiNote').textContent = '';
+      I.textContent = '';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'btn ghost sm';
+      b.textContent = 'Show the InChI (' + mol.atoms.length + ' atoms: takes a while)';
+      b.onclick = () => {
+        b.textContent = 'Working…';
+        setTimeout(() => {
+          syncInchi.now = true;
+          try {
+            syncInchi();
+          } finally {
+            syncInchi.now = false;
+          }
+        }, 30);
+      };
+      I.appendChild(b);
+      return;
+    }
     const k = currentSmiles() + '|' + nameKey();
     if (k === inchiFor) return;
     inchiFor = k;
@@ -29563,10 +29903,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return pick
       .filter(f => f.length > 1 || f[0].el !== 'C' || !f[0].label)
       .map(f => {
-        const mb = molBlock(f, fragBonds(m, f), '').replace(
-          '  0  0  0  0  0  0  0  0999 V2000',
-          '  0  0  1  0  0  0  0  0999 V2000'
-        );
+        const mb = molBlock(f, fragBonds(m, f), '').replace(CHIRAL_RX, CHIRAL_ON);
         /* chiral flag: wedges mean this enantiomer */ try {
           const om = O.Molecule.fromMolfile(mb);
           /* a crossed double bond: E or Z not known, so none is written (the bonds in the file's order, dative ones left out) */
@@ -29612,6 +29949,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   function syncNameBox() {
+    /* a very large structure: no name is looked for on every change (its SMILES takes long to make) */
+    if (mol.atoms.length > BIG_INFO) {
+      nameFor = null;
+      $('iupac').textContent = $('iupacOctet').textContent = $('iupacOctetNote').textContent = '';
+      $('iupacNote').textContent = 'Not named on every change for a structure of ' + mol.atoms.length + ' atoms';
+      $('nameIt').disabled = $('nameOctet').disabled = true;
+      return;
+    }
     const smi = currentSmiles(),
       key = nameKey();
     if (key === nameFor) return;
@@ -31404,7 +31749,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const O = oclLoad(),
         M = O.Molecule,
         om = M.fromMolfile(
-          base.replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000')
+          base.replace(CHIRAL_RX, CHIRAL_ON)
         );
       om.ensureHelperArrays(M.cHelperParities);
       if (!oclSame(om, atoms, bonds)) return base;
@@ -31417,10 +31762,40 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return base;
     }
   }
+  /* the same in V3000 (no limit on atoms); its chiral flag is the last number of COUNTS (CHIRAL_RX sets it as for V2000) */
+  function molBlockV3(atoms, bonds, title) {
+    const idx = new Map(atoms.map((a, i) => [a.id, i + 1])),
+      n = v => +v.toFixed(4),
+      V = s => 'M  V30 ' + s,
+      L = [title || '', '  Reactio   2D', '', '  0  0  0     0  0            999 V3000', V('BEGIN CTAB'), V('COUNTS ' + atoms.length + ' ' + bonds.length + ' 0 0 0'), V('BEGIN ATOM')];
+    atoms.forEach((a, i) => {
+      const el = a.label && !a.grp ? 'R' : a.el;
+      L.push(
+        V(
+          i + 1 + ' ' + el + ' ' + n(a.x * ANG) + ' ' + n(-a.y * ANG) + ' 0 0' +
+            (a.chg ? ' CHG=' + a.chg : '') +
+            (a.rad ? ' RAD=' + (a.rad === 2 ? 3 : 2) : '') +
+            (a.iso && !a.label ? ' MASS=' + a.iso : '')
+        )
+      );
+    });
+    L.push(V('END ATOM'), V('BEGIN BOND'));
+    bonds.forEach((b, i) => {
+      const ord = b.stereo === 'deloc' ? 4 : b.order === 4 ? 1 : b.order,
+        cfg = b.order === 2 && b.dx ? 2 : b.order > 1 && b.stereo !== 'deloc' ? 0 : b.stereo === 'wedge' ? 1 : b.stereo === 'hash' ? 3 : b.stereo === 'wavy' ? 2 : 0;
+      L.push(V(i + 1 + ' ' + ord + ' ' + idx.get(b.a) + ' ' + idx.get(b.b) + (cfg ? ' CFG=' + cfg : '')));
+    });
+    L.push(V('END BOND'), V('END CTAB'), 'M  END');
+    return L.join('\n');
+  }
+  const CHIRAL_RX = /  0  0  0  0  0  0  0  0999 V2000|M  V30 COUNTS (\d+) (\d+) (\d+) (\d+) 0/,
+    CHIRAL_ON = (m, a, b, c, d) => (a ? `M  V30 COUNTS ${a} ${b} ${c} ${d} 1` : '  0  0  1  0  0  0  0  0999 V2000');
   function molBlock(atoms, bonds, title) {
     /* a dative bond is left out (MDL files have none: the donor and acceptor keep their own hydrogens); a quadruple bond goes
        out as a single one (there is no such order); a crossed double bond as a double one with E/Z not known (3) */
     bonds = bonds.filter(b => !isDative(b));
+    /* more than 999 atoms or bonds (a polymer written out): V2000 has three digits for them, so V3000 */
+    if (atoms.length > 999 || bonds.length > 999) return molBlockV3(atoms, bonds, title);
     const idx = new Map(atoms.map((a, i) => [a.id, i + 1]));
     const L = [];
     const pad = (v, n) => String(v).padStart(n),
