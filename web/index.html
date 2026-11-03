@@ -8779,6 +8779,299 @@ function kdOf(st) {
       ix
     };
   }
+  /* a long open chain (a peptide, a polyether, a long alkane: 40 atoms or more on its longest path, all of them single
+     bonds out of rings) laid in rows that turn back at the ends, like lines of text, instead of the curl the general
+     layout gives it; each side group keeps the shape it had, turned with the atom it hangs on. Kept only when no two
+     atoms come closer than the layout had them (or than 0.6 of a bond) */
+  function serpentineChain(g, pos) {
+    const n = g.nodes.length;
+    if (n < 40 || pos.some(p => !p)) return false;
+    const adj = Array.from({ length: n }, () => []);
+    g.edges.forEach((e, i) => {
+      adj[e.a].push([e.b, i]);
+      adj[e.b].push([e.a, i]);
+    });
+    const far = s0 => {
+      const d = Array(n).fill(-1),
+        pr = Array(n).fill(-1),
+        q = [s0];
+      d[s0] = 0;
+      for (let k = 0; k < q.length; k++)
+        for (const [v] of adj[q[k]])
+          if (d[v] < 0) {
+            d[v] = d[q[k]] + 1;
+            pr[v] = q[k];
+            q.push(v);
+          }
+      let b = s0;
+      for (let v = 0; v < n; v++) if (d[v] > d[b]) b = v;
+      return { b, pr };
+    };
+    const A0 = far(0).b,
+      { b: B0, pr } = far(A0),
+      path = [];
+    for (let v = B0; v >= 0; v = pr[v]) path.push(v);
+    /* an end on a double bond (C=O) or in a ring: that end hangs on the path as a side group */
+    const ringAt = new Set(findRingsG(n, g.edges, adj).flat()),
+      plain = (u, v) => {
+        const e = adj[u].find(([w]) => w === v);
+        return e && (g.edges[e[1]].order || 1) === 1 && !ringAt.has(u) && !ringAt.has(v);
+      };
+    while (path.length > 1 && !plain(path[0], path[1])) path.shift();
+    while (path.length > 1 && !plain(path[path.length - 1], path[path.length - 2])) path.pop();
+    const m = path.length;
+    if (m < 40) return false;
+    const onPath = new Map(path.map((v, i) => [v, i]));
+    for (let i = 0; i + 1 < m; i++) if (!plain(path[i], path[i + 1])) return false;
+    /* the side groups: what hangs on each atom of the path */
+    const owner = Array(n).fill(-1);
+    path.forEach((v, i) => (owner[v] = i));
+    const side = path.map(() => []);
+    for (let i = 0; i < m; i++)
+      for (const [v] of adj[path[i]]) {
+        if (onPath.has(v) || owner[v] >= 0) continue;
+        const st = [v];
+        owner[v] = i;
+        while (st.length) {
+          const x = st.pop();
+          side[i].push(x);
+          for (const [y] of adj[x]) if (owner[y] < 0) ((owner[y] = i), st.push(y));
+        }
+      }
+    if (owner.some(o => o < 0) || side.some(s => s.length > 30)) return false;
+    /* each side atom in the frame of its path atom: along the chain and out from it */
+    const frame = (P, A, B) => {
+      let ox = -((A.x - P.x) / (Math.hypot(A.x - P.x, A.y - P.y) || 1) + (B.x - P.x) / (Math.hypot(B.x - P.x, B.y - P.y) || 1)),
+        oy = -((A.y - P.y) / (Math.hypot(A.x - P.x, A.y - P.y) || 1) + (B.y - P.y) / (Math.hypot(B.x - P.x, B.y - P.y) || 1));
+      let tx = B.x - A.x,
+        ty = B.y - A.y;
+      const tl = Math.hypot(tx, ty) || 1;
+      tx /= tl;
+      ty /= tl;
+      if (Math.hypot(ox, oy) < 1e-3) ((ox = -ty), (oy = tx));
+      const d = ox * tx + oy * ty;
+      ox -= d * tx;
+      oy -= d * ty;
+      const ol = Math.hypot(ox, oy) || 1;
+      return { tx, ty, ox: ox / ol, oy: oy / ol };
+    };
+    const end = (i, P) => {
+      /* an end atom of the path: its frame from the one neighbour and a point straight on beyond it */
+      const j = i === 0 ? 1 : m - 2,
+        Q = P[path[j]],
+        X = P[path[i]],
+        ext = { x: 2 * X.x - Q.x, y: 2 * X.y - Q.y };
+      return i === 0 ? [ext, Q] : [Q, ext];
+    };
+    const local = [];
+    let E = L * 0.6;
+    for (let i = 0; i < m; i++) {
+      if (!side[i].length) continue;
+      const P = pos[path[i]],
+        [A, B] = i === 0 || i === m - 1 ? end(i, pos) : [pos[path[i - 1]], pos[path[i + 1]]],
+        f = frame(P, A, B);
+      local[i] = side[i].map(v => {
+        const dx = pos[v].x - P.x,
+          dy = pos[v].y - P.y,
+          t = dx * f.tx + dy * f.ty,
+          o = dx * f.ox + dy * f.oy;
+        E = Math.max(E, o);
+        return [v, t, o];
+      });
+    }
+    /* the walk: bonds at 30° steps of a hexagonal grid; rows of about the width that gives a page-like shape */
+    const pitch = 2 * E + L * 1.4,
+      perRow0 = Math.max(24, Math.round(Math.sqrt((m * pitch * 1.6) / (L * 0.866)))) | 0;
+    if (m < perRow0 * 1.25) return false;
+    const deg = Math.PI / 180;
+    /* the closest two atoms not bonded, on a grid */
+    const closest = Q => {
+      const cell = new Map(),
+        key = (a, b) => a * 100003 + b;
+      Q.forEach((p, v) => {
+        const k = key(Math.floor(p.x / L), Math.floor(p.y / L));
+        (cell.get(k) || cell.set(k, []).get(k)).push(v);
+      });
+      const bonded = new Set(g.edges.map(e => e.a * n + e.b));
+      let c = 1e9;
+      Q.forEach((p, v) => {
+        const cx = Math.floor(p.x / L),
+          cy = Math.floor(p.y / L);
+        for (let ax = -1; ax <= 1; ax++)
+          for (let ay = -1; ay <= 1; ay++)
+            for (const w of cell.get(key(cx + ax, cy + ay)) || []) {
+              if (w <= v || bonded.has(v * n + w) || bonded.has(w * n + v)) continue;
+              c = Math.min(c, Math.hypot(Q[w].x - p.x, Q[w].y - p.y) / L);
+            }
+      });
+      return c;
+    };
+    /* a few row widths tried (a side group at a turn may meet one of the row before): the first with nothing crowded */
+    const build = perRow => {
+      const np = path.map(() => null),
+        cells = new Map(),
+        ck = (a, b) => a * 100003 + b,
+        put = q => {
+          const k = ck(Math.floor(q.x / L), Math.floor(q.y / L));
+          (cells.get(k) || cells.set(k, []).get(k)).push(q);
+        },
+        near = (q, skip) => {
+          /* the distance to the nearest atom placed (but the group's own first atom and the one it hangs on), up to two bonds */
+          let d = 2 * L;
+          const cx = Math.floor(q.x / L),
+            cy = Math.floor(q.y / L);
+          for (let ax = -2; ax <= 2; ax++)
+            for (let ay = -2; ay <= 2; ay++)
+              for (const o of cells.get(ck(cx + ax, cy + ay)) || []) {
+                if (o === skip[0] || o === skip[1]) continue;
+                d = Math.min(d, Math.hypot(o.x - q.x, o.y - q.y));
+              }
+          return d;
+        };
+      let x = 0,
+        y = 0,
+        i = 0,
+        right = true,
+        rowStart = 0;
+      np[0] = { x, y };
+      const step = a => {
+        x += L * Math.cos(a * deg);
+        y += L * Math.sin(a * deg);
+        i++;
+        np[i] = { x, y };
+      };
+      let dir = 30;
+      while (i < m - 1) {
+        if (i - rowStart < perRow || m - 1 - i < 6) {
+          dir = right ? (dir === 30 ? 330 : 30) : dir === 150 ? 210 : 150;
+          step(dir);
+          continue;
+        }
+        /* the turn: down in an armchair line until the next row clears this one, then back the other way */
+        if (right ? dir !== 30 : dir !== 150) {
+          dir = right ? 30 : 150;
+          step(dir);
+          if (i >= m - 1) break;
+        }
+        const y0 = y;
+        dir = 90;
+        step(dir);
+        while (i < m - 1 && y - y0 + L * 0.5 < pitch) {
+          dir = right ? 30 : 150;
+          step(dir);
+          if (i >= m - 1) break;
+          dir = 90;
+          step(dir);
+        }
+        if (i >= m - 1) break;
+        right = !right;
+        dir = right ? 30 : 150;
+        step(dir);
+        rowStart = i;
+      }
+      const out = pos.slice(),
+        later = [];
+      np.forEach(put);
+      path.forEach((v, k) => (out[v] = np[k]));
+      for (let k = 0; k < m; k++) {
+        if (!local[k]) continue;
+        const P = np[k],
+          [A, B] = k === 0 || k === m - 1 ? end(k, out) : [np[k - 1], np[k + 1]],
+          f = frame(P, A, B);
+        for (const [v, t, o] of local[k]) out[v] = { x: P.x + t * f.tx + o * f.ox, y: P.y + t * f.ty + o * f.oy };
+        /* the bonds into the side groups spread evenly on the outer side of the bend (one straight out, two at ±40°, three
+           at -60°, 0, +60°), each group turned with its bond */
+        const roots = adj[path[k]].map(([v]) => v).filter(v => !onPath.has(v));
+        if (!roots.length || roots.length > 3) continue;
+        let ao = Math.atan2(f.oy, f.ox),
+          spread = roots.length === 1 ? [0] : roots.length === 2 ? [-40, 40] : [-60, 0, 60];
+        const along = v => (out[v].x - P.x) * f.tx + (out[v].y - P.y) * f.ty;
+        roots.sort((a, b) => along(a) - along(b));
+        if (k === 0 || k === m - 1) {
+          /* an end of the path: its groups go on from it, one as the zigzag would, two at ±60°, three at -70°, 0, 70° */
+          const J = np[k === 0 ? 1 : m - 2],
+            JJ = np[k === 0 ? 2 : m - 3],
+            dJ = Math.atan2(P.y - J.y, P.x - J.x),
+            dP = Math.atan2(J.y - JJ.y, J.x - JJ.x),
+            turn = Math.atan2(Math.sin(dJ - dP), Math.cos(dJ - dP));
+          ao = roots.length === 1 ? dJ - turn : dJ;
+          spread = roots.length === 1 ? [0] : roots.length === 2 ? [-60, 60] : [-70, 0, 70];
+        }
+        const sgn = Math.cos(ao + 0.2) * f.tx + Math.sin(ao + 0.2) * f.ty < 0 ? -1 : 1;
+        roots.forEach((r, j) => {
+          const want = ao - sgn * spread[j] * deg,
+            now = Math.atan2(out[r].y - P.y, out[r].x - P.x),
+            d = want - now,
+            c = Math.cos(d),
+            sn = Math.sin(d);
+          const seen = new Set([path[k], r]),
+            st = [r];
+          while (st.length) {
+            const x = st.pop(),
+              dx = out[x].x - P.x,
+              dy = out[x].y - P.y;
+            out[x] = { x: P.x + dx * c - dy * sn, y: P.y + dx * sn + dy * c };
+            for (const [y] of adj[x]) if (!seen.has(y) && !onPath.has(y)) (seen.add(y), st.push(y));
+          }
+          /* the bond itself one bond long */
+          const bl = Math.hypot(out[r].x - P.x, out[r].y - P.y) || 1;
+          if (Math.abs(bl - L) > 1) {
+            const sx = (out[r].x - P.x) * (L / bl - 1),
+              sy = (out[r].y - P.y) * (L / bl - 1);
+            for (const x of seen) if (x !== path[k]) out[x] = { x: out[x].x + sx, y: out[x].y + sy };
+          }
+          put(out[r]);
+          later.push(() => {
+          /* the group as it is, mirrored along its bond, or (a single group) turned 20° or 35° either way: the one farthest from
+             what is placed already (the path and the first atom of every group are placed before) */
+          const grp = [...seen].filter(x => x !== path[k]),
+            R = out[r],
+            ux = (R.x - P.x) / L,
+            uy = (R.y - P.y) / L,
+            mir = q => {
+              const dx = q.x - P.x,
+                dy = q.y - P.y,
+                t = dx * ux + dy * uy;
+              return { x: P.x + 2 * t * ux - dx, y: P.y + 2 * t * uy - dy };
+            },
+            rot = (q, a) => {
+              const dx = q.x - P.x,
+                dy = q.y - P.y,
+                c = Math.cos(a),
+                sn = Math.sin(a);
+              return { x: P.x + dx * c - dy * sn, y: P.y + dx * sn + dy * c };
+            };
+          const vars = [q => q, mir];
+          if (roots.length === 1)
+            for (const a of [20 * deg, -20 * deg, 35 * deg, -35 * deg]) vars.push(q => rot(q, a), q => rot(mir(q), a));
+          let best = null,
+            bs = -1;
+          for (const f of vars) {
+            const P2 = grp.map(x => f(out[x]));
+            let sc = 1e9;
+            for (const q of P2) sc = Math.min(sc, near(q, [P, R]));
+            if (sc > bs + 0.05 * L) ((bs = sc), (best = P2));
+            if (bs >= 1.2 * L) break;
+          }
+          grp.forEach((x, ii) => ((out[x] = best[ii]), x !== r && put(best[ii])));
+          });
+        });
+      }
+      for (const f of later) f();
+      return out;
+    };
+    let out = null,
+      c1 = -1;
+    for (const dw of [0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5]) {
+      const o = build(perRow0 + dw),
+        c = closest(o);
+      if (c > c1) ((out = o), (c1 = c));
+      if (c1 >= 0.8) break;
+    }
+    if (c1 < 0.6 && c1 < closest(pos)) return false;
+    for (let v = 0; v < n; v++) pos[v] = out[v];
+    return true;
+  }
   /* the layout turned so a template cage in it stands as the template does */
   function cageToTemplate(pos) {
     for (const c of pos.cages) {
@@ -8956,6 +9249,9 @@ function kdOf(st) {
            layout is taken when it is clearly better */
         try {
           if (!sp.tplCage) oclLayoutIfBetter(sg, sp, sc);
+        } catch (e) {}
+        try {
+          if (!sp.tplCage && !sp.cages) serpentineChain(sg, sp);
         } catch (e) {}
         fixEZ(sg, sp);
         /* a cage laid from a template that keeps its orientation (adamantane upright, a morphinan): turned to it */
@@ -9573,7 +9869,21 @@ function kdOf(st) {
           if (v < 1) break;
         }
       }
+    if (!bt) return put(0);
+    /* a structure with wedges: kept unturned if the turn reads any centre the other way (a centre with two bonds in a line) */
+    const ids = fr.map(a => a.id),
+      idS = new Set(ids),
+      wedged = mol.bonds.some(b => idS.has(b.a) && (b.stereo === 'wedge' || b.stereo === 'hash'));
+    let s1 = null;
+    if (wedged) {
+      put(0);
+      s1 = stereoSig(ids);
+    }
     put(bt);
+    if (wedged) {
+      const s2 = stereoSig(ids);
+      if ([...s1].some(([k, v]) => s2.get(k) !== v)) put(0);
+    }
   }
   /* a bridged bicycle drawn flat (a norbornene as a hexagon with its CH2 bridge inside, the bridge bonds wedged): Clean Up
      keeps it flat, as Clean Up 2D draws it, instead of turning it into the perspective drawing */
@@ -10304,6 +10614,79 @@ function kdOf(st) {
       console.warn('cleanEndsOffBonds', e);
     }
   }
+  /* a stereocentre with three bonds, two of them in a straight line (N–Cα–C′ of a peptide straight, its methyl at 90°): which
+     side the third is on says nothing then, and a turn of the drawing reads the other way. One of the two straight branches
+     (the smaller, out of rings) is turned 60° to 120° from the others, where it lands on nothing */
+  function straightenCentres(fr, sig) {
+    let n = 0;
+    const idS = new Set(fr.map(a => a.id));
+    for (const [k] of sig) {
+      if (k[0] !== 'a') continue;
+      const C = atomById(+k.slice(1));
+      if (!C) continue;
+      const nb = neighbors(C).filter(o => idS.has(o.id));
+      if (nb.length !== 3) continue;
+      const ang = o => Math.atan2(o.y - C.y, o.x - C.x),
+        gap = (p, q) => Math.abs(Math.atan2(Math.sin(p - q), Math.cos(p - q)));
+      let pair = null;
+      for (let i = 0; i < 3 && !pair; i++)
+        for (let j = i + 1; j < 3; j++) if (gap(ang(nb[i]), ang(nb[j])) > (165 * Math.PI) / 180) pair = [nb[i], nb[j], nb[3 - i - j]];
+      if (!pair) continue;
+      /* each straight branch: the atoms reached from it without passing the centre (none if it comes back: a ring) */
+      const branch = s0 => {
+        const seen = new Set([s0.id]),
+          st = [s0];
+        while (st.length) {
+          const u = st.pop();
+          for (const v of neighbors(u)) {
+            if (v === C) {
+              if (u !== s0) return null;
+              continue;
+            }
+            if (!seen.has(v.id)) (seen.add(v.id), st.push(v));
+          }
+        }
+        return seen;
+      };
+      const opts = [pair[0], pair[1]]
+        .map(o => ({ o, set: branch(o), keep: o === pair[0] ? pair[1] : pair[0] }))
+        .filter(x => x.set)
+        .sort((x, y) => x.set.size - y.set.size);
+      let done = false;
+      for (const { o, set, keep } of opts) {
+        const a1 = ang(keep),
+          a3 = ang(pair[2]),
+          cands = [a1 + (2 * Math.PI) / 3, a1 - (2 * Math.PI) / 3].sort((p, q) => gap(q, a3) - gap(p, a3));
+        for (const t of cands) {
+          const d = t - ang(o),
+            c = Math.cos(d),
+            sn = Math.sin(d),
+            moved = [...set].map(id => atomById(id)),
+            was = moved.map(a => [a.x, a.y]);
+          moved.forEach(a => {
+            const dx = a.x - C.x,
+              dy = a.y - C.y;
+            a.x = C.x + dx * c - dy * sn;
+            a.y = C.y + dx * sn + dy * c;
+          });
+          const rest = fr.filter(a => !set.has(a.id));
+          let clash = false;
+          for (const a of moved) {
+            for (const b of rest) if (Math.hypot(a.x - b.x, a.y - b.y) < L * 0.6 && !neighbors(a).includes(b)) clash = true;
+            if (clash) break;
+          }
+          if (!clash) {
+            done = true;
+            n++;
+            break;
+          }
+          moved.forEach((a, i) => ((a.x = was[i][0]), (a.y = was[i][1])));
+        }
+        if (done) break;
+      }
+    }
+    return n;
+  }
   function cleanFragmentsH(frs) {
     let sk = 0;
     cleanStereoKept = 0;
@@ -10385,6 +10768,9 @@ function kdOf(st) {
       } catch (e) {}
       if (cleanFragments.post) cleanFragments.post(fr);
       let kept = false;
+      try {
+        if (sig.size) straightenCentres(fr, sig);
+      } catch (e) {}
       stereo: {
         /* tests: a layout that turns things over */ if (!sig.size) break stereo;
         const diff = () => {
@@ -10835,6 +11221,10 @@ function kdOf(st) {
           );
         }
       }
+      /* a long open chain: in rows (see serpentineChain) */
+      try {
+        if (pos && !pos.tplCage && !pos.cages) serpentineChain(g, pos);
+      } catch (e) {}
       /* a drawn H on an atom with two other bonds (the NH of PhNH–Ar): untangling can push it round next to one of them (the
          H–N–Ar line straight, H–N–Ph 60°); it goes back opposite the other two, as the bonds of a flat NH are drawn */
       {
@@ -23310,8 +23700,38 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           bd.stereo = null;
           return false;
         };
-        if (amb())
-          outer: for (const b of bondsNow().filter(x => (x.stereo === 'wedge' || x.stereo === 'hash') && x.order === 1)) {
+        /* the centre InChI finds ambiguous, looked for on each centre alone (with its neighbours as four different halogens),
+           so that a long chain is not tried bond by bond against the whole structure */
+        const ambAt = A => {
+          try {
+            const nb = bondsNow().filter(c => (c.a === A.id || c.b === A.id) && !isDative(c));
+            if (nb.length < 3 || nb.length > 4) return true;
+            const subst = ['F', 'Cl', 'Br', 'I'],
+              at = [{ id: A.id, x: A.x, y: A.y, el: A.el }],
+              bs = [];
+            nb.forEach((c, i) => {
+              const o = atomById(c.a === A.id ? c.b : c.a);
+              at.push({ id: o.id, x: o.x, y: o.y, el: o.el === 'H' ? 'H' : subst[i] });
+              bs.push({ id: c.id, a: c.a, b: c.b, order: 1, stereo: c.stereo });
+            });
+            const r = INCHI(molBlock(at, bs, '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000'), '');
+            return /ambiguous stereo/i.test((r && r.message) || '');
+          } catch (e) {
+            return true;
+          }
+        };
+        let ambB = null;
+        if (amb()) {
+          const wb = bondsNow().filter(x => (x.stereo === 'wedge' || x.stereo === 'hash') && x.order === 1),
+            at = new Set(wb.map(b => b.a).filter(id => {
+              const A = atomById(id);
+              return A && ambAt(A);
+            }));
+          ambB = wb.filter(b => at.has(b.a));
+          if (!ambB.length && fr.length <= 120) ambB = wb;
+        }
+        if (ambB)
+          outer: for (const b of ambB) {
             const A = atomById(b.a),
               B = atomById(b.b);
             if (!A || !B || B.el === 'H') continue;
@@ -23392,6 +23812,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           const [keys, id, A, B, X] = line.split('\t');
           const d = { id, A, B, X, keys: keys.split(' ') };
           for (const k of keys.split(' ')) if (k) DEPICT.set(k, d);
+          DEPICT.most = Math.max(DEPICT.most || 0, A.split(';').length);
         }
     } catch (e) {}
     return DEPICT;
@@ -23400,6 +23821,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       if (!at || at.length < 6 || !/@|\d/.test(smi) || at.some(a => a.label || a.multi)) return false;
       if (!depictTable().size) return false;
+      /* larger than every drawing in the table (a long polymer): not looked up */
+      if (at.filter(a => a.el !== 'H').length > depictTable().most) return false;
       return depictOnto(oclLoad().Molecule.fromSmiles(String(smi).replace(/\s+\|[^|]*\|\s*$/, '')).getIDCode(), at);
     } catch (e) {
       return false;
@@ -46629,8 +47052,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   let v3Target = null;
   function setStyle3D(st) {
-    const fr = fragments().filter(f => f.length > 1),
-      pick = v3Frags();
+    const fr = fragments().filter(f => f.length > 1);
+    let pick = v3Frags();
     v3Target = null;
     if (!pick.length) {
       toast('Draw or select a structure first.', true);
@@ -46638,7 +47061,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     snap();
     let shaped = 0,
-      flat = 0;
+      flat = 0,
+      opened = 0;
+    /* in balls, tubes or spheres every group written as a label (CF3, OMe, Ph, tBu) is drawn out atom by atom, so it has
+       its shape in 3D; Lines (as drawn) keeps the labels */
+    if (st) {
+      const keep = new Set(pick.flat().map(a => a.id)),
+        labs = pick.flat().filter(a => a.label && a.grp && !a.multi && !a.xray);
+      for (const a of labs)
+        if (graft(a, a.grp, null)) {
+          opened++;
+          delete a.z;
+        }
+      if (opened) {
+        const live = new Set(mol.atoms.map(a => a.id));
+        pick = fragments().filter(f => f.some(a => keep.has(a.id) && live.has(a.id)));
+        for (const f of pick) if (f.some(a => a.z === undefined)) for (const b of f) delete b.zx;
+      }
+    }
     for (const f of pick) {
       if (st && !v3Valid(f) && !v3Follow(f) && !v3Keep(f)) {
         if (embedBest(f) === 'none') {
@@ -46657,6 +47097,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     toast(
       (st ? V3STYLES[st] : 'Lines') +
         (shaped ? ' — 3D shape built for ' + shaped + ' structure' + (shaped > 1 ? 's' : '') : '') +
+        (opened ? '; ' + opened + ' label' + (opened > 1 ? 's' : '') + ' drawn out' : '') +
         (st ? '; turn it with 3D rotate' : '') +
         (flat ? '. ' + flat + ' left as lines: no 3D shape keeping the configuration could be made' : ''),
       !!flat
