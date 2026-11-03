@@ -3701,6 +3701,7 @@ function kdOf(st) {
     Tl: 204.38,
     Pb: 207.2,
     Bi: 208.98,
+    Th: 232.04,
     U: 238.03
   };
   const MONO = {
@@ -3845,6 +3846,8 @@ function kdOf(st) {
       'c-Bu': 'C1CCC1',
       'c-Pent': 'C1CCCC1',
       morpholino: 'N1CCOCC1',
+      Morph: 'N1CCOCC1',
+      Th: 'C1=CC=CS1',
       piperidino: 'N1CCCCC1',
       pyrrolidino: 'N1CCCC1',
       OEC: 'OCC#N',
@@ -5014,6 +5017,23 @@ function kdOf(st) {
       const h = implicitH(a);
       if (h) c.H = (c.H || 0) + h;
       q += a.chg || 0;
+    }
+    /* a repeat unit in brackets: counted on the chain written out n times (so formula and SMILES always agree) */
+    if (!SRU_OUT && mol.arrows && mol.arrows.some(r => r.sru)) {
+      const ids0 = new Set(atoms.map(a => a.id)),
+        us = srus().filter(x => x.U.every(a => ids0.has(a.id)));
+      if (us.length) {
+        const E = sruExpandedNow().m,
+          saved = mol;
+        SRU_OUT = true;
+        mol = E;
+        try {
+          return countsOf(E.atoms.filter(a => ids0.has(a.id) || (a.sruSrc != null && ids0.has(a.sruSrc))));
+        } finally {
+          mol = saved;
+          SRU_OUT = false;
+        }
+      }
     }
     /* a ring drawn with a circle may carry a charge of its own (Cp⁻, tropylium⁺) */
     if (mol.rings && mol.rings.length) {
@@ -14101,6 +14121,7 @@ function kdOf(st) {
       }
   }
   function render() {
+    if (mol.arrows.some(r => r.sru)) sruPlace();
     const own = !RIDX;
     if (own) RIDX = new Map(mol.atoms.map(a => [a.id, a]));
     try {
@@ -15285,6 +15306,12 @@ function kdOf(st) {
   function drugProps(atoms, mw) {
     /* drug-likeness is for one compound (or a salt), not for a whole sheet of structures */
     if (!atoms || !atoms.length || atoms.length > 400) return null;
+    /* a repeat unit: the chain it stands for counts (a long polymer has no drug-likeness worth the time) */
+    {
+      const ids = new Set(atoms.map(a => a.id)),
+        big = srus().some(x => x.U.some(a => ids.has(a.id)) && x.U.length * x.n > 400);
+      if (big) return null;
+    }
     let sm = '';
     try {
       /* the structures' SMILES as the panel has just written them (kept: fragSmilesS), not worked out a second time */
@@ -16303,7 +16330,548 @@ function kdOf(st) {
       mol = saved;
     }
   }
+  let SRU_OUT = false;
+  /* ===== a repeat unit drawn in brackets (polymers): r.sru = { n, ids (the unit's atoms), head and tail (its first and last
+     atom on the chain), xin and yout (the atoms outside it they bond to) }. The drawing holds one unit; formula, mass,
+     SMILES, InChI and name count n of them. The brackets and the n under them follow the unit when it moves. ===== */
+  function sruOf(r) {
+    const s = r && r.kind === 'brk' && r.sru;
+    if (!s || !(s.n >= 1)) return null;
+    const by = new Map(mol.atoms.map(a => [a.id, a])),
+      U = s.ids.map(id => by.get(id));
+    if (U.some(a => !a)) return null;
+    const head = by.get(s.head),
+      tail = by.get(s.tail),
+      xin = by.get(s.xin),
+      yout = by.get(s.yout);
+    if (!head || !tail || !xin || !yout || !bondBetween(xin, head) || !bondBetween(tail, yout)) return null;
+    return { r, n: s.n, U, ids: new Set(s.ids), head, tail, xin, yout };
+  }
+  const srus = () => (mol.arrows.some(r => r.sru) ? mol.arrows.map(sruOf).filter(Boolean) : []);
+  /* the brackets cross the bond into the unit and the bond out of it; n under the right one */
+  function sruPlace() {
+    for (const s of srus()) {
+      /* as tall as what is inside, labels and the chain ends included, the same margin above and below */
+      const pts = [...s.U, s.xin, s.yout].flatMap(a => {
+          const B = atomTextBox(a);
+          return B ? [B.y0, B.y1] : [a.y - L * 0.1, a.y + L * 0.1];
+        }),
+        y0 = Math.min(...pts) - L * 0.3,
+        y1 = Math.max(...pts) + L * 0.3;
+      let xl = (s.xin.x + s.head.x) / 2,
+        xr = (s.tail.x + s.yout.x) / 2;
+      if (xl > xr) [xl, xr] = [xr, xl];
+      const t = mol.texts.find(t => t.sruOf === s.r.id);
+      /* the brackets taller, the same both ways, while n at the lower end of the right one would touch a label beside it (OH) */
+      let grow = 0;
+      if (t) {
+        const v = String(t.text).trim();
+        if (/^[1-9]\d{0,4}$/.test(v)) s.r.sru.n = +v;
+        t.text = String(s.r.sru.n);
+        t.x = xr + 3;
+        for (let k = 0; k < 6; k++) {
+          t.y = y1 + grow + tSize(t) * 0.35;
+          const w = textW(t),
+            h = tSize(t),
+            hit = mol.atoms.some(a => {
+              const B = atomTextBox(a);
+              return B && B.x1 > t.x && B.x0 < t.x + w && B.y1 > t.y - h && B.y0 < t.y + 2;
+            });
+          if (!hit) break;
+          grow += h * 0.4;
+        }
+      }
+      Object.assign(s.r, { x1: xl, x2: xr, y1: y0 - grow, y2: y1 + grow });
+    }
+    /* a unit no longer whole (an atom of it deleted): plain brackets, and its number goes too */
+    for (const r of mol.arrows)
+      if (r.sru && !sruOf(r)) {
+        delete r.sru;
+        mol.texts = mol.texts.filter(t => t.sruOf !== r.id);
+      }
+  }
+  /* the molecule with every repeat unit written out n times (a copy: the drawing stays as it is); each copied atom knows the
+     atom it was copied from (sruSrc); the H put at an open end only for the bracket is taken off again, as its atom's H */
+  function sruExpanded(m0) {
+    const saved = mol;
+    mol = JSON.parse(JSON.stringify(m0));
+    try {
+      for (const s of srus()) {
+        const n = s.n,
+          inU = b => s.ids.has(b.a) && s.ids.has(b.b),
+          inner = mol.bonds.filter(inU),
+          bOut = bondBetween(s.tail, s.yout),
+          bIn = bondBetween(s.xin, s.head);
+        /* a wedge on the bond out of the unit (from its tail) or into it (from its head) goes on every link between units */
+        const link = (t, h) => {
+          if (bOut.stereo && bOut.a === s.tail.id) return { id: mol.next++, a: t.id, b: h.id, order: bOut.order, stereo: bOut.stereo };
+          if (bIn && bIn.stereo && bIn.a === s.head.id) return { id: mol.next++, a: h.id, b: t.id, order: bOut.order, stereo: bIn.stereo };
+          return { id: mol.next++, a: t.id, b: h.id, order: bOut.order, stereo: null };
+        };
+        /* what hangs beyond the unit's way out moves along by n − 1 units */
+        const far = new Set([s.yout.id]),
+          st = [s.yout];
+        while (st.length) {
+          const x = st.pop();
+          for (const y of neighbors(x)) if (!far.has(y.id) && !s.ids.has(y.id)) (far.add(y.id), st.push(y));
+        }
+        const dx = s.yout.x - s.head.x,
+          dy = s.yout.y - s.head.y;
+        mol.atoms.forEach(a => far.has(a.id) && ((a.x += dx * (n - 1)), (a.y += dy * (n - 1))));
+        mol.bonds.splice(mol.bonds.indexOf(bOut), 1);
+        let prevTail = s.tail;
+        for (let k = 1; k < n; k++) {
+          const map = new Map();
+          for (const a of s.U) {
+            const c = { ...JSON.parse(JSON.stringify(a)), id: mol.next++, x: a.x + dx * k, y: a.y + dy * k, sruSrc: a.id };
+            map.set(a.id, c);
+            mol.atoms.push(c);
+          }
+          for (const b of inner) mol.bonds.push({ ...b, id: mol.next++, a: map.get(b.a).id, b: map.get(b.b).id });
+          mol.bonds.push(link(prevTail, map.get(s.head.id)));
+          prevTail = map.get(s.tail.id);
+        }
+        mol.bonds.push({ id: mol.next++, a: prevTail.id, b: s.yout.id, order: bOut.order, stereo: bOut.a === s.tail.id ? bOut.stereo : null });
+        s.r.sru = null;
+      }
+      for (const h of mol.atoms.filter(a => a.sruH && a.el === 'H')) {
+        const bs = mol.bonds.filter(b => b.a === h.id || b.b === h.id);
+        if (bs.length !== 1) continue;
+        const o = atomById(bs[0].a === h.id ? bs[0].b : bs[0].a);
+        mol.bonds.splice(mol.bonds.indexOf(bs[0]), 1);
+        mol.atoms.splice(mol.atoms.indexOf(h), 1);
+        if (o && o.hExp !== undefined) {
+          o.hExp += 1;
+          o.hUsed = usedVal(o);
+        }
+      }
+      return mol;
+    } finally {
+      mol = saved;
+    }
+  }
+  /* the expanded copy, kept while the drawing's chemistry is the same (formula, SMILES and InChI of a long polymer are asked
+     for on every change of the sheet) */
+  let SRU_CACHE = null;
+  function sruKey() {
+    return (
+      mol.atoms.map(a => a.id + a.el + (a.chg || 0) + (a.label || '') + (a.hExp ?? '') + (a.rad || '') + (a.iso || '')).join() +
+      '|' +
+      mol.bonds.map(b => b.a + '-' + b.b + ':' + b.order + (b.stereo || '')).join() +
+      '|' +
+      JSON.stringify(mol.arrows.filter(r => r.sru).map(r => r.sru))
+    );
+  }
+  /* the chemistry of a drawn repeat structure, without n (n may change while the SMILES text still holds) */
+  function sruChemSig(atoms, sr) {
+    const ids = new Set(atoms.map(a => a.id));
+    return (
+      [...atoms].sort((x, y) => x.id - y.id).map(a => a.id + a.el + (a.chg || 0) + (a.label || '') + (a.hExp ?? '') + (a.rad || '') + (a.iso || '')).join() +
+      '|' +
+      mol.bonds.filter(b => ids.has(b.a) || ids.has(b.b)).sort((x, y) => x.id - y.id).map(b => b.a + '-' + b.b + ':' + b.order + (b.stereo || '')).join() +
+      '|' + sr.ids.join()
+    );
+  }
+  function sruExpandedNow() {
+    const k = sruKey();
+    if (!SRU_CACHE || SRU_CACHE.k !== k) SRU_CACHE = { k, m: sruExpanded(mol), smi: new Map() };
+    return SRU_CACHE;
+  }
+  /* wedges of a unit with stereo: tried on a chain of five units against the SMILES written with five (in three, the middle
+     centre of isotactic polypropylene is not yet one), so the unit drawn gives the configuration of the chain */
+  function sruStereo(rep, r, U) {
+    let O;
+    try {
+      O = oclLoad();
+    } catch (e) {
+      return;
+    }
+    const want3 = (() => {
+      try {
+        return O.Molecule.fromSmiles(rep.pre + rep.unit.repeat(5) + rep.suf).getIDCode();
+      } catch (e) {
+        return null;
+      }
+    })();
+    if (!want3) return;
+    const ids = new Set(U.map(a => a.id));
+    const got = () => {
+      const n0 = r.sru.n;
+      r.sru.n = 5;
+      try {
+        const m = sruExpanded(mol),
+          saved = mol;
+        mol = m;
+        try {
+          const fr = fragments().find(f => f.some(a => ids.has(a.id)));
+          const mb = molBlock(fr, fragBonds(m, fr), '').replace('  0  0  0  0  0  0  0  0999 V2000', '  0  0  1  0  0  0  0  0999 V2000');
+          return O.Molecule.fromMolfile(mb).getIDCode();
+        } finally {
+          mol = saved;
+        }
+      } catch (e) {
+        return null;
+      } finally {
+        r.sru.n = n0;
+      }
+    };
+    if (got() === want3) return;
+    /* the stereocentres of the unit (its bracket atoms with @): a wedge or a hash on one bond each, every combination */
+    const cent = U.filter((a, i) => /@/.test((rep.unit.match(SMI_ATOM) || [])[i] || ''));
+    if (!cent.length || cent.length > 5) return;
+    const bondFor = c => {
+      /* the bond to its smallest neighbour (a methyl, an H, a side group), drawn from the centre */
+      const all = mol.bonds.filter(b => (b.a === c.id || b.b === c.id) && b.order === 1),
+        inside = all.filter(b => ids.has(b.a === c.id ? b.b : b.a)),
+        bs = inside.length ? inside : all,
+        deg = b => neighbors(atomById(b.a === c.id ? b.b : b.a)).length;
+      return bs.sort((x, y) => deg(x) - deg(y))[0];
+    };
+    const plan = cent.map(c => ({ c, b: bondFor(c) })).filter(x => x.b);
+    /* the wedges the first pass put on the centres' bonds (on a bond out of the unit too) are taken off for the search */
+    const cids = new Set(cent.map(c => c.id)),
+      touched = mol.bonds.filter(b => (cids.has(b.a) || cids.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash'));
+    const old = [...new Set([...touched, ...plan.map(x => x.b)])].map(b => ({ b, a: b.a, bb: b.b, st: b.stereo }));
+    touched.forEach(b => (b.stereo = null));
+    for (let mask = 0; mask < 1 << plan.length; mask++) {
+      plan.forEach((x, i) => {
+        if (x.b.a !== x.c.id) [x.b.a, x.b.b] = [x.b.b, x.b.a];
+        x.b.stereo = mask & (1 << i) ? 'hash' : 'wedge';
+      });
+      if (got() === want3) return;
+    }
+    old.forEach(o => ((o.b.a = o.a), (o.b.b = o.bb), (o.b.stereo = o.st)));
+    toast('The wedges of the repeat unit could not be matched to the SMILES: check its configuration', true);
+  }
+  /* a SMILES with one piece repeated ten times or more in a row (NC(C)C(=O) fifty times): the piece, how often, and what is
+     before and after it; the piece holds whole branches and rings */
+  const SMI_ATOM = /\[[^\]]+\]|Br|Cl|[BCNOPSFI]|[bcnops]/g;
+  const SMI_REP = new Map();
+  function smilesRepeat(s) {
+    s = String(s || '').trim();
+    if (SMI_REP.has(s)) return SMI_REP.get(s);
+    const r = smilesRepeat0(s);
+    if (SMI_REP.size > 50) SMI_REP.clear();
+    SMI_REP.set(s, r);
+    return r;
+  }
+  function smilesRepeat0(s) {
+    if (s.length < 30 || /[.>]/.test(s)) return null;
+    const ringOpen = t => {
+      const cnt = {};
+      for (const d of t.replace(/\[[^\]]*\]/g, '').match(/%\d\d|\d/g) || []) cnt[d] = (cnt[d] || 0) + 1;
+      return Object.keys(cnt).filter(d => cnt[d] % 2);
+    };
+    const ok = (u, pre, suf) => {
+      /* a whole piece: it starts with an atom and ends without a bond sign, its brackets and rings closed in it */
+      if (!/^(\[|Br|Cl|[BCNOPSFI]|[bcnops])/.test(u) || /[=#$:\/\\(]$/.test(u)) return false;
+      let d = 0;
+      for (const ch of u.replace(/\[[^\]]*\]/g, '')) {
+        if (ch === '(') d++;
+        else if (ch === ')' && --d < 0) return false;
+      }
+      if (d || ringOpen(u).length) return false;
+      /* a ring opened before the piece and closed after it would run through it */
+      const open = ringOpen(pre),
+        ud = u.replace(/\[[^\]]*\]/g, '').match(/%\d\d|\d/g) || [];
+      if (open.some(x => ud.includes(x))) return false;
+      /* the bonds into the first piece and out of the last one plain, as between the pieces (C#C…, …C=O are drawn whole) */
+      if (/[=#$:\/\\]$/.test(pre) || /^[=#$:\/\\]/.test(suf)) return false;
+      /* an end piece written as a bracket atom has its own H: no H is added there */
+      let top = u.replace(/\[[^\]]*\]/g, 'Q');
+      while (/\([^()]*\)/.test(top)) top = top.replace(/\([^()]*\)/g, '');
+      if ((!pre && /^\[/.test(u)) || (!suf && /Q\d*$/.test(top))) return false;
+      return (u.match(SMI_ATOM) || []).length >= 2;
+    };
+    let best = null;
+    const n = s.length;
+    for (let l = 2; l <= Math.min(80, n >> 1); l++) {
+      /* where s[i] = s[i + l] for a stretch: the text repeats with period l there */
+      let i = 0;
+      while (i + l < n) {
+        if (s[i] !== s[i + l]) {
+          i++;
+          continue;
+        }
+        let e = i;
+        while (e + l < n && s[e] === s[e + l]) e++;
+        const span = e - i + l;
+        if (span >= l * 10 && (!best || span > best.k * best.l))
+          for (let o = 0; o < l && i + o + l * 10 <= e + l; o++) {
+            const st = i + o,
+              k = Math.floor((e + l - st) / l),
+              u = s.substr(st, l),
+              pre = s.slice(0, st),
+              suf = s.slice(st + k * l);
+            if (k < 10 || (best && k * l <= best.k * best.l)) continue;
+            if ((u.match(SMI_ATOM) || []).length * k < 40 || !ok(u, pre, suf)) continue;
+            best = { pre, unit: u, k, l, suf };
+            break;
+          }
+        i = e + 1;
+      }
+    }
+    if (!best) return null;
+    return parseSmiles(best.pre + best.unit + best.unit + best.suf) ? best : null;
+  }
+  /* draws pre + one unit + suf with the unit in brackets and its n */
+  function drawRepeatUnit(rep, at) {
+    const pre = rep.pre || '[H]',
+      suf = rep.suf || '[H]',
+      smi = pre + rep.unit + suf,
+      g = parseSmiles(smi);
+    if (!g) return null;
+    const nPre = (pre.match(SMI_ATOM) || []).length,
+      nU = (rep.unit.match(SMI_ATOM) || []).length;
+    snap();
+    const n0 = mol.next,
+      nA = mol.atoms.length,
+      nB = mol.bonds.length;
+    const map = placeGraph(g, at);
+    const U = map.slice(nPre, nPre + nU),
+      ids = new Set(U.map(a => a.id)),
+      head = U[0],
+      xin = neighbors(head).find(o => !ids.has(o.id)),
+      yout = map[nPre + nU],
+      tail = yout && neighbors(yout).find(o => ids.has(o.id));
+    /* the brackets cannot be put (the piece is not one stretch of the chain): nothing drawn, the caller draws it whole */
+    if (!xin || !yout || !tail) {
+      mol.atoms.length = nA;
+      mol.bonds.length = nB;
+      mol.next = n0;
+      return null;
+    }
+    /* the H put at an open end only to have an atom outside the brackets: written as the end atom's H in SMILES and InChI */
+    if (!rep.pre) map[0].sruH = 1;
+    if (!rep.suf) map[map.length - 1].sruH = 1;
+    /* the chain level, left to right, as a zigzag at 120°: from the end before the unit to the end after it; the side groups
+       turned out from the chain, each as a whole; the two bonds the brackets cross a little longer, so a bracket fits between
+       the letters */
+    {
+      const ids0 = new Set(map.map(a => a.id)),
+        nbs = a => neighbors(a).filter(o => ids0.has(o.id));
+      const first = map[0],
+        last = map[map.length - 1],
+        prev = new Map([[first.id, null]]),
+        q = [first];
+      while (q.length) {
+        const x = q.shift();
+        for (const y of nbs(x)) if (!prev.has(y.id)) (prev.set(y.id, x), q.push(y));
+      }
+      const path = [];
+      for (let x = last; x; x = prev.get(x.id)) path.unshift(x);
+      if (path.length >= 2 && path.includes(xin) && path.includes(yout)) {
+        const onPath = new Set(path.map(a => a.id)),
+          old = new Map(map.map(a => [a.id, { x: a.x, y: a.y }])),
+          cross = (a, b) => (a === xin && b === head) || (a === tail && b === yout),
+          x0 = at ? at.x : old.get(first.id).x,
+          y0 = at ? at.y : old.get(first.id).y;
+        let x = x0,
+          y = y0;
+        /* the bonds through the brackets level, as polymers are drawn: then each unit sits like the one before it, and a copy of
+           the unit sees its neighbours on the same sides (its wedges mean the same configuration) */
+        let up = -1;
+        path.forEach((a, k) => {
+          if (k) {
+            if (cross(path[k - 1], a)) x += L * 1.3;
+            else {
+              x += L * Math.cos(Math.PI / 6);
+              y += up * L * Math.sin(Math.PI / 6);
+              up = -up;
+            }
+          }
+          a.x = x;
+          a.y = y;
+        });
+        /* side groups: out from the chain on the side its corner points to */
+        const sideBr = [];
+        path.forEach((a, k) => {
+          const side = nbs(a).filter(o => !onPath.has(o.id));
+          if (!side.length) return;
+          const p0 = path[k - 1],
+            p1 = path[k + 1];
+          let bx, by;
+          if (p0 && p1) {
+            bx = 2 * a.x - p0.x - p1.x;
+            by = 2 * a.y - p0.y - p1.y;
+          } else {
+            const o = p0 || p1;
+            bx = a.x - o.x;
+            by = a.y - o.y;
+          }
+          /* straight up or down from a level chain (the phenyl of polystyrene under its CH), at the chain's ends along it */
+          const base = p0 && p1 ? (by < 0 ? -Math.PI / 2 : Math.PI / 2) : Math.atan2(by, bx),
+            spread = side.length === 1 ? [0] : side.length === 2 ? [-Math.PI / 3, Math.PI / 3] : side.map((_, i) => ((i - (side.length - 1) / 2) * Math.PI) / 3);
+          side.forEach((s0, i) => {
+            /* the branch (everything past s0 away from the chain), turned and moved as one piece */
+            const br = [s0],
+              seen = new Set([a.id, s0.id]);
+            for (let t = 0; t < br.length; t++) for (const y2 of nbs(br[t])) if (!seen.has(y2.id) && !onPath.has(y2.id)) (seen.add(y2.id), br.push(y2));
+            const o0 = old.get(a.id),
+              os = old.get(s0.id),
+              want = base + spread[i],
+              have = Math.atan2(os.y - o0.y, os.x - o0.x),
+              d = want - have,
+              c = Math.cos(d),
+              sn = Math.sin(d);
+            for (const b of br) {
+              const ob = old.get(b.id),
+                rx = ob.x - o0.x,
+                ry = ob.y - o0.y;
+              b.x = a.x + rx * c - ry * sn;
+              b.y = a.y + rx * sn + ry * c;
+            }
+            sideBr.push({ a, br });
+          });
+        });
+        /* a side group reaching over a bracket (the phenyl of polystyrene on the unit's end): turned toward the middle of the unit,
+           up to 60°, as far as it takes to stand between the brackets, clear of the other atoms */
+        const xl = (xin.x + head.x) / 2,
+          xr = (tail.x + yout.x) / 2,
+          over = br => br.reduce((t, b) => {
+            const B = atomTextBox(b),
+              x0 = Math.min(b.x, B ? B.x0 : b.x) - L * 0.4,
+              x1 = Math.max(b.x, B ? B.x1 : b.x) + L * 0.4;
+            return t + Math.max(0, xl - x0) + Math.max(0, x1 - xr);
+          }, 0);
+        for (const { a, br } of sideBr) {
+          if (!over(br)) continue;
+          const keep = br.map(b => [b, b.x, b.y]),
+            others = map.filter(m => !br.includes(m));
+          let best = { d: 0, sc: over(br) };
+          for (const deg of [10, -10, 20, -20, 30, -30, 40, -40, 50, -50, 60, -60]) {
+            const d = (deg * Math.PI) / 180,
+              c = Math.cos(d),
+              sn = Math.sin(d);
+            keep.forEach(([b, x, y]) => {
+              b.x = a.x + (x - a.x) * c - (y - a.y) * sn;
+              b.y = a.y + (x - a.x) * sn + (y - a.y) * c;
+            });
+            const clash = br.some(b => others.some(m => m !== a && Math.hypot(m.x - b.x, m.y - b.y) < L * 0.6)),
+              sc = over(br) + (clash ? 1e3 : 0);
+            if (sc < best.sc - 1e-6) best = { d, sc };
+            keep.forEach(([b, x, y]) => ((b.x = x), (b.y = y)));
+          }
+          if (best.d) {
+            const c = Math.cos(best.d),
+              sn = Math.sin(best.d);
+            keep.forEach(([b, x, y]) => {
+              b.x = a.x + (x - a.x) * c - (y - a.y) * sn;
+              b.y = a.y + (x - a.x) * sn + (y - a.y) * c;
+            });
+          }
+        }
+        /* still too wide for the brackets: the level bonds through them longer (up to 2 bonds, under the check's 2.1), what
+           lies beyond moved out with them */
+        {
+          let lo = Infinity,
+            hi = -Infinity;
+          for (const { br } of sideBr)
+            for (const b of br) {
+              const B = atomTextBox(b);
+              lo = Math.min(lo, B ? B.x0 : b.x);
+              hi = Math.max(hi, B ? B.x1 : b.x);
+            }
+          const beyond = (from, skip) => {
+            const out = new Set([from.id]),
+              st2 = [from];
+            while (st2.length) {
+              const x2 = st2.pop();
+              for (const y2 of nbs(x2)) if (!out.has(y2.id) && !ids.has(y2.id) && y2 !== skip) (out.add(y2.id), st2.push(y2));
+            }
+            return out;
+          };
+          if (lo < Infinity) {
+            const wantL = Math.min(L * 2, 2 * (head.x - lo + L * 0.4)),
+              wantR = Math.min(L * 2, 2 * (hi - tail.x + L * 0.4)),
+              dl = wantL - (head.x - xin.x),
+              dr = wantR - (yout.x - tail.x);
+            if (dl > 0) {
+              const bs = beyond(xin, head);
+              map.forEach(m => bs.has(m.id) && (m.x -= dl));
+            }
+            if (dr > 0) {
+              const bs = beyond(yout, tail);
+              map.forEach(m => bs.has(m.id) && (m.x += dr));
+            }
+          }
+        }
+      }
+    }
+    const r = { id: mol.next++, kind: 'brk', b: '[]', x1: 0, y1: 0, x2: 0, y2: 0, sru: { n: rep.k, ids: [...ids], head: head.id, tail: tail.id, xin: xin.id, yout: yout.id, pre: rep.pre, unit: rep.unit, suf: rep.suf } };
+    mol.arrows.push(r);
+    mol.texts.push({ id: mol.next++, x: 0, y: 0, text: String(rep.k), size: textDef.size, nochem: true, sruOf: r.id });
+    /* wedges after the layout, then checked on a chain of three units against the SMILES itself: a centre whose
+       configuration only shows in the chain (isotactic polypropylene) gets the wedge that gives it */
+    applySmilesStereo(smi, map);
+    if (/[@\/\\]/.test(rep.unit)) sruStereo(rep, r, U);
+    /* while the structure stays as drawn, its SMILES is the text it came from with n units */
+    r.sru.sig = sruChemSig(map, r.sru);
+    sruPlace();
+    return map;
+  }
+  /* a repeated SMILES pasted or opened: drawn as one repeat unit in brackets or in full, as the user chooses (whole chains of
+     hundreds of atoms take long to lay out) */
+  function askRepeat(rep, onUnit, onFull) {
+    const old = document.getElementById('repAsk');
+    if (old) old.remove();
+    const d = document.createElement('div');
+    d.id = 'repAsk';
+    d.className = 'pop';
+    d.style.cssText = 'position:fixed;left:50%;top:30%;transform:translateX(-50%);z-index:60;max-width:420px;padding:12px 14px';
+    const atoms = (rep.unit.match(SMI_ATOM) || []).length * rep.k;
+    d.innerHTML = `<div style="margin-bottom:8px">This SMILES repeats <b>${esc(rep.unit)}</b> ${rep.k} times (${atoms} atoms in the repeats). Draw it as one repeat unit in brackets, with n = ${rep.k}, or the whole chain?</div><div class="row" style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn sm" data-r="unit">Repeat unit</button><button type="button" class="btn ghost sm" data-r="full">Whole chain${atoms > 400 ? ' (slow)' : ''}</button><button type="button" class="btn ghost sm" data-r="no">Cancel</button></div>`;
+    document.body.appendChild(d);
+    d.addEventListener('click', e => {
+      const b = e.target.closest('[data-r]');
+      if (!b) return;
+      d.remove();
+      if (b.dataset.r === 'unit') onUnit();
+      else if (b.dataset.r === 'full') onFull();
+    });
+    d.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        d.remove();
+      }
+    });
+    d.querySelector('[data-r=unit]').focus();
+  }
   function fragSmilesS(fr, cx) {
+    /* a repeat unit: the SMILES of the chain written out n times */
+    if (!SRU_OUT && srus().some(x => fr.some(a => x.ids.has(a.id)))) {
+      /* drawn from a SMILES and unchanged since (n may be new): that text with n units */
+      {
+        const xs = srus().filter(x => fr.some(a => x.ids.has(a.id)));
+        if (xs.length === 1 && xs[0].r.sru.unit && xs[0].r.sru.sig === sruChemSig(fr, xs[0].r.sru)) {
+          const q = xs[0].r.sru;
+          return q.pre + q.unit.repeat(q.n) + q.suf;
+        }
+      }
+      const C = sruExpandedNow(),
+        key = (cx ? 'cx|' : '') + fr[0].id + '|' + fr.map(a => Math.round(a.x) + ',' + Math.round(a.y)).join(';');
+      if (C.smi.has(key)) return C.smi.get(key);
+      const saved = mol;
+      SRU_OUT = true;
+      mol = C.m;
+      try {
+        const want = new Set(fr.map(a => a.id)),
+          f2 = fragments().find(f => f.some(a => want.has(a.id)));
+        let out = '';
+        try {
+          out = f2 ? fragSmilesS(f2, cx) : '';
+        } catch (e) {
+          /* a chain of thousands of atoms is too deep for the SMILES writer */
+          out = '';
+        }
+        C.smi.set(key, out);
+        return out;
+      } finally {
+        mol = saved;
+        SRU_OUT = false;
+      }
+    }
     cx = !!cx && fr.some(a => esrOk(a.esr));
     const plain = fragSmilesX(fr);
     const ids = new Set(fr.map(a => a.id));
@@ -17992,7 +18560,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     {
       /* element with its hydrogens and charge as typed: NH2, N (no H), NH2+, O−; the hydrogens typed are kept as given */
       const eh = /^([A-Z][a-z]?)(?:H(\d*))?(?:([+\-−])(\d*))?$/.exec(t);
-      if (eh && eh[1] in AW && !(t in NICK && !(eh[1] in AW))) {
+      /* Th typed on an atom is 2-thienyl, as chemists write it; thorium comes from the periodic table (and files) */
+      if (eh && eh[1] in AW && !(t in NICK && !(eh[1] in AW)) && t !== 'Th') {
         snap();
         const same = eh[1] === a.el && !a.label,
           q0 = a.chg || 0;
@@ -18010,7 +18579,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return;
       }
       snap();
-      if (t in AW) {
+      if (t in AW && t !== 'Th') {
         setEl(a, t);
         a.chg = 0;
         commit();
@@ -22283,18 +22852,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       sel.add(na.id);
     }
     for (const b of clip.bonds) mol.bonds.push({ ...b, id: mol.next++, a: map[b.a].id, b: map[b.b].id });
+    const arrMap = new Map();
     for (const r of clip.arrows || []) {
       const o = { ...r, id: mol.next++, x1: r.x1 + dx, y1: r.y1 + dy, x2: r.x2 + dx, y2: r.y2 + dy };
+      arrMap.set(r.id, o.id);
       if (r.gid != null) o.gid = ng(r.gid);
       if (o.at != null) {
         if (map[o.at]) o.at = map[o.at].id;
         else delete o.at;
+      }
+      /* a repeat unit keeps its atoms (the copies of them), or becomes plain brackets */
+      if (r.sru) {
+        const m2 = id => map[id] && map[id].id,
+          s = r.sru,
+          ids = s.ids.map(m2);
+        if (ids.every(Boolean) && [s.head, s.tail, s.xin, s.yout].every(m2))
+          o.sru = { ...s, ids, head: m2(s.head), tail: m2(s.tail), xin: m2(s.xin), yout: m2(s.yout) };
+        else delete o.sru;
       }
       mol.arrows.push(o);
       selArr.add(o.id);
     }
     for (const t of clip.texts || []) {
       const o = { ...t, id: mol.next++, x: t.x + dx, y: t.y + dy };
+      if (t.sruOf != null) {
+        if (arrMap.has(t.sruOf)) o.sruOf = arrMap.get(t.sruOf);
+        else delete o.sruOf;
+      }
       if (t.gid != null) o.gid = ng(t.gid);
       if (t.ana) {
         const ids = t.ana.atoms.map(i => map[i] && map[i].id).filter(Boolean);
@@ -22985,7 +23569,41 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   let cageOnce = null;
+  let REP_SKIP = false;
   function pasteSmilesNow(text) {
+    /* a SMILES with a piece repeated ten times or more: asked first whether to draw one repeat unit or the whole chain */
+    {
+      const rep = !REP_SKIP && smilesRepeat(text);
+      if (rep) {
+        askRepeat(
+          rep,
+          () => {
+            if (!drawRepeatUnit(rep, null)) {
+              toast('This piece cannot be drawn as one repeat unit: drawn whole', true);
+              REP_SKIP = true;
+              try {
+                pasteSmilesNow(text);
+              } finally {
+                REP_SKIP = false;
+              }
+              return;
+            }
+            clearSel();
+            commit();
+            toast('Added one repeat unit in brackets, n = ' + rep.k + ' (formula, mass, SMILES and InChI count all of them; type another n over the number)');
+          },
+          () => {
+            REP_SKIP = true;
+            try {
+              pasteSmilesNow(text);
+            } finally {
+              REP_SKIP = false;
+            }
+          }
+        );
+        return true;
+      }
+    }
     if (String(text).includes('>')) {
       try {
         const r = apiAddReaction({ smiles: String(text).trim() });
@@ -23018,6 +23636,39 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return true;
   }
   function pasteSmiles(text, label) {
+    /* a SMILES with a piece repeated ten times or more: asked first whether to draw one repeat unit or the whole chain */
+    {
+      const rep = !REP_SKIP && smilesRepeat(text);
+      if (rep) {
+        askRepeat(
+          rep,
+          () => {
+            if (!drawRepeatUnit(rep, null)) {
+              toast('This piece cannot be drawn as one repeat unit: drawn whole', true);
+              REP_SKIP = true;
+              try {
+                pasteSmilesNow(text);
+              } finally {
+                REP_SKIP = false;
+              }
+              return;
+            }
+            clearSel();
+            commit();
+            toast('Added one repeat unit in brackets, n = ' + rep.k + ' (formula, mass, SMILES and InChI count all of them; type another n over the number)');
+          },
+          () => {
+            REP_SKIP = true;
+            try {
+              pasteSmiles(text, label);
+            } finally {
+              REP_SKIP = false;
+            }
+          }
+        );
+        return true;
+      }
+    }
     if (String(text).includes('>')) {
       try {
         const r = apiAddReaction({ smiles: String(text).trim() });
@@ -28316,6 +28967,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* the molfile InChI reads: the selected structures (or all on the sheet), labels drawn out as atoms, wedges as drawn */
   function inchiMolfile(only) {
+    /* a repeat unit in brackets: the InChI of the chain written out n times */
+    if (!SRU_OUT && srus().length) {
+      const saved = mol;
+      SRU_OUT = true;
+      mol = sruExpandedNow().m;
+      try {
+        return inchiMolfile(only);
+      } finally {
+        mol = saved;
+        SRU_OUT = false;
+      }
+    }
     const m = expandedCopy(),
       want = only || (sel.size ? sel : null),
       ids = new Set();
@@ -28364,6 +29027,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (r.unk) return { ok: false, message: 'A label that is not understood (red) has no InChI.' };
     const f = await inchiLib(),
       o = f(r.mb, r.opts);
+    /* InChI is computed from a Molfile, which holds at most 999 atoms (a long polymer written out in full has more) */
+    {
+      const na = (r.mb.match(/^ *-?\d+\.\d{4} +-?\d+\.\d{4} +-?\d+\.\d{4} [A-Z*]/gm) || []).length;
+      if (o && !o.ok && !o.message && na >= 999) o.message = 'Too many atoms for InChI here (it reads at most 999).';
+    }
     if (o && o.ok && r.opts)
       o.message = (
         (o.message || '') +
@@ -38166,6 +38834,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .filter(Boolean);
     let ok = 0,
       bad = '';
+    /* one SMILES with a long repeat: asked whether to draw it as a repeat unit */
+    if (smis.length === 1 && !REP_SKIP && smilesRepeat(smis[0])) {
+      pasteSmilesNow(smis[0]);
+      return;
+    }
     /* reaction SMILES (A.B>C>D) become a scheme with an arrow */
     for (const s of smis) {
       if (s.includes('>')) {
@@ -64156,6 +64829,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   window.__rd = {
     molBlock,
     nmrPredict,
+    smilesRepeat,
+    drawRepeatUnit,
+    sruExpanded,
+    fragBonds,
+    inchiOf,
+    currentSmiles,
     agentTexts,
     labelFrontFirst,
     useDepiction,

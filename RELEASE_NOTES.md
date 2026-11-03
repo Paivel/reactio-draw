@@ -1,5 +1,10 @@
 # Reactio Draw, next version (not released yet)
 
+## New
+
+- **Repeat units.** A SMILES with a piece repeated ten times or more (poly-L-alanine, PEG, polystyrene, isotactic polypropylene) asks first: one repeat unit in brackets with its n, H–[NH–CH(CH3)–CO]50–OH, or the whole chain (which can take minutes for hundreds of atoms). The unit sits centred between its brackets, the bonds through them level, its side groups clear of them; n stands at the foot of the right bracket and can be typed over. Formula, mass, SMILES, InChI and name are those of the whole chain, with its configuration (each unit's wedges checked against the SMILES); the brackets follow the unit when it is moved or cleaned up and come along when it is copied. Pieces that cannot be one unit as written (a double bond into the first one, a ring running through) are drawn whole.
+- Abbreviations Morph (morpholino) and Th (2-thienyl, typed on an atom); thorium is an element of its own in files and the periodic table.
+
 ## Fixed
 
 - **Reagents of a reaction SMILES are written as chemists write them** over the arrow, not as SMILES: a known reagent by its usual short name (NaBH4, K2CO3, Et3N, THF, Pd(OAc)2, MeMgBr), each cation with the anion that balances it as one salt (Na+ and BH4− as NaBH4, Mg2+ and two Br− as MgBr2; K2CO3, Ca(OH)2, (NH4)2SO4), other ions with their charge (Na+, Cl−), and an organic compound with no short name drawn over the arrow. The reagent table counts each of them.
