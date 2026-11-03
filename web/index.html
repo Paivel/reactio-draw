@@ -31044,9 +31044,38 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         'M  RAD' + pad(g.length, 3) + g.map(a => pad(idx.get(a.id), 4) + pad(a.rad === 2 ? 3 : 2, 4)).join('')
       );
     }
+    /* a repeat unit (only in files written out: Molfile, SDF, RXN) as a polymer Sgroup: SRU, its atoms, the two bonds the
+       brackets cross, head-to-tail, n as its label, and where the brackets stand */
+    if (MOL_SRU) {
+      const bidx = new Map(bonds.map((b, i) => [b, i + 1]));
+      let k = 0;
+      const lines = [];
+      for (const r of mol.arrows) {
+        const s0 = r.sru && sruOf(r);
+        if (!s0 || !s0.U.every(a => idx.has(a.id))) continue;
+        const bi = bidx.get(bondBetween(s0.xin, s0.head)),
+          bo = bidx.get(bondBetween(s0.tail, s0.yout));
+        if (!bi || !bo) continue;
+        k++;
+        lines.push('M  STY  1' + pad(k, 4) + ' SRU');
+        lines.push('M  SLB  1' + pad(k, 4) + pad(k, 4));
+        lines.push('M  SCN  1' + pad(k, 4) + ' HT ');
+        const ids = s0.U.map(a => idx.get(a.id));
+        for (let i = 0; i < ids.length; i += 15) {
+          const g = ids.slice(i, i + 15);
+          lines.push('M  SAL' + pad(k, 4) + pad(g.length, 3) + g.map(v => pad(v, 4)).join(''));
+        }
+        lines.push('M  SBL' + pad(k, 4) + pad(2, 3) + pad(bi, 4) + pad(bo, 4));
+        const R = brkRect(r);
+        for (const x of [R.x0, R.x1]) lines.push('M  SDI' + pad(k, 4) + pad(4, 3) + f(x * ANG) + f(-R.y1 * ANG) + f(x * ANG) + f(-R.y0 * ANG));
+        lines.push('M  SMT' + pad(k, 4) + ' ' + s0.n);
+      }
+      L.push(...lines);
+    }
     L.push('M  END');
     return L.join('\n');
   }
+  let MOL_SRU = false;
   function fragBonds(m, fr) {
     const ids = new Set(fr.map(a => a.id));
     return m.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
@@ -31055,6 +31084,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const saved = mol;
     const m = expandedCopy();
     mol = m;
+    MOL_SRU = true;
     try {
       const sch = schemeOrder();
       const groups = sch.list.filter(x => x.fr);
@@ -31086,6 +31116,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return { mol: all, sdf, rxn, smi, cdxml: cdxmlOf(m, sch) };
     } finally {
       mol = saved;
+      MOL_SRU = false;
     }
   }
   function xmlEsc(s) {
@@ -31925,8 +31956,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           `<t id="${id++}" p="${P(x, y)}" Justification="Center"><s font="3" size="8" face="2">δ</s><s font="20" size="8" face="64">${a.pd > 0 ? '+' : '-'}</s></t>`
         );
       }
-    /* a centred or right-aligned caption is placed by its centre or right end, as CDXML keeps it */
-    for (const t of m.texts)
+    /* a centred or right-aligned caption is placed by its centre or right end, as CDXML keeps it; the n of a repeat unit is
+       the bracket group's own label (SRULabel), not a text */
+    const sruTxt = new Set(m.arrows.filter(r => r.sru && sruOf(r)).map(r => r.id));
+    for (const t of m.texts.filter(t => !(t.sruOf != null && sruTxt.has(t.sruOf))))
       out.push(
         `<t id="${id++}" p="${P(t.x + (t.align === 'center' ? textW(t) / 2 : t.align === 'right' ? textW(t) : 0), t.y)}"${t.align ? ` Justification="${{ center: 'Center', right: 'Right', justify: 'Full' }[t.align]}"` : ''}>${(() => {
           let r = cdxRuns(t, ((10 * tSize(t)) / (STY().label || 15)).toFixed(1)),
@@ -31949,6 +31982,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         out.push(
           `<graphic id="${id++}" BoundingBox="${P(R.x1, R.y1)} ${P(R.x1, R.y0)}" GraphicType="Line"/>`
         );
+        continue;
+      }
+      /* a repeat unit: a "[" and a "]" and the bracket group that says what they hold (SRU), how often (RepeatCount, SRULabel)
+         and which bonds they cross, as CDXML keeps a polymer */
+      if (r.kind === 'brk' && r.sru && sruOf(r)) {
+        const s0 = sruOf(r),
+          R = brkRect(r),
+          gl = i,
+          gr = id++,
+          bIn = bondBetween(s0.xin, s0.head),
+          bOut = bondBetween(s0.tail, s0.yout);
+        out.push(`<graphic id="${gl}" BoundingBox="${P(R.x0, R.y1)} ${P(R.x0, R.y0)}" GraphicType="Bracket" BracketType="Square"${colAt(r.col, 'color')}/>`);
+        out.push(`<graphic id="${gr}" BoundingBox="${P(R.x1, R.y0)} ${P(R.x1, R.y1)}" GraphicType="Bracket" BracketType="Square"${colAt(r.col, 'color')}/>`);
+        const nodes = s0.U.map(a => nid.get(a.id)).filter(v => v != null);
+        if (nodes.length === s0.U.length && bnid.has(bIn) && bnid.has(bOut))
+          out.push(
+            `<bracketedgroup id="${id++}" BracketedObjectIDs="${nodes.join(' ')}" BracketUsage="SRU" RepeatCount="${s0.n}" SRULabel="${s0.n}" PolymerRepeatPattern="HeadToTail">` +
+              `<bracketattachment id="${id++}" GraphicID="${gl}"><crossingbond id="${id++}" BondID="${bnid.get(bIn)}" InnerAtomID="${nid.get(s0.head.id)}"/></bracketattachment>` +
+              `<bracketattachment id="${id++}" GraphicID="${gr}"><crossingbond id="${id++}" BondID="${bnid.get(bOut)}" InnerAtomID="${nid.get(s0.tail.id)}"/></bracketattachment>` +
+              `</bracketedgroup>`
+          );
         continue;
       }
       if (r.kind === 'brk') {
@@ -33932,6 +33986,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
                 for (let k = 0; k < bb.length; k++) bb[k] = parseInt(h.substr(k * 2, 2), 16);
                 prop(t, bb);
               }
+          });
+          break;
+        /* a polymer's bracket group, its attachments and crossing bonds (BracketUsage, RepeatCount, SRULabel…) */
+        case 'bracketedgroup':
+        case 'bracketattachment':
+        case 'crossingbond':
+          obj({ bracketedgroup: 0x8017, bracketattachment: 0x8018, crossingbond: 0x8019 }[el.tagName], el, () => {
+            for (const at of el.attributes) if (at.name !== 'id') pAny(at.name, at.value);
+            kids(el);
           });
           break;
         case 'arrow':
@@ -36694,6 +36757,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   });
   /* ---- import ---- */
   function parseMolBlock(lines, start) {
+    const sg = new Map();
     const cnt = lines[start + 3] || '';
     const na = parseInt(cnt.slice(0, 3)),
       nb = parseInt(cnt.slice(3, 6));
@@ -36759,6 +36823,30 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         continue;
       }
+      /* polymer Sgroups (SRU): type, atoms, crossing bonds and the label n */
+      if (/^M  (STY|SAL|SBL|SMT)/.test(l)) {
+        const t = l.slice(3, 6);
+        if (t === 'STY') {
+          const n = parseInt(l.slice(6, 9));
+          for (let k = 0; k < n; k++) {
+            const gi = parseInt(l.slice(10 + k * 8, 13 + k * 8)),
+              ty = l.slice(14 + k * 8, 17 + k * 8).trim();
+            sg.set(gi, { type: ty, atoms: [], bonds: [], label: '' });
+          }
+        } else {
+          const gi = parseInt(l.slice(6, 10)),
+            g = sg.get(gi);
+          if (g && t === 'SMT') g.label = l.slice(11).trim();
+          else if (g) {
+            const n = parseInt(l.slice(10, 13));
+            for (let k = 0; k < n; k++) {
+              const v = parseInt(l.slice(13 + k * 4, 17 + k * 4)) - 1;
+              if (v >= 0) (t === 'SAL' ? g.atoms : g.bonds).push(v);
+            }
+          }
+        }
+        continue;
+      }
       if (l.startsWith('M  CHG') || l.startsWith('M  RAD')) {
         const n = parseInt(l.slice(6, 9));
         atoms.forEach((a, k) => {
@@ -36773,7 +36861,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       }
     }
-    return { atoms, bonds, end: j };
+    return { atoms, bonds, end: j, sgroups: [...sg.values()].filter(g => g.type === 'SRU') };
   }
   function addParsed(frags, arrowBetween) {
     snap();
@@ -36826,6 +36914,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             stereo: b.stereo || null
           });
       });
+      /* a polymer's repeat unit read from the file: its brackets and n, as one drawn here */
+      for (const g of f.sgroups || []) {
+        const n = parseInt(g.label, 10),
+          U = g.atoms.map(i => map[i]).filter(Boolean),
+          ids = new Set(U.map(a => a.id));
+        if (!(n >= 1) || !U.length || g.bonds.length !== 2) continue;
+        const ends = g.bonds
+          .map(bi => f.bonds[bi])
+          .filter(Boolean)
+          .map(b => {
+            const A = map[b.a],
+              B = map[b.b];
+            return ids.has(A.id) ? { inner: A, outer: B } : { inner: B, outer: A };
+          });
+        if (ends.length !== 2 || ends.some(e => !ids.has(e.inner.id) || ids.has(e.outer.id))) continue;
+        ends.sort((p, q) => p.outer.x - q.outer.x);
+        const r = { id: mol.next++, kind: 'brk', b: '[]', x1: 0, y1: 0, x2: 0, y2: 0, sru: { n, ids: [...ids], head: ends[0].inner.id, tail: ends[1].inner.id, xin: ends[0].outer.id, yout: ends[1].outer.id } };
+        mol.arrows.push(r);
+        mol.texts.push({ id: mol.next++, x: 0, y: 0, text: String(n), size: textDef.size, nochem: true, sruOf: r.id });
+      }
       const w = (Math.max(...xs) - cx) * sc;
       placed.push({ x0: ox, x1: ox + w });
       ox += w + 60;
@@ -39583,6 +39691,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
     /* brackets: a pair is its box; a single one is a line, its lips on the right of the way it was drawn ("]" drawn downwards, "[" upwards) */
+    const brkOfG = new Map();
     for (const g of doc.querySelectorAll('page > graphic[GraphicType="Bracket"]')) {
       const v = (g.getAttribute('BoundingBox') || '').split(/\s+/).map(Number);
       if (v.length !== 4 || !v.every(isFinite)) continue;
@@ -39607,6 +39716,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (c) o.col = c;
       }
       mol.arrows.push(o);
+      brkOfG.set(g.getAttribute('id'), o);
+    }
+    /* a polymer's repeat unit (bracketedgroup, SRU): its two brackets become one repeat unit, n from RepeatCount or its label */
+    for (const bg of doc.querySelectorAll('bracketedgroup')) {
+      if ((bg.getAttribute('BracketUsage') || '') !== 'SRU') continue;
+      const U = (bg.getAttribute('BracketedObjectIDs') || '').split(/\s+/).map(x => nodeMap.get(x)).filter(Boolean),
+        n = parseInt(bg.getAttribute('RepeatCount') || '', 10) || parseInt(bg.getAttribute('SRULabel') || '', 10),
+        cross = [...bg.querySelectorAll('crossingbond')]
+          .map(c => ({ ab: bondMap.get(c.getAttribute('BondID')), inner: nodeMap.get(c.getAttribute('InnerAtomID')) }))
+          .filter(c => c.ab && c.inner),
+        gs = [...bg.querySelectorAll('bracketattachment')].map(x => brkOfG.get(x.getAttribute('GraphicID'))).filter(Boolean);
+      if (!U.length || cross.length !== 2 || !(n >= 1)) continue;
+      const ids = new Set(U.map(a => a.id)),
+        ends = cross.map(c => ({ inner: c.inner, outer: c.ab[0] === c.inner ? c.ab[1] : c.ab[0] }));
+      if (ends.some(e => !ids.has(e.inner.id) || ids.has(e.outer.id))) continue;
+      /* the left one is the way in */
+      ends.sort((p, q) => p.outer.x - q.outer.x);
+      mol.arrows = mol.arrows.filter(r => !gs.includes(r));
+      const r = { id: mol.next++, kind: 'brk', b: '[]', x1: 0, y1: 0, x2: 0, y2: 0, sru: { n, ids: [...ids], head: ends[0].inner.id, tail: ends[1].inner.id, xin: ends[0].outer.id, yout: ends[1].outer.id } };
+      mol.arrows.push(r);
+      mol.texts.push({ id: mol.next++, x: 0, y: 0, text: String(n), size: textDef.size, nochem: true, sruOf: r.id });
     }
     /* and its radical dots */
     for (const g of doc.querySelectorAll('graphic[GraphicType="Symbol"]')) {
