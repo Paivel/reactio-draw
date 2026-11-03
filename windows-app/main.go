@@ -73,6 +73,7 @@ func embedScript(kd string) string {
 
 func main() {
 	runtime.LockOSThread()
+	waitAfterUpdate()
 	app.embedding = hasArg("-Embedding", "/Embedding")
 	cliOn := cliRequested()
 	if hasArg("/unregister", "-unregister") {
@@ -200,6 +201,9 @@ func main() {
 		}
 	}
 	w.Init(fmt.Sprintf("window.__rdWin={embed:%v};", app.embedding))
+	if !app.embedding && !cliOn {
+		w.Init(`window.__rdUpdate={asset:"` + updAssetName() + `"};`)
+	}
 	// page errors and the moment the page is ready go to ReactioDraw.log
 	w.Init(`(function(){const L=m=>{try{window.__rdPost(JSON.stringify({id:'x',cmd:'log',msg:String(m)}));}catch(e){}};
   window.addEventListener('error',e=>L('error: '+e.message+' at '+e.filename+':'+e.lineno));
@@ -238,6 +242,7 @@ func main() {
 	}
 	namerStop()
 	pOleUninitialize.Call()
+	restartAfterUpdate()
 	os.Exit(0)
 }
 

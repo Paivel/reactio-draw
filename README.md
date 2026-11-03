@@ -47,7 +47,7 @@ The apps add naming of structures (openclatura), Word and PowerPoint objects (Wi
 
 ## Privacy
 
-Reactio Draw makes no network requests of its own: no accounts, no tracking, no analytics, no fonts or scripts from other sites. Drawings, settings, labels and templates stay in your browser or on your computer. The only downloads are these: the web version is loaded from its site like any web page, and there the NMR tables are downloaded only when you agree, on the first Predict, and kept in the browser (clearing the site's data removes them); a link you click (GitHub, a DOI) opens in your browser; Check for updates (Info) asks GitHub for the newest release, only when you press it. The apps download nothing else.
+Reactio Draw makes no network requests of its own: no accounts, no tracking, no analytics, no fonts or scripts from other sites. Drawings, settings, labels and templates stay in your browser or on your computer. The only downloads are these: the web version is loaded from its site like any web page, and there the NMR tables are downloaded only when you agree, on the first Predict, and kept in the browser (clearing the site's data removes them); a link you click (GitHub, a DOI) opens in your browser; Check for updates (Info) asks GitHub for the newest release, only when you press it, and in the apps a newer version is downloaded only when you then say Update. The apps download nothing else.
 
 NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; the copied text says where the data come from, as the nmrshiftdb2 Database License asks.
 

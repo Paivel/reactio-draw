@@ -8,11 +8,15 @@ if ! xcrun -f swiftc >/dev/null 2>&1; then
   xcode-select --install || true
   exit 1
 fi
-dest="/Applications"; [ -w "$dest" ] || { dest="$HOME/Applications"; mkdir -p "$dest"; }
+# RD_DEST: the folder of the app being updated (Update in the app itself)
+dest="${RD_DEST:-/Applications}"; [ -w "$dest" ] || { dest="$HOME/Applications"; mkdir -p "$dest"; }
 app="$dest/Reactio Draw.app"
 # an open Reactio Draw is asked to quit and waited for: it asks about unsaved documents first (answer it there); it is
 # never killed, so open tabs and their work stay
-if pgrep -xq ReactioDraw; then
+# RD_WAIT_PID: Update in the app started this installer and quits by itself; wait for it
+if [ -n "$RD_WAIT_PID" ]; then
+  while kill -0 "$RD_WAIT_PID" 2>/dev/null; do sleep 1; done
+elif pgrep -xq ReactioDraw; then
   echo "Reactio Draw is open: asking it to quit. Answer its questions about unsaved documents in its window..."
   osascript -e 'tell application id "org.reactiodraw.editor" to quit' >/dev/null 2>&1 || true
   n=0

@@ -63,6 +63,7 @@ func fileArgs() [][3]string {
 }
 
 func main() {
+	waitAfterUpdate()
 	d, err := os.UserHomeDir()
 	if err != nil {
 		d = os.TempDir()
@@ -131,6 +132,9 @@ func main() {
 		j, _ := json.Marshal(files)
 		pre += "window.__rdPending=" + string(j) + ";"
 	}
+	if !cliRequested() {
+		pre += `window.__rdUpdate={asset:"` + updAssetName() + `"};`
+	}
 	webkit_user_content_manager_add_script(ucm, webkit_user_script_new(pre, 1, 0, 0, 0)) // top frame, at document start
 
 	app.view = webkit_web_view_new_with_ucm(ucm)
@@ -159,4 +163,5 @@ func main() {
 	namerStop()
 	opsinStop()
 	logf("window closed")
+	restartAfterUpdate()
 }

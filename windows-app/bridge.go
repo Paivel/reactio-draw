@@ -109,6 +109,25 @@ func handle(s string) {
 		}
 		logf("saved %s", r.Path)
 		reply(r.ID, map[string]interface{}{"ok": true})
+	case "update":
+		// Info → Check for updates → Update: download, check and put the new version in place (update.go)
+		if upd.busy || app.embedding || cliRequested() {
+			reply(r.ID, map[string]interface{}{"ok": false, "err": "an update is already running"})
+			return
+		}
+		upd.busy = true
+		go func(id, tag string) {
+			got, err := runUpdate(tag)
+			app.w.Dispatch(func() {
+				upd.busy = false
+				if err != nil {
+					logf("update failed: %v", err)
+					reply(id, map[string]interface{}{"ok": false, "err": err.Error()})
+				} else {
+					reply(id, map[string]interface{}{"ok": true, "tag": got, "restart": "quit"})
+				}
+			})
+		}(r.ID, r.Name)
 	case "quit":
 		reply(r.ID, map[string]interface{}{"ok": true})
 		app.quitOK = true

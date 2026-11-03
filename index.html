@@ -3271,7 +3271,7 @@ html {
         <p class="note">Commands: list, scheme, properties, calc, nmr, inchi, addSmiles, addReaction, addText, addChart, addRadar, import, delete, clear, undo, redo, clean, export, table, setStyle, setRole, setAmount, prefixStyle, picture, set, image, selection, select, atoms, highlight, check, saved, markSaved, zoom, readOnly, smilesFromName, addName (common names everywhere, systematic names in the apps); in the Mac, Windows and Linux apps also name, and the same commands from scripts on this computer (local API, see the documentation). The documentation describes the format.</p>
         <p class="note" id="rdVerLine" style="margin-top:6px"></p>
         <div class="row"><button type="button" id="rdUpdBtn">Check for updates</button> <span class="note" id="rdUpdOut"></span></div>
-        <div class="note">Reactio Draw asks GitHub for the newest release only when you press this button; it never looks by itself.</div>
+        <div class="note">Reactio Draw asks GitHub for the newest release only when you press this button; it never looks by itself. In the app for Windows, Mac and Linux, a newer version is downloaded and installed only when you say Update.</div>
         <span class="tlabel" style="margin-top:6px">Credits and sources</span>
         <ul class="note credits" style="margin:0;padding-left:16px;display:grid;gap:4px">
           <li>Reactio Draw (© 2026 Pavel Sakharov and contributors) is free software under the GNU Affero General Public License v3.0 or later: you may use, share and change it, and anyone who distributes it or a modified version, or runs a modified version for others over a network, must publish the complete source code under the same license. Your drawings and files are yours. Third-party components keep their own licenses (THIRD-PARTY-NOTICES.md and LICENSES/ with the source code).</li>
@@ -4254,7 +4254,49 @@ function kdOf(st) {
           const tag = String(j.tag_name || '').replace(/[^\w.\-]/g, '');
           const url = /^https:\/\/github\.com\/Paivel\/reactio-draw\//.test(j.html_url || '') ? j.html_url : page;
           out.innerHTML = '';
-          if (tag && newer(tag, RD_VERSION)) {
+          const U = window.__rdUpdate,
+            as = U && window.rdNative && (j.assets || []).find(x => x && x.name === U.asset);
+          if (tag && newer(tag, RD_VERSION) && as) {
+            /* the desktop app: it asks first, and downloads and installs only on Yes */
+            const mb = Math.max(1, Math.round((+as.size || 0) / 1048576));
+            out.append('Reactio Draw ' + tag.replace(/^v/i, '') + ' is out (' + mb + ' MB). Download and install it? ');
+            const yes = document.createElement('button'),
+              no = document.createElement('button'),
+              what = document.createElement('a');
+            yes.type = no.type = 'button';
+            yes.textContent = 'Update';
+            no.textContent = 'Not now';
+            what.href = url;
+            what.target = '_blank';
+            what.rel = 'noopener';
+            what.textContent = 'what is new';
+            out.append(yes, ' ', no, ' · ', what);
+            no.onclick = () => {
+              out.textContent = '';
+            };
+            yes.onclick = async () => {
+              out.textContent = 'Downloading…';
+              b.disabled = true;
+              window.__rdUpdProgress = f => {
+                out.textContent = f >= 1 ? 'Installing…' : 'Downloading… ' + Math.round(f * 100) + '%';
+              };
+              const r = await window.rdNative.call('update', { name: tag });
+              window.__rdUpdProgress = null;
+              b.disabled = false;
+              if (!r || !r.ok) {
+                out.textContent = 'Not updated: ' + ((r && r.err) || 'no answer') + '.';
+                return;
+              }
+              /* the Mac app builds the new version once it has closed (its installer waits for that) */
+              out.textContent = r.build
+                ? 'Version ' + tag.replace(/^v/i, '') + ' is downloaded: Reactio Draw closes, builds it (about a minute) and opens again.'
+                : 'Version ' + tag.replace(/^v/i, '') + ' is installed: Reactio Draw starts again when it closes.';
+              setTimeout(() => {
+                if (window.__rdBeforeQuit) window.__rdBeforeQuit();
+                else window.rdNative.call('quit', {});
+              }, 1200);
+            };
+          } else if (tag && newer(tag, RD_VERSION)) {
             out.append('A newer version is out: ' + tag.replace(/^v/i, '') + ' · ');
             const a = document.createElement('a');
             a.href = url;

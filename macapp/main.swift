@@ -5,6 +5,7 @@ import WebKit
 import Network
 import Vision
 import ImageIO
+import CryptoKit
 
 let GV = NSPasteboard.PasteboardType("com.microsoft.Art--GVML-ClipFormat")
 
@@ -100,6 +101,130 @@ func pathAllowed(_ p: String) -> Bool {
     return list.contains(n) || list.contains { $0 + ".json" == n || $0 + ".reactio" == n }
 }
 
+/* Update (Info → Check for updates, then Update): only when the person asks. The newest release's Mac archive (and the
+   AI-assistants add-on, when it is installed) is downloaded, checked against the SHA-256 GitHub gives for it and
+   unpacked; then its own installer starts and waits: the app closes as on Quit (unsaved documents are asked about
+   first), and the installer builds the new app in the same folder and opens it. */
+final class Updater: NSObject {
+    static let shared = Updater()
+    var busy = false
+    var obs: NSKeyValueObservation?
+    weak var bridge: Bridge?
+    let api = "https://api.github.com/repos/Paivel/reactio-draw/releases/latest"
+    let dl = "https://github.com/Paivel/reactio-draw/releases/download/"
+
+    func run(_ b: Bridge, id: String, tag: String) {
+        if busy { b.reply(id, ["ok": false, "err": "an update is already running"]); return }
+        busy = true; bridge = b
+        DispatchQueue.global(qos: .userInitiated).async { self.work(id, tag) }
+    }
+    func fail(_ id: String, _ msg: String) {
+        DispatchQueue.main.async { self.busy = false; self.bridge?.reply(id, ["ok": false, "err": msg]) }
+    }
+    func progress(_ p: Double) {
+        let js = "window.__rdUpdProgress&&window.__rdUpdProgress(" + String(format: "%.3f", p) + ")"
+        DispatchQueue.main.async { self.bridge?.web?.evaluateJavaScript(js, completionHandler: nil) }
+    }
+    @discardableResult func sh(_ path: String, _ args: [String]) -> Int32 {
+        let p = Process(); p.executableURL = URL(fileURLWithPath: path); p.arguments = args
+        p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
+        do { try p.run() } catch { return -1 }
+        p.waitUntilExit(); return p.terminationStatus
+    }
+    func getJSON() -> [String: Any]? {
+        var req = URLRequest(url: URL(string: api)!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        req.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
+        var out: Data?
+        let sem = DispatchSemaphore(value: 0)
+        URLSession.shared.dataTask(with: req) { d, r, _ in
+            if (r as? HTTPURLResponse)?.statusCode == 200 { out = d }
+            sem.signal()
+        }.resume()
+        sem.wait()
+        guard let d = out else { return nil }
+        return (try? JSONSerialization.jsonObject(with: d)) as? [String: Any]
+    }
+    /* one asset into dir, its SHA-256 checked; done/total: the share of all downloads before it and its own */
+    func download(_ a: [String: Any], into dir: URL, before: Double, total: Double) -> (URL?, String) {
+        guard let name = a["name"] as? String, let s = a["browser_download_url"] as? String, s.hasPrefix(dl), let url = URL(string: s),
+              let size = a["size"] as? Double, size > 0, size < 400 * 1048576 else { return (nil, "unexpected download") }
+        let want = ((a["digest"] as? String) ?? "").lowercased().replacingOccurrences(of: "sha256:", with: "")
+        if want.count != 64 { return (nil, "GitHub gives no SHA-256 for \(name): not installed") }
+        let dst = dir.appendingPathComponent(name)
+        var err = ""
+        let sem = DispatchSemaphore(value: 0)
+        let t = URLSession.shared.downloadTask(with: URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 60)) { tmp, r, e in
+            if let tmp = tmp, (r as? HTTPURLResponse)?.statusCode == 200 {
+                do { try FileManager.default.moveItem(at: tmp, to: dst) } catch { err = error.localizedDescription }
+            } else { err = e?.localizedDescription ?? "the download of \(name) failed" }
+            sem.signal()
+        }
+        obs = t.progress.observe(\.fractionCompleted) { pr, _ in self.progress((before + pr.fractionCompleted * size) / total) }
+        t.resume()
+        sem.wait()
+        obs = nil
+        if !err.isEmpty { return (nil, err) }
+        guard let data = try? Data(contentsOf: dst, options: .mappedIfSafe), Double(data.count) == size else { return (nil, "the download of \(name) is incomplete") }
+        let got = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        if got != want { return (nil, "the download of \(name) does not match its SHA-256: not installed") }
+        return (dst, "")
+    }
+    func work(_ id: String, _ tag: String) {
+        guard sh("/usr/bin/xcrun", ["-f", "swiftc"]) == 0 else {
+            fail(id, "updating builds the app on this Mac and needs Apple's Command Line Tools; install the new version from its download instead"); return
+        }
+        guard let j = getJSON(), let rtag = j["tag_name"] as? String, let assets = j["assets"] as? [[String: Any]] else {
+            fail(id, "could not reach GitHub"); return
+        }
+        if !tag.isEmpty && rtag != tag { fail(id, "the newest version changed meanwhile (\(rtag)): check again"); return }
+        func asset(_ n: String) -> [String: Any]? { assets.first { ($0["name"] as? String) == n } }
+        guard let main = asset("ReactioDraw-Mac.zip") else { fail(id, "ReactioDraw-Mac.zip is not in release \(rtag)"); return }
+        let kit = aiKitInstalled() ? asset("ReactioDraw-Mac-AI-assistants.zip") : nil
+        let fm = FileManager.default
+        let work = fm.temporaryDirectory.appendingPathComponent("ReactioDraw-update-" + UUID().uuidString)
+        do { try fm.createDirectory(at: work, withIntermediateDirectories: true) } catch { fail(id, error.localizedDescription); return }
+        let sMain = (main["size"] as? Double) ?? 1, sKit = (kit?["size"] as? Double) ?? 0
+        let (zMain, e1) = download(main, into: work, before: 0, total: sMain + sKit)
+        guard let zm = zMain else { fail(id, e1); return }
+        let mainDir = work.appendingPathComponent("main")
+        guard sh("/usr/bin/ditto", ["-x", "-k", zm.path, mainDir.path]) == 0 else { fail(id, "could not unpack \(zm.lastPathComponent)"); return }
+        let inst = mainDir.appendingPathComponent("Reactio Draw/Files/Install Reactio Draw.command")
+        guard fm.fileExists(atPath: inst.path) else { fail(id, "the archive has no installer"); return }
+        if let k = kit {
+            let (zKit, e2) = download(k, into: work, before: sMain, total: sMain + sKit)
+            guard let zk = zKit else { fail(id, e2); return }
+            let kitDir = work.appendingPathComponent("kit")
+            guard sh("/usr/bin/ditto", ["-x", "-k", zk.path, kitDir.path]) == 0 else { fail(id, "could not unpack \(zk.lastPathComponent)"); return }
+            #if arch(arm64)
+            let m = "reactio-mcp-arm64"
+            #else
+            let m = "reactio-mcp-x86_64"
+            #endif
+            /* the new reactio-mcp goes into this app; the installer carries it into the app it builds */
+            let src = kitDir.appendingPathComponent("Reactio Draw - AI assistants/Files/" + m)
+            let dst = URL(fileURLWithPath: Bundle.main.bundlePath + "/Contents/MacOS/reactio-mcp")
+            let tmp = URL(fileURLWithPath: dst.path + ".new")
+            try? fm.removeItem(at: tmp)
+            do {
+                try fm.copyItem(at: src, to: tmp)
+                try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: tmp.path)
+                _ = try fm.replaceItemAt(dst, withItemAt: tmp)
+            } catch { fail(id, "could not put the new reactio-mcp in place: \(error.localizedDescription)"); return }
+        }
+        progress(1)
+        /* the installer runs on its own (it outlives this app): once the app has closed it builds the new one and opens it */
+        let log = work.appendingPathComponent("install.log").path
+        let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash")
+        p.arguments = ["-c", "nohup /bin/bash \"$0\" >\"$1\" 2>&1 &", inst.path, log]
+        var env = ProcessInfo.processInfo.environment
+        env["RD_ASK"] = "1"; env["RD_DEST"] = (Bundle.main.bundlePath as NSString).deletingLastPathComponent
+        env["RD_WAIT_PID"] = String(ProcessInfo.processInfo.processIdentifier)
+        p.environment = env
+        do { try p.run(); p.waitUntilExit() } catch { fail(id, "could not start the installer: \(error.localizedDescription)"); return }
+        DispatchQueue.main.async { self.busy = false; self.bridge?.reply(id, ["ok": true, "tag": rtag, "restart": "quit", "build": true]) }
+    }
+}
+
 final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     weak var web: WKWebView?
     var lastCC = NSPasteboard.general.changeCount
@@ -192,6 +317,10 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         case "apiStop":
             if cliArgs == nil { LocalAPI.shared.stop() }
             reply(id, ["ok": true])
+        case "update":
+            // Info → Check for updates → Update: download, check and install the new version (Updater below)
+            if cliArgs != nil { reply(id, ["ok": false, "err": "not from the command line"]); return }
+            Updater.shared.run(self, id: id, tag: m["name"] as? String ?? "")
         case "aiKit":
             reply(id, ["installed": aiKitInstalled()])
         case "aiFolders":
@@ -697,6 +826,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         buildMenu()
         let cfg = WKWebViewConfiguration()
         cfg.userContentController.add(bridge, name: "rd")
+        cfg.userContentController.addUserScript(WKUserScript(source: "window.__rdUpdate={asset:'ReactioDraw-Mac.zip'};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
         cfg.preferences.setValue(true, forKey: "developerExtrasEnabled")
         let rect = NSRect(x: 0, y: 0, width: 1440, height: 920)
         web = WKWebView(frame: rect, configuration: cfg); web.autoresizingMask = [.width, .height]

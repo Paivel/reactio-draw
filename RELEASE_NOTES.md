@@ -1,5 +1,9 @@
 # Reactio Draw, next version (not released yet)
 
+## New
+
+- **Update from the app.** Info → Check for updates: when a newer version is out, the apps for Windows, Mac and Linux ask whether to download and install it, and only on Update download it (with the AI-assistants add-on, when it is installed), check it against the SHA-256 GitHub gives for it, put it in place and start again. Unsaved documents are asked about first. The Mac app builds the new version on the Mac, as its installer does (it needs Apple's Command Line Tools).
+
 ## Changed
 
 - **Clearer wedges.** A wedge or hash no longer runs from one stereocentre to another: the centre's H is drawn with the wedge on it (as at ring junctions), or the wedge moves to a bond out to an atom that is no stereocentre; the same where InChI found the wedges ambiguous. The configuration is checked after every move. Strychnine and paclitaxel come out as they are usually drawn.
