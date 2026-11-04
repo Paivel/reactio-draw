@@ -9,8 +9,9 @@ Attribute VB_Name = "ReactioDraw"
 '   Number compounds      numbers the compounds of this document from their marks ([[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1),
 '                         in the text and in Reactio Draw drawings, in the open document (it stays open; Undo takes it back)
 '   Show marks            the same document with the marks shown instead of the numbers, to see which key is which
-'   Style, From           how the numbers look ({n}, S{n}, ...) and the first one, kept in the document as its variables
-'                         rdFormat and rdStart (they come before [[#format ...]] and [[#start ...]] lines in the text)
+'   Style, From, Bold     how the numbers look ({n}, S{n}, ...), the first one, and bold in the text or the drawings, kept in
+'                         the document as its variables rdFormat, rdStart, rdBoldText, rdBoldDraw; Style and From
+'                         come before [[#format ...]] and [[#start ...]] lines in the text
 '   Remove marks          a copy with the numbers as plain text and no marks left (drawings stay Reactio Draw drawings), opened in Word
 '   Final copy            the same with plain vector pictures too: the copy to send
 ' Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
@@ -125,6 +126,20 @@ Public Sub RD_StartChange(control As Object, txt As String)
     If txt <> "" Then txt = CStr(CLng(txt))
     SetDocVar "rdStart", txt
 End Sub
+
+' Bold in text, Bold in drawings: the numbers bold there (kept as rdBoldText, rdBoldDraw); not ticked, as the mark is written
+Public Sub RD_BoldState(control As Object, ByRef pressed)
+    pressed = (DocVar(BoldVar(control)) = "1")
+End Sub
+
+Public Sub RD_BoldSet(control As Object, pressed As Boolean)
+    If pressed Then SetDocVar BoldVar(control), "1" Else SetDocVar BoldVar(control), ""
+End Sub
+
+Private Function BoldVar(control As Object) As String
+    BoldVar = "rdBoldDraw"
+    If control.Id = "rdBoldText" Then BoldVar = "rdBoldText"
+End Function
 
 Private Function DocVar(nm As String) As String
     On Error Resume Next
@@ -445,7 +460,7 @@ Public Sub RD_Tick()
     If Documents.Count > 0 Then n = ActiveDocument.FullName
     If n <> RDLastDoc Then
         RDLastDoc = n
-        If Not RDRibbon Is Nothing Then RDRibbon.InvalidateControl "rdFmt": RDRibbon.InvalidateControl "rdStart"
+        If Not RDRibbon Is Nothing Then RDRibbon.InvalidateControl "rdFmt": RDRibbon.InvalidateControl "rdStart": RDRibbon.InvalidateControl "rdBoldText": RDRibbon.InvalidateControl "rdBoldDraw"
     End If
     Application.OnTime When:=Now + TimeSerial(0, 0, 3), Name:="RD_Tick"
 End Sub

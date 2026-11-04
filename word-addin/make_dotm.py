@@ -166,22 +166,30 @@ CUSTOM_UI = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             screentip="Open in Reactio Draw" supertip="Opens all structures of the document on one sheet in Reactio Draw."/>
         </group>
         <group id="rdNumbers" label="Compound numbers">
+          <box id="rdStyleBox" boxStyle="vertical">
+            <comboBox id="rdFmt" label="Style" sizeString="SI-{n}xx" getText="RD_FmtText" onChange="RD_FmtChange"
+              screentip="Style of the numbers" supertip="How the numbers of this document look: {n} gives 1, 2, 3; S{n} gives S1, S2, S3; any text with {n} in it. Kept in the document; it comes before a [[#format …]] line in the text. Empty: the line in the text, else {n}.">
+              <item id="rdFmt1" label="{n}"/>
+              <item id="rdFmt2" label="S{n}"/>
+              <item id="rdFmt3" label="({n})"/>
+            </comboBox>
+            <editBox id="rdStart" label="From" sizeString="0000" getText="RD_StartText" onChange="RD_StartChange"
+              screentip="First number" supertip="The number the first compound gets (1 when left empty). Kept in the document; it comes before a [[#start …]] line in the text."/>
+          </box>
+          <box id="rdBoldBox" boxStyle="vertical">
+            <checkBox id="rdBoldText" label="Bold in text" getPressed="RD_BoldState" onAction="RD_BoldSet"
+              screentip="Bold numbers in the text" supertip="The numbers in the text bold, whatever the mark is written in. Not ticked: as the mark is written. Kept in the document."/>
+            <checkBox id="rdBoldDraw" label="Bold in drawings" getPressed="RD_BoldState" onAction="RD_BoldSet"
+              screentip="Bold numbers in the drawings" supertip="The numbers in Reactio Draw drawings bold, whatever the mark is written in. Not ticked: as the mark is written. Kept in the document."/>
+          </box>
           <button id="rdNumber" label="Number compounds" size="large" image="rdNumber" onAction="RD_Number"
-            screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance. Style and From on this tab (or [[#format S{n}]] and [[#start 5]] in the text) set how they look. The document stays open (Undo takes it back); the marks stay, so press again after adding compounds."/>
+            screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance in the drawings, in their order (compounds only in the text come after). Style and From on this tab (or [[#format S{n}]] and [[#start 5]] in the text) set how they look. The document stays open (Undo takes it back); the marks stay, so press again after adding compounds."/>
           <button id="rdMarks" label="Show marks" size="large" image="rdMarks" onAction="RD_ShowMarks"
             screentip="Show marks" supertip="Shows the marks ([[aldehyde]]) instead of the numbers, in the text and in the drawings, to see which mark to write. Number compounds puts the numbers back."/>
           <button id="rdUnmark" label="Remove marks" size="large" image="rdUnmark" onAction="RD_Unmark"
             screentip="Remove marks" supertip="Makes a copy of the document with the numbers as plain text and no marks left, in the text and in the drawings (they stay Reactio Draw drawings), and opens it. This document keeps its marks."/>
           <button id="rdFinal" label="Final copy" size="large" image="rdFinal" onAction="RD_Final"
             screentip="Final copy" supertip="Makes a copy to send: numbers as plain text, no marks, and plain vector pictures without Reactio Draw data; opens it. This document keeps its marks and drawings."/>
-          <comboBox id="rdFmt" label="Style" sizeString="SI-{n}xx" getText="RD_FmtText" onChange="RD_FmtChange"
-            screentip="Style of the numbers" supertip="How the numbers of this document look: {n} gives 1, 2, 3; S{n} gives S1, S2, S3; any text with {n} in it. Kept in the document; it comes before a [[#format …]] line in the text. Empty: the line in the text, else {n}.">
-            <item id="rdFmt1" label="{n}"/>
-            <item id="rdFmt2" label="S{n}"/>
-            <item id="rdFmt3" label="({n})"/>
-          </comboBox>
-          <editBox id="rdStart" label="From" sizeString="0000" getText="RD_StartText" onChange="RD_StartChange"
-            screentip="First number" supertip="The number the first compound gets (1 when left empty). Kept in the document; it comes before a [[#start …]] line in the text."/>
         </group>
         <group id="rdDrawing" label="Drawing">
           <button id="rdEdit" label="Edit drawing" size="large" image="rdEdit" onAction="RD_Edit"

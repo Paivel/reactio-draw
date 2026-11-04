@@ -3023,6 +3023,8 @@ html {
         <button class="tb" data-chg="ball" title="Mark ball: a light ball with an outline on an atom, only for highlighting (e.g. Me/H positions). Each click makes it bigger, then removes it; Shift+click removes it; color it by selecting the atom and using the color menu"><svg viewBox="0 0 22 22"><path d="M11 12L4 6M11 12L18 6M11 12v7" stroke="currentColor" stroke-width="1.6" fill="none"/><circle cx="11" cy="12" r="4.6" fill="currentColor" fill-opacity=".3" stroke="currentColor" stroke-width="1.4"/></svg></button>
         <button class="tb" data-chg="dp" title="Partial charge δ+: click an atom; click again to remove (drawing only, not counted)"><svg viewBox="0 0 22 22"><text x="2.5" y="16" font-size="13" font-style="italic" fill="currentColor" font-family="serif">δ</text><path d="M13 7h7M16.5 3.5v7" stroke="currentColor" stroke-width="1.5"/></svg></button>
         <button class="tb" data-chg="dm" title="Partial charge δ−: click an atom; click again to remove (drawing only, not counted)"><svg viewBox="0 0 22 22"><text x="2.5" y="16" font-size="13" font-style="italic" fill="currentColor" font-family="serif">δ</text><path d="M13 7h7" stroke="currentColor" stroke-width="1.5"/></svg></button>
+        <button class="tb" data-chg="up" title="Electron with its spin ↿: in an orbital's lobe it stands along the lobe and stays in it (an electron there counts on a carbon); on the sheet a free one. Shift+click: ⇂"><svg viewBox="0 0 22 22"><path d="M11 19V3l-4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="tb" data-chg="ud" title="Paired electrons ↿⇂: in an orbital's lobe along the lobe (a pair there counts on a carbon: a carbene), or on the sheet"><svg viewBox="0 0 22 22"><path d="M8 19V3l-3.5 4.5M14 3v16l3.5-4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       </div>
       <span class="tlabel">Rings</span>
       <div class="tgroup">
@@ -3128,6 +3130,7 @@ html {
           <button class="tb" data-rich="_" title="Subscript: select characters while editing a text, then click"><svg viewBox="0 0 22 22"><text x="3" y="15" font-size="13" font-family="Georgia,serif" fill="currentColor">X</text><text x="13" y="19" font-size="8" font-family="Arial" fill="currentColor">2</text></svg></button>
           <button class="tb" data-rich="^" title="Superscript: select characters while editing a text, then click"><svg viewBox="0 0 22 22"><text x="3" y="17" font-size="13" font-family="Georgia,serif" fill="currentColor">X</text><text x="13" y="9" font-size="8" font-family="Arial" fill="currentColor">2</text></svg></button>
           <button class="tb" data-act="txtStruct" title="Count text as a structure: the selected text (MeMgBr, nBuLi, AIBN, K2CO3…) stays as written and counts in the grid by its structure; click again to take it off. Shift+click draws the structure in its place"><svg viewBox="0 0 22 22"><text x="1" y="9" font-size="8" font-family="Arial,Helvetica,sans-serif" font-weight="700" fill="currentColor">Ab</text><path d="M6 12l-3 5h6l-3-5zM14 7h5M16.5 4.5L19 7l-2.5 2.5M14 15l3-2 3 2v3l-3 2-3-2z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg></button>
+          <button class="tb" data-act="markOrd" title="Order of the [[key]] marks for numbering in Word: click the texts with marks in turn (round a catalytic cycle); the others follow in reading order (Ctrl+Shift+O)"><svg viewBox="0 0 22 22"><circle cx="6" cy="6" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="16" cy="16" r="4" fill="none" stroke="currentColor" stroke-width="1.4"/><text x="6" y="8.6" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor">1</text><text x="16" y="18.6" text-anchor="middle" font-size="7" font-weight="700" fill="currentColor">2</text><path d="M9.5 8.5l3.5 3.5" stroke="currentColor" stroke-width="1.3"/><path d="M13.8 12.8l-2.6-.2.4-2.4z" fill="currentColor"/></svg></button>
         </div>
         <div class="pop" id="pop" hidden></div>
       </div>
@@ -4862,13 +4865,31 @@ function kdOf(st) {
     if (a.hExp !== undefined && usedVal(a) === a.hUsed) return a.hExp;
     const v = valenceOf(a.el, a.chg);
     if (v === undefined) return 0;
-    const u = usedVal(a) + (a.rad || 0) + (a.wcut !== undefined ? 1 : 0);
+    const u = usedVal(a) + (a.rad || 0) + (a.wcut !== undefined ? 1 : 0) + carbeneE(a);
     return Math.max(0, Math.floor(v - u + 1e-9)) || hyperH(a, u);
   }
   function freeVal(a) {
     if (a.label) return 0;
     const v = valenceOf(a.el, a.chg);
-    return (v === undefined ? 4 : v) - usedVal(a) - (a.rad || 0);
+    return (v === undefined ? 4 : v) - usedVal(a) - (a.rad || 0) - carbeneE(a);
+  }
+  /* the electrons drawn on an atom with as many electrons as carbon (C, Si, Ge, Sn; N+, P+, As+; B−, Ga−) that take the
+     place of hydrogens: a lone pair on it makes a carbene or its like (an NHC, a silylene, a phosphenium, a nitrenium, a
+     borylene: two H fewer), and the electrons put in its orbitals' lobes count too (a pair two, ↿ or a dot one: two lobes
+     with ↿ each a triplet carbene). On N, O, P and the others a lone pair is only drawn, as their pairs are there anyway;
+     an orbital's own single electron is already the atom's radical */
+  function carbeneE(a) {
+    const g = MAIN_G[a.el];
+    if (!g || g[0] - (a.chg || 0) !== 4) return 0;
+    let n = 2 * (a.lp || 0);
+    if (mol.arrows.length)
+      for (const r of mol.arrows) {
+        if (r.kind !== 'orb' || r.at !== a.id) continue;
+        if (r.el === 2) n += 2;
+        for (const t of mol.texts)
+          if (t.fsym && t.orb && t.orb.id === r.id) n += t.fsym === 'lp' || t.fsym === 'ud' ? 2 : 1;
+      }
+    return n;
   }
   /* main-group elements: [group, period]. A charged atom is checked as the element with the same number of electrons (P− as S, so PF6−, AsF6−,
    SbF6−, SiF6 2− pass; N+ as C; B− as C, so BF4− passes), as RDKit does; from period 3 on the shell expands (P 3/5, S 2/4/6, Cl 1/3/5/7),
@@ -11264,6 +11285,7 @@ function kdOf(st) {
         cleanStereoKept = kp0;
         cleanEndsOffBonds(frs);
         frs.forEach(metalStar);
+        orbBend(frs);
         METAL_PREV = null;
         return;
       }
@@ -11277,13 +11299,85 @@ function kdOf(st) {
       cleanStereoKept = keptH;
       cleanEndsOffBonds(frs);
       frs.forEach(metalStar);
+      orbBend(frs);
       METAL_PREV = null;
       return;
     }
     const res = cleanFragmentsH(frs);
     frs.forEach(metalStar);
+    orbBend(frs);
     METAL_PREV = null;
     return res;
+  }
+  /* an atom with orbitals drawn on it and two bonds (a carbene R2C with its sp2 lobe and p orbital): the two bonds 105° apart
+     instead of 120°, on the side away from its one-sided lobes (or about where they were), so the orbitals have room; each
+     branch turned as a whole, and nothing moved where it would come near other atoms */
+  function orbBend(frs) {
+    if (!mol.arrows.some(r => r.kind === 'orb' && r.at != null)) return;
+    for (const f of frs)
+      for (const a of f) {
+        const R = mol.arrows.filter(r => r.kind === 'orb' && r.at === a.id && r.orb !== 's');
+        if (!R.length) continue;
+        const nb = neighbors(a);
+        if (nb.length !== 2) continue;
+        const ang = o => Math.atan2(o.y - a.y, o.x - a.x),
+          diff = (x, y) => Math.abs(Math.atan2(Math.sin(x - y), Math.cos(x - y)));
+        if (diff(ang(nb[0]), ang(nb[1])) < (112 * Math.PI) / 180) continue;
+        /* the branches, each without the atom; a ring through the atom: left as it is */
+        const br = nb.map(s0 => {
+          const seen = new Set([a.id, s0.id]),
+            st = [s0],
+            out = [s0];
+          while (st.length) {
+            const x = st.pop();
+            for (const y of neighbors(x))
+              if (!seen.has(y.id)) {
+                seen.add(y.id);
+                st.push(y);
+                out.push(y);
+              }
+          }
+          return out;
+        });
+        if (br[0].some(x => br[1].includes(x))) continue;
+        let sx = 0,
+          sy = 0;
+        for (const r of R) {
+          if (r.orb !== 'lobe' && r.orb !== 'sp3') continue;
+          const L = Math.hypot(r.x2 - r.x1, r.y2 - r.y1) || 1;
+          sx += (r.x2 - r.x1) / L;
+          sy += (r.y2 - r.y1) / L;
+        }
+        let bis;
+        if (Math.hypot(sx, sy) > 0.2) bis = Math.atan2(-sy, -sx);
+        else {
+          const ux = Math.cos(ang(nb[0])) + Math.cos(ang(nb[1])),
+            uy = Math.sin(ang(nb[0])) + Math.sin(ang(nb[1]));
+          if (Math.hypot(ux, uy) < 0.2) continue;
+          bis = Math.atan2(uy, ux);
+        }
+        const h = (52.5 * Math.PI) / 180,
+          T = [bis - h, bis + h];
+        /* each branch to the target nearer to it */
+        const keep = diff(ang(nb[0]), T[0]) + diff(ang(nb[1]), T[1]) <= diff(ang(nb[0]), T[1]) + diff(ang(nb[1]), T[0]);
+        const tg = keep ? T : [T[1], T[0]],
+          saved = br.flat().map(x => [x, x.x, x.y]);
+        br.forEach((b, i) => {
+          const d = tg[i] - ang(nb[i]),
+            co = Math.cos(d),
+            sn = Math.sin(d);
+          for (const x of b) {
+            const dx = x.x - a.x,
+              dy = x.y - a.y;
+            x.x = a.x + dx * co - dy * sn;
+            x.y = a.y + dx * sn + dy * co;
+          }
+        });
+        const moved = new Set(br.flat().map(x => x.id)),
+          near = mol.atoms.some(x => !moved.has(x.id) && x !== a && !x.multi && br.flat().some(y => Math.hypot(x.x - y.x, x.y - y.y) < L * 0.5)) ||
+            br[0].some(x => br[1].some(y => Math.hypot(x.x - y.x, x.y - y.y) < L * 0.5));
+        if (near) for (const [x, X, Y] of saved) ((x.x = X), (x.y = Y));
+      }
   }
   /* a chain end (a methyl, an OH) laid on top of another bond of its atom (under 20° from it, as in a crowded bridged
      system): turned into the widest gap between that atom's bonds, at the same length, if it lands clear of the other atoms;
@@ -15674,6 +15768,7 @@ function kdOf(st) {
     const isBack = r => r.kind === 'shp' || r.kind === 'orb' || r.kind === 'img';
     for (const r of mol.arrows) if (!isBack(r)) s += arrowSVG(r);
     s += fsymHintSVG();
+    s += cordSVG();
     let topShapes = '';
     for (const r of mol.arrows) if (isBack(r) && r.top) topShapes += arrowSVG(r);
     for (const t of mol.texts)
@@ -20990,6 +21085,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   svg.addEventListener('pointerdown', e => {
     lastPtrType = e.pointerType || 'mouse';
+    if (CORD && e.button === 0) {
+      e.preventDefault();
+      cordClick(pt(e));
+      return;
+    }
     if (isTouchPtr(e)) {
       touchDown(e);
       return;
@@ -21372,7 +21472,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (tool === 'chg') {
-      if (h && h.atom) {
+      if (h && h.atom && (chgMode === 'up' || chgMode === 'ud')) {
+        /* electrons with their spin go into an orbital's lobe or stand on the sheet, not on an atom */
+        toast('Put it in a lobe of an orbital, or on the sheet beside it', true);
+      } else if (h && h.atom) {
         snap();
         applySym(h.atom, chgMode, e.shiftKey);
         commit();
@@ -21381,15 +21484,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         snap();
         freeCharge(chgMode.endsWith('-1') ? -1 : 1, chgMode.startsWith('p') ? 'p' : 'c', p.x, p.y);
         commit();
-      } else if ((chgMode === 'lp' || chgMode === 'rad') && (!h || h.arrow)) {
-        /* a lone pair or a radical on its own: in an orbital's lobe it goes inside it and stays there (Alt: free) */
+      } else if ((chgMode === 'lp' || chgMode === 'rad' || chgMode === 'up' || chgMode === 'ud') && (!h || h.arrow)) {
+        /* a lone pair, a radical or electrons with their spin on their own: in an orbital's lobe they go inside it and stay
+           there (Alt: free) */
         const lb = e.altKey ? null : orbLobeAt(p.x, p.y);
         if (lb || !h) {
           snap();
-          const t = freeSymbol(chgMode, p.x, p.y);
+          const kind = chgMode === 'up' && e.shiftKey ? 'dn' : chgMode,
+            t = freeSymbol(kind, p.x, p.y),
+            what = { lp: 'Lone pair', rad: 'Electron', up: 'Electron ↿', dn: 'Electron ⇂', ud: 'Paired electrons' }[kind];
           if (lb) t.orb = { id: lb.r.id, lobe: lb.lobe, along: lb.along };
           commit();
-          toast(lb ? (chgMode === 'lp' ? 'Lone pair' : 'Electron') + ' put in the lobe: it goes with the orbital (Alt+drag takes it out)' : 'Free ' + (chgMode === 'lp' ? 'lone pair' : 'radical') + ': drag it into an orbital lobe to put it there');
+          toast(lb ? what + ' put in the lobe: it goes with the orbital (Alt+drag takes it out)' : 'Free ' + (kind === 'rad' ? 'radical' : what.toLowerCase()) + ': drag it into an orbital lobe to put it there');
         }
       }
       return;
@@ -22807,6 +22913,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['act:stereoGrp', 'Stereo group (abs, &, or)', ''],
       ['act:chemTxt', 'Count selected text as a compound', ''],
       ['act:txtStruct', 'Count text as a structure', ''],
+      ['act:markOrd', 'Order of the [[key]] marks for numbering in Word', 'Ctrl+Shift+KeyO'],
       ['act:rotL', 'Rotate 90° left', ''],
       ['act:rotR', 'Rotate 90° right', ''],
       ['act:rot180', 'Rotate 180°', ''],
@@ -27435,6 +27542,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         commit();
         toast('Mirrored ' + t.length + ' label(s)');
       }
+    } else if (a === 'markOrd') {
+      if (CORD) cordEnd();
+      else cordStart();
     } else if (a === 'clean') doClean();
     else if (a === 'clean2d') doClean(true);
     else if (a === 'cleanRxn') {
@@ -37552,7 +37662,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         [w, h] = fit(pic.wPt, pic.hPt),
         ri = 'rId' + rid++,
         ro = 'rId' + rid++;
-      files.push(['word/media/image1.png', pic.png], ['word/embeddings/oleObject1.bin', chemOleOf(contents)]);
+      /* the whole drawing goes in with it (as Ctrl+Shift+D puts it), so nothing of it is lost on the way through CDX */
+      save();
+      files.push(['word/media/image1.png', pic.png], ['word/embeddings/oleObject1.bin', chemOleOf(contents, JSON.stringify({ rd: 1, state: S }))]);
       rels.push(
         `<Relationship Id="${ri}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image1.png"/>`,
         `<Relationship Id="${ro}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject" Target="embeddings/oleObject1.bin"/>`
@@ -38334,7 +38446,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['h', 'Word files'],
     ['w-all', 'All structures of a Word file on one sheet, one under another (then Save as CDXML)…'],
     ['w-clean', 'Copy of a Word file with plain vector pictures, without Reactio Draw data…'],
-    ['w-num', 'Number the compounds of a Word file ([[key]] marks in the text and drawings)…']
+    ['w-num', 'Number the compounds of a Word file ([[key]] marks in the text and drawings)…'],
+    ['w-ord', 'Order of the [[key]] marks on this drawing (click them in turn)…']
   ];
   const filePop = document.createElement('div');
   filePop.className = 'pop filepop';
@@ -38399,7 +38512,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* ===== compound numbers in a Word file =====
      Marks in the text and in Reactio Draw's drawings: [[key]] (the compound's number, 7), [[key.sub.letter]] (7a, 7b… in the
      order the subs first come), [[key.sub.num]] (7.1, 7.2…); [[#format S{n}]] and [[#start 5]] anywhere set the style.
-     Numbers go by first appearance, text and drawings in reading order. In the text a mark becomes a content control (tag
+     Numbers go by first appearance in the drawings, in their order in the document, each read line by line; compounds
+     only in the text come after them, in its order. In the text a mark becomes a content control (tag
      rdcmpd:<mark>) holding the number, so a second run finds it again; in a drawing the text keeps its marks (t.ctpl) and
      shows the numbers. The file written is a copy. */
   const CMPD_RX = /\[\[([A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num))?)?\]\]/g,
@@ -38447,8 +38561,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
        the [[#format …]] and [[#start …]] lines */
     if (setXml) {
       const un = v => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
-      for (const m of setXml.matchAll(/<w:docVar\s+w:name="(rdFormat|rdStart)"\s+w:val="([^"]*)"/g))
-        if (m[2].trim()) o[m[1] === 'rdFormat' ? 'format' : 'start'] = un(m[2]).trim();
+      for (const m of setXml.matchAll(/<w:docVar\s+w:name="(rdFormat|rdStart|rdBoldText|rdBoldDraw)"\s+w:val="([^"]*)"/g))
+        if (m[2].trim()) o[{ rdFormat: 'format', rdStart: 'start', rdBoldText: 'boldText', rdBoldDraw: 'boldDraw' }[m[1]]] = un(m[2]).trim();
     }
     return o;
   }
@@ -38495,9 +38609,84 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } catch (e) {}
     }
   }
+  /* the order of the compound marks on a drawing, set by hand: each text with [[key]] marks clicked in turn gets the next
+     place (t.cord, 1, 2, 3…) and a small numbered badge while this lasts; the texts not clicked follow in reading order.
+     Esc, Enter or the bar's Done ends it; a click on the sheet away from them too. Clear takes the order away */
+  let CORD = null;
+  function cordStart() {
+    const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    if (!T.length) {
+      toast('There are no [[key]] marks on this drawing: write one in a text under a compound, e.g. [[aldehyde]]', true);
+      return;
+    }
+    snap();
+    CORD = { n: 0, bar: document.createElement('div'), key: null };
+    for (const t of T) delete t.cord;
+    const b = CORD.bar;
+    /* a box in the corner (as the 3D export's), so the sheet stays free to click */
+    b.className = 'askbox xyzbox';
+    b.setAttribute('role', 'status');
+    b.innerHTML =
+      '<div class="card"><b>Order of the marks</b><div class="tx">Click the texts with [[key]] marks in the order their compounds are to be numbered (round the cycle). The others follow in reading order.</div><div class="row"><button data-k="clear">Clear</button><button class="pri" data-k="done">Done</button></div></div>';
+    document.body.appendChild(b);
+    b.querySelector('[data-k=done]').onclick = () => cordEnd();
+    b.querySelector('[data-k=clear]').onclick = () => {
+      for (const t of mol.texts) delete t.cord;
+      CORD.n = 0;
+      render();
+    };
+    CORD.key = e => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        cordEnd();
+      }
+    };
+    document.addEventListener('keydown', CORD.key, true);
+    render();
+  }
+  function cordClick(p) {
+    const t = findText(p);
+    if (!t || !/\[\[/.test(t.ctpl || t.text || '')) {
+      if (!t) cordEnd();
+      return;
+    }
+    if (t.cord) return;
+    t.cord = ++CORD.n;
+    render();
+  }
+  function cordEnd() {
+    if (!CORD) return;
+    document.removeEventListener('keydown', CORD.key, true);
+    CORD.bar.remove();
+    const n = CORD.n;
+    CORD = null;
+    commit();
+    toast(n ? n + ' mark text' + (n > 1 ? 's' : '') + ' in the order you clicked; Number compounds in Word follows it' : 'No order set: the marks go in reading order');
+  }
+  /* the places, as a small index after each text with marks ([[ald]]₁): while the order is being set every one (set by
+     hand in the accent colour, the others after them in grey); otherwise only those set by hand. On the screen only */
+  function cordSVG() {
+    if (renderPlain) return '';
+    if (!CORD && !mol.texts.some(t => t.cord)) return '';
+    let s = '',
+      i = 0;
+    for (const t of cmpdTexts()) {
+      i++;
+      if (!CORD && !t.cord) continue;
+      const fz = tSize(t) * 0.7,
+        x = t.x + textW(t) + 1.5,
+        y = t.y + tSize(t) * 0.3;
+      s += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fz.toFixed(1)}" font-family="Arial, Helvetica, sans-serif" pointer-events="none" style="fill:${t.cord ? 'var(--accent)' : '#9aa3ad'}">${i}</text>`;
+    }
+    return s;
+  }
   /* the texts of the sheet now that carry marks, in reading order (rows top to bottom, left to right) */
   function cmpdTexts() {
-    const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    const all = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    /* an order set by hand (File → Word files → Order of the marks on this drawing: a catalytic cycle read round) comes
+       first, the other texts after it in reading order */
+    const set = all.filter(t => t.cord).sort((a, b) => a.cord - b.cord),
+      T = all.filter(t => !t.cord);
     T.sort((a, b) => a.y - b.y);
     const rows = [];
     for (const t of T) {
@@ -38505,7 +38694,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (r) r.t.push(t);
       else rows.push({ y: t.y, t: [t] });
     }
-    return rows.flatMap(r => r.t.sort((a, b) => a.x - b.x));
+    return set.concat(rows.flatMap(r => r.t.sort((a, b) => a.x - b.x)));
   }
   /* the text runs of Word XML between two places: each run with its properties and text (raw XML), or null when it is no
      plain text run */
@@ -38520,8 +38709,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* marks: true, the marks shown instead of numbers ([[aldehyde]] in the text and on the drawings), to see which key is
      which; numbering again puts the numbers back. 'strip': the numbers as plain text, the marks gone from the text and the
      drawings, the settings lines taken out (a copy that is not numbered again) */
-  async function wordNumber(u, tpl, start, job, marks) {
+  async function wordNumber(u, tpl, start, job, marks, look) {
     const mode = marks;
+    /* look.boldText, look.boldDraw: the numbers bold in the text, in the drawings (the Word tab's ticks); otherwise as the
+       mark is written */
+    look = look || {};
+    const boldRPr = rp => (/<w:b\/>/.test(rp) ? rp : rp ? rp.replace('<w:rPr>', '<w:rPr><w:b/>') : '<w:rPr><w:b/></w:rPr>');
     const z = await unzipAll(u),
       td = new TextDecoder(),
       te = new TextEncoder(),
@@ -38679,7 +38872,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       it.order = out.indexOf(o);
       its.push(it);
     }
-    /* numbering: text marks and drawing marks by their place in the document */
+    /* numbering: the drawings' marks first, then the text's (see below) */
     const uses = new Map();
     {
       const seq = [];
@@ -38690,8 +38883,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (it) seq.push([i, it]);
         }
       });
-      /* taken again from the start, now in document order (the first pass above only collected them) */
+      /* taken again from the start: the drawings first, in the order they come in the document (each read line by line),
+         then what is only in the text, in its order; a mark in the text takes the number its compound got in a drawing */
       N.reset();
+      seq.sort((a, b) => (a[1].spec ? 1 : 0) - (b[1].spec ? 1 : 0) || a[0] - b[0]);
       for (const [, x] of seq) {
         if (x.spec) {
           N.take(x.key, x.sub);
@@ -38712,9 +38907,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .map(o => o.xml)
       .join('')
       .replace(/\u0000M(\d+)\u0000/g, (m0, i) => {
-        const t = textMarks[+i];
-        if (marks === 'strip') return wT(t.rPr, N.text(t.key, t.sub, t.fmt));
-        return wSdt(t.rPr, t.spec, marks ? '[[' + t.spec + ']]' : N.text(t.key, t.sub, t.fmt));
+        const t = textMarks[+i],
+          rp = look.boldText && marks !== true ? boldRPr(t.rPr) : t.rPr;
+        if (marks === 'strip') return wT(rp, N.text(t.key, t.sub, t.fmt));
+        return wSdt(rp, t.spec, marks ? '[[' + t.spec + ']]' : N.text(t.key, t.sub, t.fmt));
       });
     /* the drawings: their texts show the numbers, the marks kept; drawn again */
     let k = 0,
@@ -38745,7 +38941,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           t.nochem = true;
           t.fs = false;
           const cx = t.x + textW(t) / 2;
-          t.text = marks === true ? t.ctpl : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
+          t.text =
+            marks === true
+              ? t.ctpl
+              : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => {
+                  const n = N.text(a, b || '', c || (b ? 'letter' : ''));
+                  return look.boldDraw ? '\\b{' + n + '}' : n;
+                });
           if (marks === 'strip') delete t.ctpl;
           t.x = cx - textW(t) / 2;
         }
@@ -38842,8 +39044,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     d.className = 'pop';
     d.style.cssText = 'position:fixed;left:50%;top:22%;transform:translateX(-50%);z-index:60;width:min(440px,calc(100vw - 32px));padding:12px 14px;display:block';
     d.innerHTML = `<div style="font-weight:600;margin-bottom:6px">Number the compounds of ${esc(f.name)}</div>
-<div class="note" style="margin-bottom:8px">Marks in the text and in Reactio Draw drawings: <b>[[key]]</b> → 7, <b>[[key.sub.letter]]</b> → 7a, <b>[[key.sub.num]]</b> → 7.1. Numbers go by first appearance. A copy of the file is written; the marks stay in it, so it can be numbered again.</div>
+<div class="note" style="margin-bottom:8px">Marks in the text and in Reactio Draw drawings: <b>[[key]]</b> → 7, <b>[[key.sub.letter]]</b> → 7a, <b>[[key.sub.num]]</b> → 7.1. Numbers go by first appearance in the drawings (in their order, each read line by line); compounds only in the text come after. A copy of the file is written; the marks stay in it, so it can be numbered again.</div>
 <div style="display:flex;gap:6px;align-items:center"><span class="note">Number</span><input id="wnumTpl" style="width:96px" aria-label="Number style"><span class="note">from</span><input id="wnumStart" style="width:52px" aria-label="First number"><span class="note" style="flex:1">{n} the number, e.g. S{n}</span></div>
+<div style="display:flex;gap:14px;align-items:center;margin-top:6px"><label class="note"><input type="checkbox" id="wnumBT"> Bold in the text</label><label class="note"><input type="checkbox" id="wnumBD"> Bold in the drawings</label></div>
 <div class="note" id="wnumFrom" style="margin-top:4px"></div>
 <div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="marks" title="A copy that shows [[key]] instead of each number, in the text and on the drawings: to see which mark to write. Number it again for the numbers">Show the marks</button><button type="button" class="btn ghost sm" data-w="strip" title="A copy with the numbers as plain text and no marks left (the drawings stay Reactio Draw drawings): to send. Keep the file with the marks for numbering again">Remove the marks</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
     document.body.appendChild(d);
@@ -38851,6 +39054,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       Sx = d.querySelector('#wnumStart');
     T.value = set.format || last.tpl || '{n}';
     Sx.value = set.start || last.start || '1';
+    /* bold: as the file says (the Word tab's ticks), else as last time */
+    const BT = d.querySelector('#wnumBT'),
+      BD = d.querySelector('#wnumBD');
+    BT.checked = set.boldText != null ? set.boldText === '1' : !!last.bt;
+    BD.checked = set.boldDraw != null ? set.boldDraw === '1' : !!last.bd;
     d.querySelector('#wnumFrom').textContent =
       set.format || set.start ? 'Style set in the file ([[#format …]], [[#start …]]); change it here for this copy only' : 'In the file, [[#format S{n}]] and [[#start 5]] set the style for it';
     d.addEventListener('keydown', e => {
@@ -38865,12 +39073,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         mk = b.dataset.w === 'marks' ? true : b.dataset.w === 'strip' ? 'strip' : false;
       d.remove();
       try {
-        localStorage.setItem('rd-wnum', JSON.stringify({ tpl, start: String(st) }));
+        localStorage.setItem('rd-wnum', JSON.stringify({ tpl, start: String(st), bt: BT.checked, bd: BD.checked }));
       } catch (er) {}
       const job = busyBar('Numbering the compounds of ' + f.name);
       try {
         await job.pause();
-        const r = await wordNumber(u, tpl, st, job, mk);
+        const r = await wordNumber(u, tpl, st, job, mk, { boldText: BT.checked, boldDraw: BD.checked });
         if (!r.compounds) {
           toast('No [[key]] marks in ' + f.name, true);
           return;
@@ -38915,6 +39123,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     filePop.hidden = true;
     if (k === 'open') {
       openFile();
+      return;
+    }
+    if (k === 'w-ord') {
+      cordStart();
       return;
     }
     if (k === 'w-all' || k === 'w-clean' || k === 'w-num') {
@@ -51092,8 +51304,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      t.fsym ('lp', 'rad', 'el') and a turn t.ang (degrees, the line through the two dots). Put in a lobe of an orbital they
      are tied to it (t.orb = {id, lobe, along}): they sit on its axis, along its length, the dots across it, and go with it.
      They are drawing only: an atom's lone pairs do not change. */
-  const FSYM = { lp: '••', rad: '•', el: '•' },
-    FSYM_NAME = { lp: 'lonePair', rad: 'radical', el: 'electron' };
+  /* electrons with their spin, as half-headed arrows: up ↿, down ⇂, a pair ↿⇂ (in a lobe along its axis, else upright) */
+  const FSYM = { lp: '••', rad: '•', el: '•', up: '↿', dn: '⇂', ud: '↿⇂' },
+    FSYM_NAME = { lp: 'lonePair', rad: 'radical', el: 'electron', up: 'spinUp', dn: 'spinDown', ud: 'spinPair' };
   let FSYM_DRAG = null,
     fsymHint = null;
   const fsymCentre = t => ({ x: t.x + textW(t) / 2, y: t.y - tSize(t) * 0.35 });
@@ -51316,6 +51529,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       a = ((t.ang || 0) * Math.PI) / 180,
       col = t.color || 'var(--ink)',
       dots = t.fsym === 'lp' ? [-1, 1] : [0];
+    if (t.fsym === 'up' || t.fsym === 'dn' || t.fsym === 'ud') {
+      /* the arrows run across the line t.ang (along a lobe's axis, outward): ↿ its barb on the left, ⇂ pointing back */
+      const h = (r ? L * 0.17 : tSize(t) * 0.42) * Math.sqrt(fk),
+        ax = Math.sin(a),
+        ay = -Math.cos(a),
+        bx = Math.cos(a),
+        by = Math.sin(a),
+        w = Math.max(1, dr * 0.75),
+        one = (k, up) => {
+          const ox = c.x + bx * k,
+            oy = c.y + by * k,
+            s0 = up ? -1 : 1,
+            tx = ox + ax * h * s0 * -1,
+            ty = oy + ay * h * s0 * -1,
+            fx = ox - ax * h * s0 * -1,
+            fy = oy - ay * h * s0 * -1,
+            /* the barb: back from the tip and to the left of the way it points */
+            dx = (tx - fx) / (2 * h),
+            dy = (ty - fy) / (2 * h),
+            qx = tx - dx * h * 0.55 + dy * h * 0.38,
+            qy = ty - dy * h * 0.55 - dx * h * 0.38;
+          return `<path d="M${fx.toFixed(2)} ${fy.toFixed(2)}L${tx.toFixed(2)} ${ty.toFixed(2)}L${qx.toFixed(2)} ${qy.toFixed(2)}" fill="none" style="stroke:${col}" stroke-width="${w.toFixed(2)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        };
+      const g = h * 0.32;
+      if (t.fsym === 'ud') return one(-g, true) + one(g, false);
+      return one(0, t.fsym === 'up');
+    }
     return dots.map(k => `<circle cx="${(c.x + Math.cos(a) * sp * k).toFixed(2)}" cy="${(c.y + Math.sin(a) * sp * k).toFixed(2)}" r="${dr.toFixed(2)}" style="fill:${col}"/>`).join('');
   }
   /* the lobe a dragged symbol would go into, outlined */
@@ -52534,8 +52774,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* a free symbol from the API: type lonePair, radical or electron; at [x, y], or orbital (id) with lobe and along */
   function apiSymbolKind(v) {
-    const k = { lonepair: 'lp', pair: 'lp', lp: 'lp', radical: 'rad', rad: 'rad', electron: 'el', el: 'el', charge: 'chg' }[String(v || 'lonePair').toLowerCase()];
-    if (!k) throw new Error('symbol type: lonePair, radical, electron or charge');
+    const k = { lonepair: 'lp', pair: 'lp', lp: 'lp', radical: 'rad', rad: 'rad', electron: 'el', el: 'el', charge: 'chg', spinup: 'up', up: 'up', spindown: 'dn', down: 'dn', spinpair: 'ud', pairedspins: 'ud' }[String(v || 'lonePair').toLowerCase()];
+    if (!k) throw new Error('symbol type: lonePair, radical, electron, spinUp, spinDown, spinPair or charge');
     return k;
   }
   /* a charge's text: +, −, 2+, 3− … */
@@ -58623,6 +58863,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (o.lonePairs != null) {
       const n = Math.max(0, Math.min(3, +o.lonePairs | 0));
+      /* a pair on a carbon-like atom takes the place of hydrogens (a carbene): its H count is worked out again */
+      if (MAIN_G[q.el] && MAIN_G[q.el][0] - (q.chg || 0) === 4) delete q.hExp;
       if (n) q.lp = n;
       else delete q.lp;
     }
@@ -64176,7 +64418,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           String(opt.number || set.format || '{n}'),
           parseInt(opt.start || set.start || '1', 10) || 1,
           null,
-          opt.strip ? 'strip' : !!opt.marks
+          opt.strip ? 'strip' : !!opt.marks,
+          { boldText: set.boldText === '1', boldDraw: set.boldDraw === '1' }
         );
         if (!r.compounds) {
           say('nothing to number: no [[key]] marks in ' + f.name);
@@ -64206,7 +64449,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           try {
             set = cmpdSettingsZ(await unzipAll(u0));
           } catch (e) {}
-          const n = await wordNumber(u0, String(set.format || '{n}'), parseInt(set.start || '1', 10) || 1, null, 'strip');
+          const n = await wordNumber(u0, String(set.format || '{n}'), parseInt(set.start || '1', 10) || 1, null, 'strip', {
+            boldText: set.boldText === '1',
+            boldDraw: set.boldDraw === '1'
+          });
           if (n.compounds) u0 = n.bytes instanceof Blob ? new Uint8Array(await n.bytes.arrayBuffer()) : n.bytes;
           stripped = !!n.compounds;
         }
