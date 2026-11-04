@@ -9102,6 +9102,50 @@ function kdOf(st) {
      aryl groups on CMe2): the large ones go up to either side, 120° apart, the small ones down, 60° apart, as chemists draw
      them, each branch turned as a whole (rings with a donor next to the carbon turned so the donors face each other). Kept
      when no two atoms come closer than before (or than 0.6 of a bond) */
+  /* two branches of one atom c matched atom for atom (the same elements and bonds), first atom to first atom: [[x, y]…]
+     from the one to the other, or null when they differ */
+  function mapBranch(g, adj, c, A, B) {
+    if (A.set.size !== B.set.size || A.set.size > 60) return null;
+    const el = v => g.nodes[v].el + (g.nodes[v].chg || 0),
+      ord = (u, v) => {
+        const e = adj[u].find(([w]) => w === v);
+        return e ? g.edges[e[1]].order || 1 : 0;
+      };
+    const m = new Map([[A.v, B.v]]),
+      used = new Set([B.v]);
+    if (el(A.v) !== el(B.v)) return null;
+    let steps = 0;
+    const order = [A.v];
+    {
+      const seen = new Set([A.v]);
+      for (let i = 0; i < order.length; i++)
+        for (const [w] of adj[order[i]]) if (w !== c && A.set.has(w) && !seen.has(w)) (seen.add(w), order.push(w));
+    }
+    const go = i => {
+      if (++steps > 20000) return false;
+      if (i === order.length) return true;
+      const x = order[i];
+      if (m.has(x)) return go(i + 1);
+      /* x hangs on an atom already matched: its partner is a neighbour of that atom's partner */
+      const p = adj[x].find(([w]) => m.has(w));
+      if (!p) return false;
+      for (const [y] of adj[m.get(p[0])]) {
+        if (y === c || used.has(y) || !B.set.has(y) || el(y) !== el(x)) continue;
+        if (adj[x].length !== adj[y].length) continue;
+        let ok = true;
+        for (const [w] of adj[x]) if (m.has(w) && ord(x, w) !== ord(y, m.get(w))) ok = false;
+        for (const [w] of adj[y]) if (w !== c && B.set.has(w) && ![...m].some(([a, b]) => b === w && adj[x].some(([z]) => z === a)) && used.has(w)) ok = false;
+        if (!ok) continue;
+        m.set(x, y);
+        used.add(y);
+        if (go(i + 1)) return true;
+        m.delete(x);
+        used.delete(y);
+      }
+      return false;
+    };
+    return go(1) ? [...m] : null;
+  }
   function quatFan(g, pos) {
     const n = g.nodes.length;
     if (n < 8 || n > 400 || pos.some(p => !p)) return 0;
@@ -9202,8 +9246,89 @@ function kdOf(st) {
           out[x] = { x: C.x + dx * co - dy * sn, y: C.y + dx * sn + dy * co };
         }
       }
-      const c0 = closest(pos),
-        c1 = closest(out);
+      /* the two large branches alike (a C2 ligand: two oxazolines, two pyridines) and the two small ones alike: each the
+         mirror of the other across the upright axis, so the drawing is symmetric; the side groups of the large ones (the
+         benzyls of a Bn-box) may each be swung over its bond, the same on both sides, to keep them clear */
+      let c1 = closest(out);
+      {
+        const m12 = mapBranch(g, adj, c, b1, b2),
+          m34 = mapBranch(g, adj, c, s1, s2);
+        if (m12 && m34) {
+          const mirror = (O, map) => {
+            for (const [x, y] of map) O[y] = { x: 2 * C.x - O[x].x, y: O[x].y };
+          };
+          /* the side groups of b1: an open-chain group on a ring atom (or on the branch's first atom) */
+          const units = [];
+          for (const r of b1.set) {
+            if (!ringAt.has(r) && r !== b1.v) continue;
+            for (const [x] of adj[r]) {
+              if (x === c || !b1.set.has(x) || ringAt.has(x)) continue;
+              const sub = new Set([x]),
+                st = [x];
+              let ok = true;
+              while (st.length) {
+                const u = st.pop();
+                for (const [w] of adj[u]) {
+                  if (w === r || sub.has(w)) continue;
+                  if (w === c || !b1.set.has(w)) ok = false;
+                  sub.add(w);
+                  st.push(w);
+                }
+              }
+              if (ok && sub.size >= 2 && !sub.has(r)) units.push({ r, x, sub });
+            }
+          }
+          /* a small branch that runs along the axis (an ethyl straight down) would meet its own mirror image: turned over its
+             bond to the carbon first, away from the axis */
+          {
+            const A = out[s1.v],
+              dx = A.x - C.x,
+              dy = A.y - C.y,
+              l2 = dx * dx + dy * dy,
+              near = O => Math.min(...[...s1.set].map(v => Math.abs(O[v].x - C.x))),
+              F = out.slice();
+            for (const v of s1.set) {
+              if (v === s1.v) continue;
+              const q = out[v],
+                k = ((q.x - C.x) * dx + (q.y - C.y) * dy) / l2,
+                fx = C.x + k * dx,
+                fy = C.y + k * dy;
+              F[v] = { x: 2 * fx - q.x, y: 2 * fy - q.y };
+            }
+            if (near(F) > near(out) + 1) for (const v of s1.set) out[v] = F[v];
+          }
+          const tries = Math.min(1 << Math.min(units.length, 4), 16);
+          let best = null;
+          for (let t = 0; t < tries; t++) {
+            const O = out.slice();
+            units.slice(0, 4).forEach((u, i) => {
+              if (!(t & (1 << i))) return;
+              const A = O[u.r],
+                B = O[u.x],
+                dx = B.x - A.x,
+                dy = B.y - A.y,
+                l2 = dx * dx + dy * dy;
+              for (const v of u.sub) {
+                if (v === u.x) continue;
+                const q = O[v],
+                  k = ((q.x - A.x) * dx + (q.y - A.y) * dy) / l2,
+                  fx = A.x + k * dx,
+                  fy = A.y + k * dy;
+                O[v] = { x: 2 * fx - q.x, y: 2 * fy - q.y };
+              }
+            });
+            mirror(O, m12);
+            mirror(O, m34);
+            const cl = closest(O);
+            if (!best || cl > best.cl + 0.02) best = { cl, O };
+          }
+          if (best && (best.cl >= 0.9 || best.cl >= c1 - 0.02)) {
+            for (let v = 0; v < n; v++) out[v] = best.O[v];
+            c1 = best.cl;
+          }
+        }
+      }
+      const c0 = closest(pos);
       if (c1 < 0.6 && c1 < c0) continue;
       if (c1 < c0 - 0.05 && c1 < 0.9) continue;
       for (let v = 0; v < n; v++) pos[v] = out[v];
@@ -9380,7 +9505,7 @@ function kdOf(st) {
     HAP_ARENE_TM = new Set('Cr Mo W Mn Re Fe Ru Os Co Rh Ir'.split(' ')),
     HAP_COD_TM = new Set('Fe Ru Os Co Rh Ir Ni Pd Pt Cu'.split(' ')),
     /* cod seen from the side, as a tub, its two double bonds toward the metal (at 0,0; the ring to its left), in bonds:
-       C1=C2, C2–C3–C4–C5 round the far side, C5=C6, C6–C7–C8–C1 in front of it */
+       C1=C2, C2–C3–C4–C5 round the far side, C5=C6, C6–C7–C8–C1 in front of it; its bonds to the metal dashed */
     HAP_COD = [[-0.55, -0.75], [-1.1, -1.3], [-1.95, -0.6], [-1.95, 0.6], [-1.1, 1.3], [-0.55, 0.75], [-1.45, 0.45], [-1.45, -0.45]];
   /* the one ring of a piece of atoms (by removing ends one by one), or null when it has none or more than one */
   function hapRingOf(comp, adj) {
@@ -9661,6 +9786,8 @@ function kdOf(st) {
               h = newAtom((P.x + Q.x) / 2, (P.y + Q.y) / 2, 'C');
             h.multi = [P.id, Q.id];
             bond(m, h);
+            /* drawn dashed, as the bonds of a cod to its metal are */
+            mol.bonds[mol.bonds.length - 1].stereo = 'dash';
             atoms.push(h);
             placed.add(h.id);
           }
