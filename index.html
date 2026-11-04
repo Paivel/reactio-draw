@@ -26919,7 +26919,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
 
   /* ===== text style ===== */
   function styleTargets() {
-    return mol.texts.filter(t => selTxt.has(t.id));
+    return mol.texts.filter(t => selTxt.has(t.id)).concat(gridStyleTargets());
   }
   /* selected atoms that show a label (N, NH, OMe, Ph…): bold, italic, underline and font apply to them too */
   function atomTargets() {
@@ -27012,6 +27012,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const b of mol.bonds) if (all || bondSel(b)) fn(b, 'bond');
     for (const r of mol.arrows) if (all || selArr.has(r.id)) fn(r, 'arrow');
     for (const t of mol.texts) if (all || selTxt.has(t.id)) fn(t, 'text');
+    if (!all) for (const t of gridStyleTargets()) fn(t, 'text');
     commit();
     return true;
   }
@@ -47982,9 +47983,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       let pick = i,
         bestS = Infinity;
       for (let k = lo; k <= hi; k++) {
-        /* an arc of about a quarter turn reads best; near the place found above */
+        /* an arc of about a quarter turn and about three bonds long reads best; near the place found above */
         const q = cycleArc(P[k], tan(k), it, j.io);
-        const sc = (q ? Math.abs(q.ph - 1.5) : 50) + (Math.abs(k - i) / P.length) * 4;
+        const sc = (q ? Math.abs(q.ph - 1.5) + (0.5 * Math.abs(q.R * q.ph - 3 * L)) / L : 50) + (Math.abs(k - i) / P.length) * 2;
         if (sc < bestS) {
           bestS = sc;
           pick = k;
@@ -48050,8 +48051,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return { kind: 'shp', sh: 'cycle', dir: curArrow.cycle || 1, x1: p0.x, y1: p0.y, x2, y2 };
   }
   function cycleNear(it) {
+    /* within about four bonds of the cycle's line: reagents stand a little way out, their arcs swing in */
     let best = null,
-      bd = 2.2 * L;
+      bd = 4 * L;
     for (const r of mol.arrows) {
       if (r.kind !== 'shp' || r.sh !== 'cycle') continue;
       const G = cycleGeo(r),
@@ -65535,13 +65537,76 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   const gridFz = r => r.fz || textDef.size || STY().text || 14;
   /* a cell's text as a text object (to measure and draw); a compound number or a [[key]] mark in it is no formula */
-  const gridTxt = (r, c) => ({ text: c.t || '', size: gridFz(r), bold: !!c.b, color: c.col || null, fs: !c.nochem && !/\[\[/.test(c.t || ''), x: 0, y: 0 });
+  const gridTxt = (r, c) => ({
+    text: c.t || '',
+    size: c.sz || gridFz(r),
+    bold: !!c.b,
+    italic: !!c.i,
+    ul: !!c.u,
+    font: c.font,
+    color: c.col || null,
+    fs: !c.nochem && !c.nofs && !/\[\[/.test(c.t || ''),
+    x: 0,
+    y: 0
+  });
+  /* a cell's own line height, from its letter size */
+  const gridLH = (r, c) => (c.sz || gridFz(r)) * 1.25;
+  /* the CSS font of a cell's text */
+  const gridFont = t => `${t.italic ? 'italic ' : ''}${t.bold ? 700 : STY().weight === 400 ? 400 : 500} ${tSize(t)}px ${txtFont(t)}${t.ul ? ';text-decoration:underline' : ''}`;
+  /* the first column numbered by itself (1, 2, 3… down the rows under the head), when the table asks for it */
+  function gridAutoNum(r) {
+    if (!r.autoNum) return;
+    for (let i = 1; i < r.cells.length; i++) r.cells[i][0].t = String(i);
+  }
+  /* the picked cells of the selected table as texts for the text buttons (bold, italic, underline, alignment, size, font,
+     colour): what is set on them is set on the cells */
+  function gridStyleTargets() {
+    const out = [];
+    for (const r of mol.arrows) {
+      if (r.kind !== 'grid' || !selArr.has(r.id) || !gridSelOf(r)) continue;
+      const own = { bold: 'b', italic: 'i', ul: 'u', size: 'sz', font: 'font', color: 'col' };
+      for (const { c } of gridSelCells(r))
+        out.push(
+          new Proxy(
+            /* own keys for a copy ({...t}) to see; the values come from the cell */
+            { cell: c, grid: r, text: '', bold: 0, italic: 0, ul: 0, size: 0, font: 0, color: 0, align: 0, fs: 0, nochem: true },
+            {
+              get(o, k) {
+                if (k === 'nochem') return true;
+                if (k in own) return c[own[k]];
+                if (k === 'align') return c.al === 'left' ? undefined : c.al || 'center';
+                if (k === 'fs') return !c.nofs;
+                if (k === 'text') return c.t || '';
+                return o[k];
+              },
+              set(o, k, v) {
+                if (k in own) c[own[k]] = k === 'bold' || k === 'italic' || k === 'ul' ? (v ? 1 : undefined) : v;
+                else if (k === 'align') c.al = v || 'left';
+                else if (k === 'fs') v ? delete c.nofs : (c.nofs = 1);
+                else o[k] = v;
+                return true;
+              },
+              deleteProperty(o, k) {
+                if (k in own) delete c[own[k]];
+                else if (k === 'align') c.al = 'left';
+                else if (k === 'fs') c.nofs = 1;
+                return true;
+              },
+              has(o, k) {
+                return k in own || k === 'align' || k === 'fs' || k in o;
+              }
+            }
+          )
+        );
+    }
+    return out;
+  }
   /* where a cell's text is drawn: its left end and its first line's baseline */
   function gridTextAt(r, i, j) {
     const { X, Y } = GRIDL.get(r) || (gridLayout(r), GRIDL.get(r)),
       c = r.cells[i][j],
       t = gridTxt(r, c),
-      lh = gridFz(r) * 1.25,
+      lh = gridLH(r, c),
       w = textW(t),
       al = c.al || 'center',
       n = String(c.t || '').split('\n').length;
@@ -65599,9 +65664,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* sizes and places: the columns as wide as their widest cell (or as set), the rows as tall as their tallest; a cell's
      structure set in its middle */
   function gridLayout(r) {
+    gridAutoNum(r);
     const nr = r.cells.length,
       nc = r.cells[0].length,
-      lh = gridFz(r) * 1.25,
       W = Array(nc).fill(0),
       H = Array(nr).fill(0),
       FB = r.cells.map(row => row.map(c => {
@@ -65614,6 +65679,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           n = Math.max(1, String(c.t || '').split('\n').length),
           fb = FB[i][j];
         let w = c.t ? textW(t) : 0,
+          lh = gridLH(r, c),
           h = c.t ? n * lh : lh;
         if (fb) {
           w = Math.max(w, fb.b.x1 - fb.b.x0);
@@ -65640,7 +65706,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const fb = FB[i][j];
         if (!fb) return;
         const cx = (X[j] + X[j + 1]) / 2,
-          top = Y[i] + GRID_PAD * 0.6 + (c.t ? String(c.t).split('\n').length * lh + 6 : 0),
+          top = Y[i] + GRID_PAD * 0.6 + (c.t ? String(c.t).split('\n').length * gridLH(r, c) + 6 : 0),
           dx = cx - (fb.b.x0 + fb.b.x1) / 2,
           dy = top - fb.b.y0;
         if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01)
@@ -65689,7 +65755,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function gridSVG(r) {
     gridLayout(r);
     const { X, Y } = GRIDL.get(r),
-      lh = gridFz(r) * 1.25,
       lw = Math.max(1, (STY().line || 1.6) * 0.9);
     let s = '';
     /* fills, then texts, then rules */
@@ -65702,16 +65767,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       row.forEach((c, j) => {
         if (!c.t) return;
         const t = gridTxt(r, c),
-          w = textW(t),
           al = c.al || 'center',
-          x = al === 'left' ? X[j] + GRID_PAD : al === 'right' ? X[j + 1] - GRID_PAD - w : (X[j] + X[j + 1]) / 2 - w / 2,
-          n = String(c.t).split('\n').length,
-          fb = c.at != null && atomById(c.at),
-          y = fb ? Y[i] + GRID_PAD * 0.6 + tSize(t) * 0.85 : (Y[i] + Y[i + 1]) / 2 - ((n - 1) * lh) / 2 + tSize(t) * 0.35;
-        t.x = x;
-        t.y = y;
+          P = gridTextAt(r, i, j);
+        t.x = P.x;
+        t.y = P.y;
         t.align = al === 'center' ? 'center' : al === 'right' ? 'right' : undefined;
-        s += `<text x="${t.x}" y="${t.y}" style="fill:${t.color || 'var(--ink)'};font:${t.bold ? 700 : STY().weight === 400 ? 400 : 500} ${tSize(t)}px ${txtFont(t)}">${textHTML(t)}</text>`;
+        s += `<text x="${t.x}" y="${t.y}" style="fill:${t.color || 'var(--ink)'};font:${gridFont(t)}">${textHTML(t)}</text>`;
       })
     );
     const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--ink)" stroke-width="${lw}" stroke-linecap="square"/>`;
@@ -65897,9 +65958,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '</div>' + H('Columns') +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">' +
       B('colLeft', 'Insert left') + B('colRight', 'Insert right') + B('colMoveL', 'Move left') + B('colMoveR', 'Move right') + B('colDel', 'Delete column') + B('colAuto', 'Width to fit') +
-      '</div>' + H('Rules of the picked cells') +
+      '</div>' + H('Borders of the picked cells') +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">' +
-      B('bT', 'Top') + B('bB', 'Bottom') + B('bL', 'Left') + B('bR', 'Right') + B('bOut', 'Outside') + B('bAll', 'All') + B('bNone', 'None') + B('bJournal', 'Journal', 'Rules above and under the head and under the last row only') +
+      B('bT', 'Top') + B('bB', 'Bottom') + B('bL', 'Left') + B('bR', 'Right') + B('bOut', 'Outer box', 'One box round the picked cells, none inside it') + B('bAll', 'All', 'Every side of every picked cell') + B('bNone', 'None', 'No borders on the picked cells') + B('bJournal', 'Journal style', 'The whole table as journals rule it: a line above and under the head row and under the last row, nothing else') +
       '</div>' + H('Text and fill') +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">' +
       B('bold', '<b>Bold</b>') + B('alL', 'Left') + B('alC', 'Centre') + B('alR', 'Right') + B('colBlue', '<span style="color:#1f5fb4">Blue</span>') + B('colInk', 'Black') +
@@ -65909,6 +65970,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       H('Structure') +
       B('fragIn', 'Put the selected structure in this cell') + B('fragOut', 'Take the structure out of the cell') +
       H('Table') +
+      B('autoNum', (r.autoNum ? '✓ ' : '') + 'Number the first column (1, 2, 3…)', 'The rows under the head numbered by themselves, again when rows are added, moved or deleted') +
       B('notes', 'Footnotes under the table…', 'One line each, e.g. ^{a} Isolated yield. Write ^{a} in a cell for the mark') + B('size', 'Letter size…') + B('del', 'Delete the table');
     gridPop.hidden = false;
     const W = gridPop.offsetWidth,
@@ -66095,6 +66157,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (k === 'del') {
       mol.arrows = mol.arrows.filter(x => x !== r);
       GRIDSEL = null;
+    } else if (k === 'autoNum') {
+      if (r.autoNum) delete r.autoNum;
+      else r.autoNum = 1;
     }
     commit();
   }
@@ -66115,7 +66180,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function gridExplode(r) {
     gridLayout(r);
     const { X, Y } = GRIDL.get(r),
-      lh = gridFz(r) * 1.25,
       texts = [],
       lines = [],
       boxes = [];
@@ -66125,12 +66189,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (c.fill) boxes.push({ id: id++, kind: 'shp', sh: 'rect', st: 'filled', col: c.fill, x1: X[j], y1: Y[i], x2: X[j + 1], y2: Y[i + 1] });
         if (c.t) {
           const t = gridTxt(r, c),
-            w = textW(t),
             al = c.al || 'center',
-            n = String(c.t).split('\n').length;
+            P = gridTextAt(r, i, j);
           t.id = id++;
-          t.x = al === 'left' ? X[j] + GRID_PAD : al === 'right' ? X[j + 1] - GRID_PAD - w : (X[j] + X[j + 1]) / 2 - w / 2;
-          t.y = c.at != null && atomById(c.at) ? Y[i] + GRID_PAD * 0.6 + tSize(t) * 0.85 : (Y[i] + Y[i + 1]) / 2 - ((n - 1) * lh) / 2 + tSize(t) * 0.35;
+          t.x = P.x;
+          t.y = P.y;
+          if (!t.italic) delete t.italic;
+          if (!t.ul) delete t.ul;
+          if (!t.font) delete t.font;
           if (al !== 'left') t.align = al;
           if (!t.color) delete t.color;
           texts.push(t);
@@ -68675,6 +68741,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     get sel() {
       return sel;
+    },
+    get selArr() {
+      return selArr;
     },
     get drag() {
       return drag;
