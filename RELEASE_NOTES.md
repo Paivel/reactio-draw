@@ -1,5 +1,9 @@
 # Next version
 
+## New
+
+- **Metal complexes written as pieces.** A SMILES that gives a complex piece by piece (Cl[Ru]Cl.Cl[Ru]Cl with two p-cymenes, [Fe+2] with two Cp−, Cl[Ir].Cl[Ir] with two cod) is drawn as one structure: an arene on its metal through the ring centre (η6), a Cp or Cp* (η5), a cod by its two double bonds, seen from the side as a tub; two like metals with their halides joined by two bridging halides as a rhombus, M(μ-Cl)2M, the rings on opposite sides; a metal with one ring as a piano stool, two rings as a sandwich (ferrocene, Cp2ZrCl2, Ni(cod)2). Charges that only came of writing the pieces apart (Fe2+ and two Cp−) are taken off; the formula stays. Pieces that make no complex (Pd(OAc)2 beside toluene) stay apart. In a reaction SMILES such a complex is one compound, and over the arrow it is written by its name ([RuCl2(p-cymene)]2, [Rh(cod)Cl]2, [Cp*RhCl2]2…), however its pieces are written. Paste name draws them too.
+
 ## Fixed
 
 - **A pasted copy keeps its own texts.** A reaction copied and pasted: the pasted arrow took hold of the original's texts over the arrow (Et3N, iPrOH), so they jumped to the copy and the original's reagent table lost them. Each copy now holds its own texts, and the original stays as it was.

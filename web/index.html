@@ -9371,6 +9371,461 @@ function kdOf(st) {
       if (clash) saved.flat().forEach(([a, x, y]) => ((a.x = x), (a.y = y)));
     }
   }
+  /* ===== a metal complex written as separate pieces (Cl[Ru]Cl.Cl[Ru]Cl.cymene.cymene, [Fe+2].[cH-]1cccc1.[cH-]1cccc1): the
+     arene, Cp and Cp* pieces are put on their metal through the ring centre (η6, η5), one to each metal (two on a lone metal: a
+     sandwich); two like metals each with a halide are joined by two bridging halides, M(μ-X)2M, laid as a rhombus with each
+     ring outward on opposite sides. A metal with one ring stands as a piano stool (the ring up, its other ligands below).
+     Charges that only came of writing the pieces apart (Fe2+ and two Cp−) are taken off. Other pieces are left as they are. ===== */
+  const HAP_TM = new Set('Sc Ti V Cr Mn Fe Co Ni Cu Zr Nb Mo Tc Ru Rh Pd Hf Ta W Re Os Ir Pt'.split(' ')),
+    HAP_ARENE_TM = new Set('Cr Mo W Mn Re Fe Ru Os Co Rh Ir'.split(' ')),
+    HAP_COD_TM = new Set('Fe Ru Os Co Rh Ir Ni Pd Pt Cu'.split(' ')),
+    /* cod seen from the side, as a tub, its two double bonds toward the metal (at 0,0; the ring to its left), in bonds:
+       C1=C2, C2–C3–C4–C5 round the far side, C5=C6, C6–C7–C8–C1 in front of it */
+    HAP_COD = [[-0.55, -0.75], [-1.1, -1.3], [-1.95, -0.6], [-1.95, 0.6], [-1.1, 1.3], [-0.55, 0.75], [-1.45, 0.45], [-1.45, -0.45]];
+  /* the one ring of a piece of atoms (by removing ends one by one), or null when it has none or more than one */
+  function hapRingOf(comp, adj) {
+    const ids = new Set(comp.map(a => a.id)),
+      nE = comp.reduce((s, a) => s + adj.get(a.id).length, 0) / 2;
+    if (nE - comp.length + 1 !== 1) return null;
+    const deg = new Map(comp.map(a => [a.id, adj.get(a.id).length])),
+      left = new Set(ids),
+      st = comp.filter(a => deg.get(a.id) === 1);
+    while (st.length) {
+      const a = st.pop();
+      if (!left.has(a.id)) continue;
+      left.delete(a.id);
+      for (const o of adj.get(a.id))
+        if (left.has(o.id)) {
+          deg.set(o.id, deg.get(o.id) - 1);
+          if (deg.get(o.id) === 1) st.push(o);
+        }
+    }
+    /* the ring in order round it */
+    const R = comp.filter(a => left.has(a.id));
+    if (!R.length) return null;
+    const out = [R[0]];
+    while (out.length < R.length) {
+      const last = out[out.length - 1],
+        nx = adj.get(last.id).find(o => left.has(o.id) && !out.includes(o));
+      if (!nx) break;
+      out.push(nx);
+    }
+    return out.length === R.length ? out : null;
+  }
+  /* what kind of η-ligand a piece is: 'arene' (one benzene ring of carbons), 'cp' (one five-ring of carbons, a Cp− or Cp*−),
+     or null */
+  function hapLigand(comp, adj) {
+    if (comp.some(a => HAP_TM.has(a.el) || STAR_METALS.has(a.el))) return null;
+    const R = hapRingOf(comp, adj);
+    if (!R || R.some(a => a.el !== 'C')) return null;
+    const q = comp.reduce((s, a) => s + (a.chg || 0), 0);
+    const ringOrder = R.map((a, i) => {
+      const b = bondBetween(a, R[(i + 1) % R.length]);
+      return b ? b.order : 0;
+    });
+    const dbl = ringOrder.filter(o => o === 2).length,
+      aro = ringOrder.filter(o => o === 1.5).length;
+    if (R.length === 6 && !q && (dbl === 3 || aro === 6)) return { kind: 'arene', R };
+    if (R.length === 5 && q === -1 && R.some(a => a.chg === -1)) return { kind: 'cp', R };
+    /* a Cp written as a radical ([Fe].C1C=C[CH]C=1, as name readers give ferrocene) */
+    if (R.length === 5 && !q && dbl === 2 && R.filter(a => a.rad === 1).length === 1) return { kind: 'cp', R, rad: true };
+    /* cycloocta-1,5-diene (cod): its two double bonds across the ring from each other; the ring from the first of them on */
+    if (R.length === 8 && comp.length === 8 && !q && dbl === 2) {
+      const e = ringOrder.indexOf(2);
+      if (ringOrder[(e + 4) % 8] === 2) return { kind: 'cod', R: R.slice(e).concat(R.slice(0, e)) };
+    }
+    return null;
+  }
+  function hapComplex(atoms) {
+    if (!atoms || atoms.length < 3 || !atoms.some(a => HAP_TM.has(a.el))) return false;
+    const ids = new Set(atoms.map(a => a.id)),
+      adj = new Map(atoms.map(a => [a.id, []]));
+    for (const b of mol.bonds)
+      if (ids.has(b.a) && ids.has(b.b)) {
+        const A = atomById(b.a),
+          B = atomById(b.b);
+        adj.get(b.a).push(B);
+        adj.get(b.b).push(A);
+      }
+    const comps = [],
+      seen = new Set();
+    for (const a of atoms) {
+      if (seen.has(a.id)) continue;
+      const c = [],
+        st = [a];
+      seen.add(a.id);
+      while (st.length) {
+        const x = st.pop();
+        c.push(x);
+        for (const y of adj.get(x.id))
+          if (!seen.has(y.id)) {
+            seen.add(y.id);
+            st.push(y);
+          }
+      }
+      comps.push(c);
+    }
+    if (comps.length < 2) return false;
+    const metalComps = comps.filter(c => c.some(a => HAP_TM.has(a.el)));
+    const metals = metalComps.flatMap(c => c.filter(a => HAP_TM.has(a.el)));
+    if (!metals.length || metalComps.some(c => c.some(a => a.multi))) return false;
+    const ligs = comps
+      .filter(c => !metalComps.includes(c))
+      .map(c => ({ c, ...(hapLigand(c, adj) || {}) }))
+      .filter(l => l.kind);
+    if (!ligs.length) return false;
+    /* one ring to each metal, or two on a lone metal (a sandwich); an arene only on a metal that takes one */
+    let pairs;
+    if (ligs.length === metals.length) pairs = metals.map((m, i) => [m, [ligs[i]]]);
+    else if (metals.length === 1 && ligs.length === 2 && (ligs.every(l => l.kind !== 'arene') || metalComps[0].length === 1))
+      pairs = [[metals[0], ligs]];
+    else return false;
+    if (pairs.some(([m, ls]) => ls.some(l => (l.kind === 'arene' && !HAP_ARENE_TM.has(m.el)) || (l.kind === 'cod' && !HAP_COD_TM.has(m.el)))))
+      return false;
+    /* the metals and their pieces become one structure where the first metal was; what else is there stays */
+    const X = new Set(['Cl', 'Br', 'I', 'F']),
+      bond = (a, b) => mol.bonds.push({ id: mol.next++, a: a.id, b: b.id, order: 1, stereo: null });
+    /* two like metals each with a halide of its own: bridged */
+    if (metalComps.length === 2 && metals.length === 2 && metals[0].el === metals[1].el) {
+      const [A, B] = metals,
+        xa = adj.get(A.id).filter(o => X.has(o.el) && adj.get(o.id).length === 1),
+        xb = adj.get(B.id).filter(o => X.has(o.el) && adj.get(o.id).length === 1);
+      if (xa.length && xb.length) {
+        const p = xa[xa.length - 1],
+          q = xb[xb.length - 1];
+        bond(p, B);
+        bond(q, A);
+        adj.get(p.id).push(B);
+        adj.get(B.id).push(p);
+        adj.get(q.id).push(A);
+        adj.get(A.id).push(q);
+      }
+    }
+    /* charges that only came of writing the pieces apart: a Cp− on its metal is the neutral ring ligand (the metal's charge
+       goes down with it, Fe2+ and two Cp− as ferrocene; Cl[Zr]Cl with two Cp− as Cp2ZrCl2) */
+    for (const [m, ls] of pairs)
+      for (const l of ls)
+        if (l.kind === 'cp' && l.rad) {
+          const c = l.R.find(a => a.rad === 1);
+          delete c.rad;
+          if (c.hExp === undefined) c.hExp = 0;
+          c.hUsed = usedVal(c);
+        } else if (l.kind === 'cp') {
+          const c = l.R.find(a => a.chg === -1);
+          c.chg = 0;
+          if ((m.chg || 0) > 0) m.chg -= 1;
+          if (c.hExp === undefined) c.hExp = 0;
+          c.hUsed = usedVal(c);
+        }
+    /* where the metal core goes: the first metal's place */
+    const core = [],
+      cs = new Set();
+    {
+      const st = [metals[0]];
+      cs.add(metals[0].id);
+      while (st.length) {
+        const x = st.pop();
+        core.push(x);
+        for (const y of adj.get(x.id))
+          if (!cs.has(y.id)) {
+            cs.add(y.id);
+            st.push(y);
+          }
+      }
+    }
+    const branchOf = (m, s) => {
+      const out = [],
+        st = [s],
+        sn = new Set([m.id, s.id]);
+      while (st.length) {
+        const x = st.pop();
+        out.push(x);
+        for (const y of adj.get(x.id))
+          if (!sn.has(y.id)) {
+            sn.add(y.id);
+            st.push(y);
+          }
+      }
+      return out;
+    };
+    /* a branch put on its metal at an angle (its first atom one bond out, the rest turned with it) */
+    const putBranch = (m, s, br, ang) => {
+      const a0 = Math.atan2(s.y - m.y, s.x - m.x),
+        d = ang - a0,
+        c = Math.cos(d),
+        sn = Math.sin(d),
+        r = Math.hypot(s.x - m.x, s.y - m.y) || L,
+        k = L / r;
+      const ox = s.x,
+        oy = s.y;
+      for (const a of br) {
+        const x = a.x - ox,
+          y = a.y - oy;
+        a.x = x * c - y * sn;
+        a.y = x * sn + y * c;
+      }
+      const nx = m.x + Math.cos(ang) * r * k,
+        ny = m.y + Math.sin(ang) * r * k;
+      for (const a of br) {
+        a.x += nx;
+        a.y += ny;
+      }
+    };
+    const mx0 = metals[0].x,
+      my0 = metals[0].y;
+    /* the directions round each metal: [angle, what goes there] */
+    const plan = new Map();
+    const bridges = metals.length === 2 ? adj.get(metals[0].id).filter(o => adj.get(o.id).includes(metals[1])) : [];
+    if (metals.length === 2 && bridges.length === 2) {
+      /* the metal–halide bonds of the rhombus a little longer than a bond, so the four letters keep apart */
+      const [A, B] = metals,
+        s = L;
+      const move = (a, x, y) => {
+        a.x = x;
+        a.y = y;
+      };
+      move(A, mx0 - s, my0);
+      move(B, mx0 + s, my0);
+      move(bridges[0], mx0, my0 - s);
+      move(bridges[1], mx0, my0 + s);
+      [A, B].forEach((m, i) => {
+        const others = adj.get(m.id).filter(o => !bridges.includes(o)),
+          ls = pairs.find(p => p[0] === m)[1],
+          k = others.length + ls.length,
+          out = i ? 0 : Math.PI,
+          step = (1.5 * Math.PI) / (k + 1),
+          deg = Math.PI / 180;
+        /* slots on the side away from the other metal, the two metals alike turned half round each other (the rings on
+           opposite sides): a ring and one ligand, the ring upright over the left metal (clear of the bridges) and the ligand out to the side
+           and a little down ([RuCl2(p-cymene)]2, [Cp*RhCl2]2); one ring straight out ([Ir(cod)Cl]2); more, spread evenly,
+           the ring first */
+        let slots;
+        if (k === 2 && ls.length === 1) {
+          slots = [Math.PI + 90 * deg, Math.PI - 30 * deg].map(a => a + (i ? Math.PI : 0));
+          ls[0].far = 1;
+        }
+        else {
+          slots = [...Array(k).keys()].map(j => out + (j - (k - 1) / 2) * step);
+          slots.sort((p, q) => (i ? Math.sin(q) - Math.sin(p) : Math.sin(p) - Math.sin(q)));
+        }
+        plan.set(m, { slots, others, ls });
+      });
+    } else {
+      for (const [m, ls] of pairs) {
+        const others = adj.get(m.id),
+          t = others.length + ls.length,
+          /* two cod on a lone metal (Ni(cod)2) side by side, as their tubs lie; rings otherwise from the top */
+          a0 = ls.every(l => l.kind === 'cod') && !others.length ? Math.PI : -Math.PI / 2,
+          slots = [...Array(t).keys()].map(j => a0 + (j * 2 * Math.PI) / t);
+        plan.set(m, { slots, others, ls, star: true });
+      }
+    }
+    for (const [m, P] of plan) {
+      const { slots, others, ls } = P;
+      let ringSlots, rest;
+      if (P.star) {
+        /* the rings as far apart as can be (a sandwich: up and down), the other ligands in the slots between, in their order */
+        const t = slots.length,
+          ri = ls.map((l, j) => Math.round((j * t) / ls.length));
+        ringSlots = ri.map(j => slots[j]);
+        rest = slots.filter((x, j) => !ri.includes(j));
+        const order = others.slice().sort((p, q) => Math.atan2(p.y - m.y, p.x - m.x) - Math.atan2(q.y - m.y, q.x - m.x));
+        order.forEach((o, j) => putBranch(m, o, branchOf(m, o), rest[j]));
+      } else {
+        ringSlots = slots.slice(0, ls.length);
+        rest = slots.slice(ls.length);
+        others.forEach((o, j) => putBranch(m, o, branchOf(m, o), rest[j]));
+      }
+      ls.forEach((l, j) => (l.ang = ringSlots[j]));
+    }
+    /* each ring on its metal: its centre straight out at its angle, turned so that a side faces the metal and what hangs on the
+       ring keeps clear of the rest */
+    const placed = new Set(core.map(a => a.id));
+    for (const [m, ls] of pairs)
+      for (const l of ls) {
+        if (l.kind === 'cod') {
+          const t = l.ang - Math.PI,
+            co = Math.cos(t),
+            si = Math.sin(t),
+            k = L * 1.1;
+          l.R.forEach((a, j) => {
+            const [x, y] = HAP_COD[j];
+            a.x = m.x + (x * co - y * si) * k;
+            a.y = m.y + (x * si + y * co) * k;
+            a.hap = 1;
+            placed.add(a.id);
+          });
+          for (const [i, j] of [[0, 1], [4, 5]]) {
+            const P = l.R[i],
+              Q = l.R[j],
+              h = newAtom((P.x + Q.x) / 2, (P.y + Q.y) / 2, 'C');
+            h.multi = [P.id, Q.id];
+            bond(m, h);
+            atoms.push(h);
+            placed.add(h.id);
+          }
+          continue;
+        }
+        const R = l.R,
+          n = R.length,
+          apo = L / (2 * Math.tan(Math.PI / n)),
+          D = apo + L * (l.far ? 1.65 : 1.3),
+          cx = m.x + Math.cos(l.ang) * D,
+          cy = m.y + Math.sin(l.ang) * D;
+        const c0 = [R.reduce((s, a) => s + a.x, 0) / n, R.reduce((s, a) => s + a.y, 0) / n];
+        const base = l.c.map(a => [a, a.x - c0[0], a.y - c0[1]]);
+        const others = atoms.filter(a => placed.has(a.id));
+        /* a side toward the metal by preference; turned a little, or set a little farther out, only to keep its groups off
+           the other ligands (the methyls of a Cp* off the bridging Cl) */
+        let best = null;
+        for (const push of [0, 0.3, 0.6])
+          for (const mir of [1, -1])
+            for (let e = 0; e < n; e++)
+              for (const tw of [0, -12, 12, -24, 24]) {
+                const P = R[e],
+                  Q = R[(e + 1) % n],
+                  mxe = ((P.x + Q.x) / 2 - c0[0]) * mir,
+                  mye = (P.y + Q.y) / 2 - c0[1],
+                  rot = l.ang + Math.PI - Math.atan2(mye, mxe) + (tw * Math.PI) / 180,
+                  co = Math.cos(rot),
+                  si = Math.sin(rot),
+                  px = cx + Math.cos(l.ang) * push * L,
+                  py = cy + Math.sin(l.ang) * push * L;
+                const pts = base.map(([a, x, y]) => [a, px + x * mir * co - y * si, py + x * mir * si + y * co]);
+                let clash = 0,
+                  far = 0;
+                for (const [a, x, y] of pts) {
+                  for (const o of others) {
+                    const d = Math.hypot(x - o.x, y - o.y);
+                    if (d < 1.1 * L) clash += (1.1 * L - d) ** 2;
+                  }
+                  if (!R.includes(a)) far += Math.hypot(x - m.x, y - m.y);
+                }
+                const score = clash * 10 - far * 0.05 + Math.abs(tw) * 15 + push * 400;
+                if (!best || score < best.score) best = { score, pts, px, py };
+              }
+        for (const [a, x, y] of best.pts) {
+          a.x = x;
+          a.y = y;
+          placed.add(a.id);
+        }
+        const h = newAtom(best.px, best.py, 'C');
+        h.multi = R.map(a => a.id);
+        R.forEach(a => (a.hap = 1));
+        bond(m, h);
+        atoms.push(h);
+        placed.add(h.id);
+      }
+    /* the other pieces kept in a row beside the complex, as they were laid out, with room for it */
+    const cx_ = new Set([...placed]);
+    const box = list => {
+      const xs = list.map(a => a.x),
+        ys = list.map(a => a.y);
+      return { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+    };
+    const rest = comps.filter(c => !c.some(a => cx_.has(a.id)));
+    if (rest.length) {
+      const cplx = atoms.filter(a => cx_.has(a.id)),
+        units = [cplx, ...rest].map(c => ({ c, b: box(c) }));
+      units.sort((p, q) => (p.c === cplx ? p.b.x0 - 1e-9 : p.b.x0) - q.b.x0);
+      const all = box(atoms.filter(a => !a.multi)),
+        cy = (all.y0 + all.y1) / 2;
+      let x = all.x0;
+      for (const u of units) {
+        const dx = x - u.b.x0,
+          dy = cy - (u.b.y0 + u.b.y1) / 2;
+        u.c.forEach(a => ((a.x += dx), (a.y += dy)));
+        x += u.b.x1 - u.b.x0 + 70;
+      }
+    }
+    return true;
+  }
+  /* the pieces of a dot-separated SMILES that make one metal complex (Cl[Ru]Cl, Cl[Ru]Cl and two p-cymenes): put together into
+     one, at the place of the first of them, by the same rule as hapComplex; the other pieces stay as they are, in their order */
+  function cxGroupParts(parts) {
+    if (parts.length < 2 || !parts.some(p => /\[(Sc|Ti|V|Cr|Mn|Fe|Co|Ni|Cu|Zr|Nb|Mo|Tc|Ru|Rh|Pd|Hf|Ta|W|Re|Os|Ir|Pt)[^a-z]/.test(p)))
+      return parts;
+    const info = parts.map(s => {
+      const g = parseSmiles(s);
+      if (!g) return { s };
+      const tm = g.nodes.filter(n => HAP_TM.has(n.el));
+      if (tm.length) return { s, metals: tm.map(n => n.el) };
+      return { s, kind: hapLigandG(g) };
+    });
+    const ms = info.filter(x => x.metals),
+      nm = ms.reduce((t, x) => t + x.metals.length, 0),
+      ls = info.filter(x => x.kind),
+      els = ms.flatMap(x => x.metals);
+    if (!ms.length || !ls.length) return parts;
+    /* two rings on one metal: two Cp or cod, or two arenes on the bare metal (Cr(C6H6)2) */
+    const bare = ms.length === 1 && /^\[[A-Z][a-z]?[+\d]*\]$/.test(ms[0].s);
+    if (!(ls.length === nm || (nm === 1 && ls.length === 2 && (ls.every(l => l.kind !== 'arene') || bare)))) return parts;
+    const okFor = (k, el) => (k === 'arene' ? HAP_ARENE_TM : k === 'cod' ? HAP_COD_TM : HAP_TM).has(el);
+    if (!ls.every((l, i) => okFor(l.kind, els[Math.min(i, els.length - 1)]))) return parts;
+    const grp = new Set([...ms, ...ls]),
+      first = info.findIndex(x => grp.has(x)),
+      out = [];
+    info.forEach((x, i) => {
+      if (i === first) out.push([...grp].sort((p, q) => info.indexOf(p) - info.indexOf(q)).map(y => y.s).join('.'));
+      else if (!grp.has(x)) out.push(x.s);
+    });
+    return out;
+  }
+  /* hapLigand on a parsed SMILES graph */
+  function hapLigandG(g) {
+    const n = g.nodes.length,
+      adj = Array.from({ length: n }, () => []);
+    g.edges.forEach(e => {
+      adj[e.a].push([e.b, e.order]);
+      adj[e.b].push([e.a, e.order]);
+    });
+    if (g.edges.length - n + 1 !== 1 || g.nodes.some(x => HAP_TM.has(x.el) || STAR_METALS.has(x.el))) return null;
+    const deg = adj.map(a => a.length),
+      left = new Set([...Array(n).keys()]),
+      st = [...left].filter(i => deg[i] === 1);
+    while (st.length) {
+      const i = st.pop();
+      if (!left.has(i)) continue;
+      left.delete(i);
+      for (const [j] of adj[i])
+        if (left.has(j) && --deg[j] === 1) st.push(j);
+    }
+    const R = [...left];
+    if (R.some(i => g.nodes[i].el !== 'C')) return null;
+    const ord = g.edges.filter(e => left.has(e.a) && left.has(e.b)).map(e => e.order),
+      q = g.nodes.reduce((t, x) => t + (x.chg || 0), 0),
+      dbl = ord.filter(o => o === 2).length,
+      aro = ord.filter(o => o === 1.5).length;
+    if (R.length === 6 && !q && (dbl === 3 || aro === 6)) return 'arene';
+    if (R.length === 5 && q === -1) return 'cp';
+    if (
+      R.length === 5 &&
+      !q &&
+      dbl === 2 &&
+      R.filter(i => {
+        const x = g.nodes[i];
+        return x.br && (x.hb || 0) + adj[i].reduce((t, [, o]) => t + o, 0) === 3;
+      }).length === 1
+    )
+      return 'cp';
+    if (R.length === 8 && n === 8 && !q && dbl === 2) return 'cod';
+    return null;
+  }
+  /* a complex compared whatever way its pieces are written: the bonds to the metals taken out, every charge set to 0
+     ([Rh(cod)Cl]2 as Cl1[Rh]Cl[Rh]1.cod.cod or as Cl[Rh].Cl[Rh].cod.cod) */
+  function cxKey(smi) {
+    try {
+      /* double-bond marks left out too: cod is written with and without them */
+      const O = oclLoad(),
+        M = O.Molecule.fromSmiles(String(smi).replace(/[\/\\]/g, ''));
+      for (let b = M.getAllBonds() - 1; b >= 0; b--)
+        if (M.isMetalAtom(M.getBondAtom(0, b)) || M.isMetalAtom(M.getBondAtom(1, b))) M.deleteBond(b);
+      for (let i = 0; i < M.getAllAtoms(); i++) M.setAtomCharge(i, 0);
+      return M.getIDCode();
+    } catch (e) {
+      return null;
+    }
+  }
   function placeGraph(g, anchor) {
     const pos = Array(g.nodes.length).fill(null);
     let ox = 0,
@@ -9494,6 +9949,11 @@ function kdOf(st) {
       })
     );
     metalStar(map);
+    try {
+      hapComplex(map);
+    } catch (e) {
+      console.warn('hapComplex', e);
+    }
     return map;
   }
   function graft(center, smiles, attach) {
@@ -13946,6 +14406,8 @@ function kdOf(st) {
      are names, their digits stay on the line */
   const FORM_GROUPS = ['Me', 'Et', 'Pr', 'Bu', 'Ph', 'Ac', 'Bn', 'Bz', 'Ts', 'Ms', 'Tf', 'Boc', 'Cbz', 'Fmoc', 'Tr', 'Piv', 'Tol', 'Mes', 'Cy', 'Cp', 'Ar', 'Het', 'R', 'X', 'Y', 'Z', 'L', 'M', 'Hal', 'Nu', 'E', 'D', 'TMS', 'TBS', 'TIPS', 'TES', 'Np', 'Py', 'Im', 'Ad', 'Am', 'Hex', 'Oct', 'dba', 'cod', 'acac', 'OTf'];
   function formulaWord(w) {
+    /* a ligand name with a hyphen inside a formula ([RuCl2(p-cymene)]2) comes as two words: "[RuCl2(p" and "cymene)]2" */
+    w = w.replace(/\([a-z]+$/, '').replace(/^[a-z]+\)/, '');
     let x = w.replace(/\([^()]*\)|\[[^\[\]]*\]/g, ' ').replace(/[\d\s()[\]·•.+\-−=]/g, ' ');
     return x
       .split(' ')
@@ -27297,6 +27759,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['Ag2CO3', 'C([O-])([O-])=O.[Ag+].[Ag+]'],
     ['NiCl2', '[Ni](Cl)Cl'],
     ['Ni(cod)2', '[Ni].C1C/C=C\\CC/C=C\\1.C1C/C=C\\CC/C=C\\1'],
+    ['[RuCl2(p-cymene)]2', 'Cl[Ru]Cl.Cl[Ru]Cl.CC(C)c1ccc(C)cc1.CC(C)c1ccc(C)cc1'],
+    ['[RuCl2(benzene)]2|[RuCl2(C6H6)]2', 'Cl[Ru]Cl.Cl[Ru]Cl.c1ccccc1.c1ccccc1'],
+    ['[RuCl2(mesitylene)]2', 'Cl[Ru]Cl.Cl[Ru]Cl.Cc1cc(C)cc(C)c1.Cc1cc(C)cc(C)c1'],
+    ['[Ir(cod)Cl]2', 'Cl[Ir].Cl[Ir].C1C/C=C\\CC/C=C\\1.C1C/C=C\\CC/C=C\\1'],
+    ['[Rh(cod)Cl]2', 'Cl[Rh].Cl[Rh].C1C/C=C\\CC/C=C\\1.C1C/C=C\\CC/C=C\\1'],
+    ['[Cp*RhCl2]2', 'Cl[Rh]Cl.Cl[Rh]Cl.C[c-]1c(C)c(C)c(C)c1C.C[c-]1c(C)c(C)c(C)c1C'],
+    ['[Cp*IrCl2]2', 'Cl[Ir]Cl.Cl[Ir]Cl.C[c-]1c(C)c(C)c(C)c1C.C[c-]1c(C)c(C)c(C)c1C'],
+    ['Cp2ZrCl2|zirconocene dichloride', 'Cl[Zr]Cl.[cH-]1cccc1.[cH-]1cccc1'],
+    ['Cp2TiCl2|titanocene dichloride', 'Cl[Ti]Cl.[cH-]1cccc1.[cH-]1cccc1'],
+    ['ferrocene|Cp2Fe', '[Fe+2].[cH-]1cccc1.[cH-]1cccc1'],
     ['FeCl3', '[Fe](Cl)(Cl)Cl'],
     ['ZnCl2', '[Cl-].[Cl-].[Zn+2]'],
     ['ZnBr2', '[Br-].[Br-].[Zn+2]'],
@@ -51277,9 +51749,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const k = idOf(smi);
     if (!k) return null;
     let ki;
+    /* a metal complex: also by its pieces, however they are bonded and charged */
+    const isCx = /\./.test(smi) && /\[(?:[A-Z][a-z]?)/.test(smi) && cxGroupParts(smi.split('.')).length === 1;
+    let kc;
     const hits = list.filter(e => {
       if (e.id === undefined) e.id = idOf(e.s);
       if (e.id === k) return true;
+      if (isCx) {
+        if (kc === undefined) kc = cxKey(smi);
+        if (e.cx === undefined) e.cx = cxKey(e.s);
+        if (kc && e.cx === kc) return true;
+      }
       if (ki === undefined) ki = ionicId(smi);
       return !!ki && e.id === ki;
     });
@@ -51298,10 +51778,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return el.some(x => x[0] === 'O') ? g('H') + rest + g('O') : rest + g('H');
   }
   function agentTexts(m) {
-    const parts = String(m).split('.').filter(Boolean);
+    let parts = String(m).split('.').filter(Boolean);
     if (!parts.length) return [];
     const whole = agentName(parts.join('.'));
     if (whole) return [whole];
+    /* a metal complex written as its pieces ([RuCl2(p-cymene)]2 as Cl[Ru]Cl.Cl[Ru]Cl and two cymenes): by its name, else
+       drawn over the arrow as one structure */
+    const grouped = cxGroupParts(parts),
+      cx = grouped.filter(p => p.includes('.'));
+    if (cx.length) {
+      const rest = grouped.filter(p => !p.includes('.'));
+      return [...cx.map(p => agentName(p) || { smiles: p }), ...(rest.length ? agentTexts(rest.join('.')) : [])];
+    }
     let O;
     try {
       O = oclLoad();
@@ -51374,8 +51862,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         .replace(/\s+\|[^|]*\|\s*$/, '')
         .split('>');
       if (r === undefined) throw new Error('Reaction SMILES needs ">>"');
-      R = l ? l.split('.').filter(Boolean) : [];
-      P = r ? r.split('.').filter(Boolean) : [];
+      /* a metal complex written as its pieces is one compound */
+      R = cxGroupParts(l ? l.split('.').filter(Boolean) : []);
+      P = cxGroupParts(r ? r.split('.').filter(Boolean) : []);
       if (m) {
         const ag = agentTexts(m);
         a.above = (a.above || []).concat(ag.filter(x => typeof x === 'string'));
