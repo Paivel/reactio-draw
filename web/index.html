@@ -38453,12 +38453,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     };
   }
   /* the settings written in a Word file ([[#format …]], [[#start …]]) */
-  function cmpdSettings(docXml) {
+  function cmpdSettings(docXml, setXml) {
     const plain = docXml.replace(/<[^>]+>/g, ''),
       o = {};
     for (const m of plain.matchAll(CMPD_SET)) if (!(m[1] in o)) o[m[1]] = m[2];
+    /* the style and first number set on the Word tab (kept in the document as its variables rdFormat, rdStart) come before
+       the [[#format …]] and [[#start …]] lines */
+    if (setXml) {
+      const un = v => v.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+      for (const m of setXml.matchAll(/<w:docVar\s+w:name="(rdFormat|rdStart)"\s+w:val="([^"]*)"/g))
+        if (m[2].trim()) o[m[1] === 'rdFormat' ? 'format' : 'start'] = un(m[2]).trim();
+    }
     return o;
   }
+  /* the same from the files of a .docx (unzipped) */
+  const cmpdSettingsZ = z => {
+    const t = n => (z.get(n) ? new TextDecoder().decode(z.get(n)) : '');
+    return cmpdSettings(t('word/document.xml'), t('word/settings.xml'));
+  };
   /* a drawing of the file as sheet data, loaded for a moment so it can be measured and drawn (fn may wait) */
   async function withDrawing(it, fn) {
     const keep = JSON.stringify(S),
@@ -38828,7 +38840,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let set = {};
     try {
       const z = await unzipAll(u);
-      set = cmpdSettings(new TextDecoder().decode(z.get('word/document.xml')));
+      set = cmpdSettingsZ(z);
     } catch (e) {
       toast('Could not read ' + f.name + ': ' + ((e && e.message) || e), true);
       return;
@@ -64171,7 +64183,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           u = Uint8Array.from(atob(f.b64), c => c.charCodeAt(0));
         let set = {};
         try {
-          set = cmpdSettings(new TextDecoder().decode((await unzipAll(u)).get('word/document.xml')));
+          set = cmpdSettingsZ(await unzipAll(u));
         } catch (e) {}
         const r = await wordNumber(
           u,
@@ -64206,7 +64218,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (opt.strip) {
           let set = {};
           try {
-            set = cmpdSettings(new TextDecoder().decode((await unzipAll(u0)).get('word/document.xml')));
+            set = cmpdSettingsZ(await unzipAll(u0));
           } catch (e) {}
           const n = await wordNumber(u0, String(set.format || '{n}'), parseInt(set.start || '1', 10) || 1, null, 'strip');
           if (n.compounds) u0 = n.bytes instanceof Blob ? new Uint8Array(await n.bytes.arrayBuffer()) : n.bytes;
@@ -67440,6 +67452,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     tableSVG,
     switchStep,
     wordNumber,
+    rdCliRun,
+    unzipAll,
     rdUntag,
     molBlock,
     nmrPredict,

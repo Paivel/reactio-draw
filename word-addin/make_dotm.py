@@ -167,13 +167,21 @@ CUSTOM_UI = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
         </group>
         <group id="rdNumbers" label="Compound numbers">
           <button id="rdNumber" label="Number compounds" size="large" image="rdNumber" onAction="RD_Number"
-            screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance. [[#format S{n}]] and [[#start 5]] in the document set the style. The document is saved, numbered and opened again; the marks stay, so press again after adding compounds."/>
+            screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance. Style and From on this tab (or [[#format S{n}]] and [[#start 5]] in the text) set how they look. The document stays open (Undo takes it back); the marks stay, so press again after adding compounds."/>
           <button id="rdMarks" label="Show marks" size="large" image="rdMarks" onAction="RD_ShowMarks"
             screentip="Show marks" supertip="Shows the marks ([[aldehyde]]) instead of the numbers, in the text and in the drawings, to see which mark to write. Number compounds puts the numbers back."/>
           <button id="rdUnmark" label="Remove marks" size="large" image="rdUnmark" onAction="RD_Unmark"
             screentip="Remove marks" supertip="Makes a copy of the document with the numbers as plain text and no marks left, in the text and in the drawings (they stay Reactio Draw drawings), and opens it. This document keeps its marks."/>
           <button id="rdFinal" label="Final copy" size="large" image="rdFinal" onAction="RD_Final"
             screentip="Final copy" supertip="Makes a copy to send: numbers as plain text, no marks, and plain vector pictures without Reactio Draw data; opens it. This document keeps its marks and drawings."/>
+          <comboBox id="rdFmt" label="Style" sizeString="SI-{n}xx" getText="RD_FmtText" onChange="RD_FmtChange"
+            screentip="Style of the numbers" supertip="How the numbers of this document look: {n} gives 1, 2, 3; S{n} gives S1, S2, S3; any text with {n} in it. Kept in the document; it comes before a [[#format …]] line in the text. Empty: the line in the text, else {n}.">
+            <item id="rdFmt1" label="{n}"/>
+            <item id="rdFmt2" label="S{n}"/>
+            <item id="rdFmt3" label="({n})"/>
+          </comboBox>
+          <editBox id="rdStart" label="From" sizeString="0000" getText="RD_StartText" onChange="RD_StartChange"
+            screentip="First number" supertip="The number the first compound gets (1 when left empty). Kept in the document; it comes before a [[#start …]] line in the text."/>
         </group>
         <group id="rdDrawing" label="Drawing">
           <button id="rdEdit" label="Edit drawing" size="large" image="rdEdit" onAction="RD_Edit"
@@ -195,13 +203,18 @@ def build(out):
     # the macros: the VBA project Word itself saved from ReactioDraw.bas (Word on a Mac, File > Import File, Save As .dotm);
     # Word compiles it again on Windows. Checked here: its module must be ReactioDraw.bas, line for line
     vba = open(os.path.join(HERE, 'vbaProject.bin'), 'rb').read()
-    norm = lambda t: [l.rstrip() for l in t.replace('\r\n', '\n').replace('\r', '\n').split('\n') if l.strip()]
+    # compared without regard to case: VBA is case-blind and gives a name the same case everywhere in the project (a
+    # parameter once called text turns every .Text into .text, even after the module is imported again)
+    norm = lambda t: [l.rstrip().lower() for l in t.replace('\r\n', '\n').replace('\r', '\n').split('\n') if l.strip()]
     bas = open(os.path.join(HERE, 'ReactioDraw.bas'), encoding='utf-8').read()
+    # Word for Mac reads an imported module as Mac Roman: anything past ASCII would come out garbled
+    if any(ord(ch) > 127 for ch in bas):
+        sys.exit('ReactioDraw.bas has characters past ASCII: Word would garble them; write them in ASCII')
     if norm(module_source(vba, 'ReactioDraw')) != norm(bas):
         # Word for Mac runs the compiled code it saved, not a source put in later: import ReactioDraw.bas in Word again
         sys.exit('vbaProject.bin does not hold the current ReactioDraw.bas: import it in Word again (see the notes at the top of make_dotm.py)')
     # the template's own document module (ThisDocument): its code is ThisDocument.cls, pasted into it in Word
-    code = lambda t: [l for l in norm(t) if not l.startswith('Attribute ')]   # Word adds its own Attribute lines
+    code = lambda t: [l for l in norm(t) if not l.startswith('attribute ')]   # Word adds its own Attribute lines
     if code(module_source(vba, 'ThisDocument')) != code(open(os.path.join(HERE, 'ThisDocument.cls'), encoding='utf-8').read()):
         sys.exit('vbaProject.bin does not hold the current ThisDocument.cls: paste it into ThisDocument in Word again (see the notes at the top of make_dotm.py)')
     ic = icons()

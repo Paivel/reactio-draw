@@ -9,6 +9,8 @@ Attribute VB_Name = "ReactioDraw"
 '   Number compounds      numbers the compounds of this document from their marks ([[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1),
 '                         in the text and in Reactio Draw drawings, in the open document (it stays open; Undo takes it back)
 '   Show marks            the same document with the marks shown instead of the numbers, to see which key is which
+'   Style, From           how the numbers look ({n}, S{n}, ...) and the first one, kept in the document as its variables
+'                         rdFormat and rdStart (they come before [[#format ...]] and [[#start ...]] lines in the text)
 '   Remove marks          a copy with the numbers as plain text and no marks left (drawings stay Reactio Draw drawings), opened in Word
 '   Final copy            the same with plain vector pictures too: the copy to send
 ' Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
@@ -18,6 +20,7 @@ Private Const TTL As String = "Reactio Draw"
 Private RDRibbon As Object   ' the tab, to redraw the Mark drawings button
 Private RDNumPath As String  ' the document Number compounds / Show marks works on, and which of the two
 Private RDNumCmd As String
+Private RDLastDoc As String  ' the document the Style and From boxes show
 
 Public Sub RD_Plain(control As Object)
     Listen
@@ -91,6 +94,53 @@ Private Sub NumberDoc(marks As Boolean)
     PutContent d, t
     On Error Resume Next
     Kill t
+End Sub
+
+' ---------- Style and From: kept in the document (Reactio Draw reads them from it) ----------
+Public Sub RD_FmtText(control As Object, ByRef txt)
+    txt = DocVar("rdFormat")
+End Sub
+
+Public Sub RD_FmtChange(control As Object, txt As String)
+    txt = Trim$(txt)
+    If txt <> "" And InStr(txt, "{n}") = 0 Then
+        MsgBox "The style needs {n} where the number goes, as in S{n} or ({n}).", vbInformation, TTL
+        If Not RDRibbon Is Nothing Then RDRibbon.InvalidateControl "rdFmt"
+        Exit Sub
+    End If
+    SetDocVar "rdFormat", txt
+End Sub
+
+Public Sub RD_StartText(control As Object, ByRef txt)
+    txt = DocVar("rdStart")
+End Sub
+
+Public Sub RD_StartChange(control As Object, txt As String)
+    txt = Trim$(txt)
+    If txt <> "" And Not (IsNumeric(txt) And InStr(txt, ".") = 0 And InStr(txt, ",") = 0) Then
+        MsgBox "From takes a whole number, such as 1 or 5.", vbInformation, TTL
+        If Not RDRibbon Is Nothing Then RDRibbon.InvalidateControl "rdStart"
+        Exit Sub
+    End If
+    If txt <> "" Then txt = CStr(CLng(txt))
+    SetDocVar "rdStart", txt
+End Sub
+
+Private Function DocVar(nm As String) As String
+    On Error Resume Next
+    If Documents.Count = 0 Then Exit Function
+    DocVar = ActiveDocument.Variables(nm).Value
+End Function
+
+' an empty value takes the variable away
+Private Sub SetDocVar(nm As String, v As String)
+    On Error Resume Next
+    If Documents.Count = 0 Then Exit Sub
+    ActiveDocument.Variables(nm).Delete
+    Err.Clear
+    If v <> "" Then ActiveDocument.Variables.Add Name:=nm, Value:=v
+    ' so that it is saved before the next numbering
+    ActiveDocument.Saved = False
 End Sub
 
 ' where Reactio Draw writes the numbered copy: a folder Word may read (on a Mac, Office's own)
@@ -390,6 +440,13 @@ Public Sub RD_Tick()
     On Error Resume Next
     Listen
     FitPage
+    ' another document in front: the Style and From boxes show its settings
+    Dim n As String
+    If Documents.Count > 0 Then n = ActiveDocument.FullName
+    If n <> RDLastDoc Then
+        RDLastDoc = n
+        If Not RDRibbon Is Nothing Then RDRibbon.InvalidateControl "rdFmt": RDRibbon.InvalidateControl "rdStart"
+    End If
     Application.OnTime When:=Now + TimeSerial(0, 0, 3), Name:="RD_Tick"
 End Sub
 
