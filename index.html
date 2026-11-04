@@ -47856,40 +47856,64 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      edge of the structure's box. One even bend with nothing sharp, and at the structure it points at its middle (coming
      out the head points there; going in it sets off from there). Going in it is the same arc walked the other way, so it
      reaches J running the way the cycle runs. */
+  /* a join as a circular arc: it leaves the cycle along it (against it, going in) and bends round to the structure, its
+     far end aimed at the structure's middle and stopping short of the structure; null when no such arc fits */
+  function cycleArc(J, u, it, io) {
+    const b = it.box,
+      M = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 };
+    if (inBox(J, b)) return null;
+    const t = io === 'in' ? { x: -u.x, y: -u.y } : u,
+      mx = M.x - J.x,
+      my = M.y - J.y;
+    let n = { x: -t.y, y: t.x };
+    if (n.x * mx + n.y * my < 0) n = { x: -n.x, y: -n.y };
+    const nm = n.x * mx + n.y * my,
+      mm = mx * mx + my * my;
+    if (nm < 1e-6) return null;
+    /* the room the structure takes on the way in: its box seen from the arc's end (made larger until the end is clear of it) */
+    let rM = Math.min(b.x1 - b.x0, b.y1 - b.y0) / 2,
+      best = null;
+    for (let tries = 0; tries < 8; tries++) {
+      if (rM * rM >= mm) return null;
+      const R = (mm - rM * rM) / (2 * nm),
+        C = { x: J.x + n.x * R, y: J.y + n.y * R },
+        dC = Math.hypot(M.x - C.x, M.y - C.y);
+      if (dC <= R) return null;
+      const al = Math.atan2(M.y - C.y, M.x - C.x),
+        be = Math.acos(R / dC),
+        a0 = Math.atan2(J.y - C.y, J.x - C.x),
+        /* which way round the circle the arc runs: the way t points at J */
+        sg = -Math.sin(a0) * t.x + Math.cos(a0) * t.y > 0 ? 1 : -1;
+      best = null;
+      for (const ae of [al + be, al - be]) {
+        let ph = (ae - a0) * sg;
+        while (ph <= 1e-6) ph += 2 * Math.PI;
+        while (ph > 2 * Math.PI) ph -= 2 * Math.PI;
+        const E = { x: C.x + R * Math.cos(ae), y: C.y + R * Math.sin(ae) },
+          dir = { x: -Math.sin(ae) * sg, y: Math.cos(ae) * sg };
+        if (dir.x * (M.x - E.x) + dir.y * (M.y - E.y) <= 0) continue;
+        if (!best || ph < best.ph) best = { C, R, a0, sg, ph, E };
+      }
+      if (!best) return null;
+      if (!inBox(best.E, b)) return best;
+      rM *= 1.25;
+    }
+    return null;
+  }
   function cycleBranch(J, u, it, io) {
     const b = it.box,
       M = { x: (b.x0 + b.x1) / 2, y: (b.y0 + b.y1) / 2 },
-      t = io === 'in' ? { x: -u.x, y: -u.y } : u,
-      dx = M.x - J.x,
-      dy = M.y - J.y,
-      d2 = dx * dx + dy * dy;
-    let n = { x: -t.y, y: t.x },
-      dn = dx * n.x + dy * n.y;
-    if (dn < 0) {
-      n = { x: -n.x, y: -n.y };
-      dn = -dn;
-    }
+      q = cycleArc(J, u, it, io);
     let P = [];
-    if (dn < 1e-6 * Math.sqrt(d2) + 1e-9) {
-      for (let i = 0; i <= 40; i++) P.push({ x: J.x + (dx * i) / 40, y: J.y + (dy * i) / 40 });
-    } else {
-      const R = d2 / (2 * dn),
-        C = { x: J.x + n.x * R, y: J.y + n.y * R },
-        a0 = Math.atan2(J.y - C.y, J.x - C.x),
-        a1 = Math.atan2(M.y - C.y, M.x - C.x),
-        /* the way round that leaves J along t */
-        up = -Math.sin(a0) * t.x + Math.cos(a0) * t.y > 0;
-      let sw = a1 - a0;
-      if (up) while (sw <= 0) sw += 2 * Math.PI;
-      else while (sw >= 0) sw -= 2 * Math.PI;
-      for (let i = 0; i <= 60; i++) {
-        const a = a0 + (sw * i) / 60;
-        P.push({ x: C.x + R * Math.cos(a), y: C.y + R * Math.sin(a) });
-      }
+    if (q) for (let i = 0; i <= 60; i++) {
+      const a = q.a0 + q.sg * q.ph * (i / 60);
+      P.push({ x: q.C.x + q.R * Math.cos(a), y: q.C.y + q.R * Math.sin(a) });
     }
-    /* up to the box: the part inside it is left out */
-    const k = P.findIndex(p => inBox(p, b));
-    if (k > 1) P = P.slice(0, k);
+    else {
+      /* no arc fits (the structure sits on the cycle): straight to its box */
+      const E = inBox(J, b) ? J : boxExit(M, J, b);
+      for (let i = 0; i <= 20; i++) P.push({ x: J.x + ((E.x - J.x) * i) / 20, y: J.y + ((E.y - J.y) * i) / 20 });
+    }
     return io === 'in' ? P.reverse() : P;
   }
   /* a join made an ordinary arrow where it is: the same arc as a curved arrow (its curve is the arc's angle), going in
@@ -47950,8 +47974,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const lo = Math.max(1, Math.ceil(P.length * 0.2)),
         hi = Math.min(P.length - 2, Math.floor(P.length * 0.8));
       i = Math.max(lo, Math.min(hi, i));
-      const d = Math.hypot(P[i + 1].x - P[i - 1].x, P[i + 1].y - P[i - 1].y) || 1;
-      out.push({ j, it, J: P[i], u: { x: (P[i + 1].x - P[i - 1].x) / d, y: (P[i + 1].y - P[i - 1].y) / d } });
+      const tan = k => {
+        const d = Math.hypot(P[k + 1].x - P[k - 1].x, P[k + 1].y - P[k - 1].y) || 1;
+        return { x: (P[k + 1].x - P[k - 1].x) / d, y: (P[k + 1].y - P[k - 1].y) / d };
+      };
+      /* where on the cycle the join leaves it in one round bend that ends aimed at the structure */
+      let pick = i,
+        bestS = Infinity;
+      for (let k = lo; k <= hi; k++) {
+        /* an arc of about a quarter turn reads best; near the place found above */
+        const q = cycleArc(P[k], tan(k), it, j.io);
+        const sc = (q ? Math.abs(q.ph - 1.5) : 50) + (Math.abs(k - i) / P.length) * 4;
+        if (sc < bestS) {
+          bestS = sc;
+          pick = k;
+        }
+      }
+      i = pick;
+      out.push({ j, it, J: P[i], u: tan(i) });
     }
     return out;
   }
@@ -65898,10 +65938,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         g = gridSelOf(r);
       /* a right-click outside the picked cells picks the one under the pointer */
       if (!g || !gridSelCells(r).some(x => x.i === q.i && x.j === q.j)) GRIDSEL = { id: r.id, r0: q.i, c0: q.j, r1: q.i, c1: q.j };
-      if (!selArr.has(r.id)) {
-        clearSel();
-        selArr.add(r.id);
-      }
+      /* the table is picked too; a structure picked before stays picked, for Put the selected structure in this cell */
+      selArr.add(r.id);
       render();
       gridMenu(r, e.clientX, e.clientY);
     },
@@ -68537,6 +68575,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     tableSVG,
     gridAct,
     gridLayout,
+    gridLines: r => (gridLayout(r), GRIDL.get(r)),
     gridExplode,
     get GRIDSEL() {
       return GRIDSEL;

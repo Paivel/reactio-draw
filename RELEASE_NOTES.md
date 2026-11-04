@@ -15,6 +15,7 @@
 - **Clean Up of an atom with orbitals** (a carbene with its sp2 lobe and p orbital): its two bonds 105° apart, on the side away from the lobe, so the orbitals have room.
 - **A carbon with two like large branches is drawn symmetric**: a bis(oxazoline) or two pyridines on CMe2 or CEt2 come out as the mirror of themselves across the upright line through that carbon, the two small branches alike below, on paste and after Clean Up (it turned one ring over and laid the ethyls unlike); a Bn-box, whose benzyls ran into each other, has its benzyls swung clear and is fanned too.
 - The bonds of a cod to its metal are dashed.
+- **Arrows into and out of a catalytic cycle** are one round bend: they leave the cycle along it and end aimed at the middle of their structure, the tail of one going in and the head of one coming out looking at the molecule.
 
 ## Fixed
 
