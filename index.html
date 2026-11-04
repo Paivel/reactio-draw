@@ -9084,6 +9084,119 @@ function kdOf(st) {
     for (let v = 0; v < n; v++) pos[v] = out[v];
     return true;
   }
+  /* a carbon with four branches and no ring of its own, two of them large (the two rings of a bis(oxazoline) on CEt2, two
+     aryl groups on CMe2): the large ones go up to either side, 120° apart, the small ones down, 60° apart, as chemists draw
+     them, each branch turned as a whole (rings with a donor next to the carbon turned so the donors face each other). Kept
+     when no two atoms come closer than before (or than 0.6 of a bond) */
+  function quatFan(g, pos) {
+    const n = g.nodes.length;
+    if (n < 8 || n > 400 || pos.some(p => !p)) return 0;
+    const adj = Array.from({ length: n }, () => []);
+    g.edges.forEach((e, i) => {
+      adj[e.a].push([e.b, i]);
+      adj[e.b].push([e.a, i]);
+    });
+    const ringAt = new Set(findRingsG(n, g.edges, adj).flat());
+    const closest = P => {
+      let c = 1e9;
+      const bonded = new Set(g.edges.map(e => e.a * n + e.b));
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++) {
+          if (bonded.has(i * n + j) || bonded.has(j * n + i)) continue;
+          c = Math.min(c, Math.hypot(P[i].x - P[j].x, P[i].y - P[j].y) / L);
+        }
+      return c;
+    };
+    let done = 0;
+    for (let c = 0; c < n; c++) {
+      if (adj[c].length !== 4 || ringAt.has(c) || g.nodes[c].el !== 'C') continue;
+      if (adj[c].some(([, k]) => (g.edges[k].order || 1) !== 1)) continue;
+      /* each branch: the atoms reached from its first atom without passing c */
+      const br = adj[c].map(([v]) => {
+        const seen = new Set([v]),
+          st = [v];
+        while (st.length) {
+          const x = st.pop();
+          for (const [y] of adj[x]) if (y !== c && !seen.has(y)) (seen.add(y), st.push(y));
+        }
+        return { v, set: seen };
+      });
+      br.sort((a, b) => b.set.size - a.set.size);
+      const [b1, b2, s1, s2] = br;
+      if (b2.set.size < 4 || b2.set.size < 2 * s1.set.size) continue;
+      const C = pos[c],
+        ang = v => Math.atan2(pos[v].y - C.y, pos[v].x - C.x);
+      let ux = Math.cos(ang(b1.v)) + Math.cos(ang(b2.v)),
+        uy = Math.sin(ang(b1.v)) + Math.sin(ang(b2.v));
+      if (Math.hypot(ux, uy) < 0.2) ((ux = -Math.sin(ang(b1.v))), (uy = Math.cos(ang(b1.v))));
+      const au = Math.atan2(uy, ux),
+        side = v => Math.sign(Math.sin(ang(v) - au)) || 1,
+        D = Math.PI / 180;
+      /* b1 keeps its side of the axis, b2 the other; the small ones likewise */
+      const tgt = new Map([
+        [b1, au + side(b1.v) * 60 * D],
+        [b2, au - side(b1.v) * 60 * D],
+        [s1, au + 180 * D + side(s1.v) * 30 * D],
+        [s2, au + 180 * D - side(s1.v) * 30 * D]
+      ]);
+      const out = pos.slice();
+      for (const [b, t] of tgt) {
+        const d = t - ang(b.v),
+          co = Math.cos(d),
+          sn = Math.sin(d);
+        for (const x of b.set) {
+          const dx = pos[x].x - C.x,
+            dy = pos[x].y - C.y;
+          out[x] = { x: C.x + dx * co - dy * sn, y: C.y + dx * sn + dy * co };
+        }
+      }
+      /* a ligand (two rings with a donor next to the carbon they hang on: the N of two oxazolines, two pyridines): each ring
+         turned over its bond so the donors face each other, as a chelating ligand is drawn */
+      const donor = b => {
+        for (const el of ['N', 'P', 'S', 'O'])
+          for (const [y] of adj[b.v]) if (y !== c && b.set.has(y) && ringAt.has(y) && g.nodes[y].el === el && ringAt.has(b.v)) return y;
+        return -1;
+      };
+      for (const [b, o] of [
+        [b1, b2],
+        [b2, b1]
+      ]) {
+        const dn = donor(b);
+        if (dn < 0 || donor(o) < 0) continue;
+        const R0 = out[b.v],
+          ax = R0.x - C.x,
+          ay = R0.y - C.y,
+          l2 = ax * ax + ay * ay,
+          sd = q => Math.sign(ax * (q.y - C.y) - ay * (q.x - C.x));
+        if (sd(out[dn]) === sd(out[o.v])) continue;
+        for (const x of b.set) {
+          const q = out[x],
+            t = ((q.x - C.x) * ax + (q.y - C.y) * ay) / l2,
+            fx = C.x + t * ax,
+            fy = C.y + t * ay;
+          out[x] = { x: 2 * fx - q.x, y: 2 * fy - q.y };
+        }
+      }
+      /* the whole structure turned so the large branches stand up */
+      {
+        const d = -Math.PI / 2 - au,
+          co = Math.cos(d),
+          sn = Math.sin(d);
+        for (let x = 0; x < n; x++) {
+          const dx = out[x].x - C.x,
+            dy = out[x].y - C.y;
+          out[x] = { x: C.x + dx * co - dy * sn, y: C.y + dx * sn + dy * co };
+        }
+      }
+      const c0 = closest(pos),
+        c1 = closest(out);
+      if (c1 < 0.6 && c1 < c0) continue;
+      if (c1 < c0 - 0.05 && c1 < 0.9) continue;
+      for (let v = 0; v < n; v++) pos[v] = out[v];
+      done++;
+    }
+    return done;
+  }
   /* the layout turned so a template cage in it stands as the template does */
   function cageToTemplate(pos) {
     for (const c of pos.cages) {
@@ -9285,6 +9398,9 @@ function kdOf(st) {
           } catch (e) {}
           try {
             if (!sp.tplCage && !sp.cages) serpentineChain(sg, sp);
+          } catch (e) {}
+          try {
+            if (!sp.tplCage && !sp.cages) quatFan(sg, sp);
           } catch (e) {}
         }
         fixEZ(sg, sp);
@@ -11258,6 +11374,9 @@ function kdOf(st) {
       /* a long open chain: in rows (see serpentineChain) */
       try {
         if (pos && !pos.tplCage && !pos.cages) serpentineChain(g, pos);
+      } catch (e) {}
+      try {
+        if (pos && !pos.tplCage && !pos.cages) quatFan(g, pos);
       } catch (e) {}
       /* a drawn H on an atom with two other bonds (the NH of PhNH–Ar): untangling can push it round next to one of them (the
          H–N–Ar line straight, H–N–Ph 60°); it goes back opposite the other two, as the bonds of a flat NH are drawn */
