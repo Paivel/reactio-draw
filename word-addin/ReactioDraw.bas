@@ -14,6 +14,8 @@ Option Explicit
 
 Private Const TTL As String = "Reactio Draw"
 Private RDRibbon As Object   ' the tab, to redraw the Mark drawings button
+Private RDNumPath As String  ' the document Number compounds / Show marks works on, and which of the two
+Private RDNumCmd As String
 
 Public Sub RD_Plain(control As Object)
     Listen
@@ -42,17 +44,51 @@ Public Sub RD_ShowMarks(control As Object)
     NumberDoc True
 End Sub
 
-' saved, closed, numbered by Reactio Draw in place (the version before goes to Reactio Draw's own folder) and opened again
+' saved, closed, numbered by Reactio Draw in place (the version before goes to Reactio Draw's own folder) and opened again.
+' The work is done a moment after the button returns (Word on a Mac may refuse to close a document from inside the button's
+' own call, error 4198), and Word gets a few tries to close and open it
 Private Sub NumberDoc(marks As Boolean)
     Listen
-    Dim p As String, cmd As String
+    Dim p As String
     p = DocPath()
     If p = "" Then Exit Sub
-    cmd = "number"
-    If marks Then cmd = "marks"
-    ActiveDocument.Close SaveChanges:=False
-    RunRD cmd, p, p
-    Documents.Open p
+    RDNumPath = p
+    RDNumCmd = "number"
+    If marks Then RDNumCmd = "marks"
+    Application.OnTime When:=Now, Name:="RD_NumberNow"
+End Sub
+
+Public Sub RD_NumberNow()
+    Dim p As String, d As Object, i As Integer, open1 As Boolean
+    p = RDNumPath
+    RDNumPath = ""
+    If p = "" Then Exit Sub
+    On Error Resume Next
+    For Each d In Documents
+        If d.FullName = p Then
+            If Not d.Saved Then d.Save
+            Err.Clear
+            d.Close SaveChanges:=0
+        End If
+    Next d
+    For Each d In Documents
+        If d.FullName = p Then open1 = True
+    Next d
+    On Error GoTo 0
+    If open1 Then
+        MsgBox "Word did not close the document, so it was not numbered. Press the button again.", vbExclamation, TTL
+        Exit Sub
+    End If
+    RunRD RDNumCmd, p, p
+    On Error Resume Next
+    For i = 1 To 20
+        Err.Clear
+        Documents.Open FileName:=p
+        If Err.Number = 0 Then Exit For
+        DoEvents
+    Next i
+    If Err.Number <> 0 Then MsgBox "The document is ready but Word could not open it again: open it yourself." & vbCr & p, vbInformation, TTL
+    On Error GoTo 0
 End Sub
 
 Public Sub RD_Open(control As Object)
@@ -83,7 +119,15 @@ Private Function DocPath() As String
         MsgBox "Reactio Draw reads Word documents saved as .docx. Save the document as .docx, then try again.", vbInformation, TTL
         Exit Function
     End If
-    If Not d.Saved Then d.Save
+    If Not d.Saved Then
+        On Error Resume Next
+        d.Save
+        If Err.Number <> 0 Then
+            MsgBox "Word could not save the document (" & Err.Description & "). Save it, then try again.", vbExclamation, TTL
+            Exit Function
+        End If
+        On Error GoTo 0
+    End If
     DocPath = d.FullName
 End Function
 
