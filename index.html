@@ -2985,6 +2985,7 @@ html {
         <button class="tb" data-tool="bracket" title="Brackets: drag a box around a structure (single brackets: drag up or down); click again for the bracket menu"><span style="font:18px Georgia,serif">[ ]</span></button>
         <button class="tb" data-tool="shape" title="Shapes and lines: click again for the shape menu"></button>
         <button class="tb" data-tool="chart" title="Charts: product ratios (pie) and sensitivity screens (radar); click again for the chart menu"></button>
+        <button class="tb" data-tool="table" title="Table: click on the sheet to put a table there and type in its cells (Tab and Enter go on); right-click it for rows, columns, rules, fill, a structure in a cell and footnotes"><svg viewBox="0 0 22 22"><path d="M3 5h16M3 8.5h16M3 18h16" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 10.5v5.5M13.5 10.5v5.5" stroke="currentColor" stroke-width="1" opacity=".55"/><path d="M5 12.5h2M10 12.5h2M15 12.5h2M5 15.5h2M10 15.5h2M15 15.5h2" stroke="currentColor" stroke-width="1.2"/></svg></button>
       </div>
       <span class="tlabel">Bonds</span>
       <div class="tgroup">
@@ -13601,7 +13602,63 @@ function kdOf(st) {
     }
     return s;
   }
-  const tLines = t => String(t.text).split('\n');
+  /* a text with a width of its own (t.ww, set with the side handles of a lone text) flows into as many lines as that width
+     takes; its own line breaks stay. A break inside \b{…}, _{…} and the like closes the marks at the end of the line and opens
+     them again on the next */
+  const TWRAP = new Map();
+  function wrapPara(t, para, ww) {
+    const opRx = /^(?:[_^]|\\[biu]|\\f\[[^\]{}]*\]|\\c\[[^\]{}]*\])\{/;
+    const st = [],
+      brk = [];
+    for (let i = 0; i < para.length; ) {
+      const m = opRx.exec(para.slice(i, i + 80));
+      if (m) {
+        st.push(m[0]);
+        i += m[0].length;
+        continue;
+      }
+      const ch = para[i];
+      if (ch === '{') st.push('{');
+      else if (ch === '}' && st.length) st.pop();
+      /* a number keeps its unit on its line (5 mol%, 110 °C, 2 equiv.) */
+      else if (ch === ' ' && !(/\d$/.test(para.slice(0, i)) && /^(?:mol%|equiv|eq\.|°C|K\b|h\b|min\b|s\b|d\b|M\b|mM|mmol|mol\b|mL|ml|L\b|mg|g\b|kg|bar|atm|psi|%|ppm|nm|W\b|V\b|mA|rpm)/.test(para.slice(i + 1, i + 8)))) brk.push({ i, st: st.slice() });
+      i++;
+    }
+    if (!brk.length) return [para];
+    const lines = [];
+    let from = 0,
+      open = [];
+    const piece = (a, b, opn, cls) => opn.join('') + para.slice(a, b) + '}'.repeat(cls.length);
+    let last = null;
+    for (const b of brk) {
+      const cand = piece(from, b.i, open, b.st);
+      if (last && lineW(t, cand) > ww) {
+        lines.push(piece(from, last.i, open, last.st));
+        from = last.i + 1;
+        open = last.st;
+      }
+      last = b;
+    }
+    let tail = piece(from, para.length, open, []);
+    if (last && last.i >= from && lineW(t, tail) > ww) {
+      lines.push(piece(from, last.i, open, last.st));
+      tail = piece(last.i + 1, para.length, last.st, []);
+    }
+    lines.push(tail);
+    return lines;
+  }
+  const tLines = t => {
+    const raw = String(t.text);
+    if (!(t.ww > 0)) return raw.split('\n');
+    const k = raw + '\u0001' + t.ww + '\u0001' + tSize(t) + '\u0001' + txtFont(t) + '\u0001' + (t.bold ? 1 : 0) + (t.italic ? 1 : 0) + (t.fs ? 1 : 0);
+    let L = TWRAP.get(k);
+    if (!L) {
+      L = raw.split('\n').flatMap(p => wrapPara(t, p, t.ww));
+      if (TWRAP.size > 2000) TWRAP.clear();
+      TWRAP.set(k, L);
+    }
+    return L;
+  };
   const tLH = t => tSize(t) * 1.25,
     tExtra = t => (tLines(t).length - 1) * tLH(t);
   /* a text line's real width in its own font (measured, not guessed from the number of characters), so centres and edges are where the ink is:
@@ -14689,7 +14746,11 @@ function kdOf(st) {
           al === 'justify' && i < L.length - 1 && lw > 0
             ? ` textLength="${W.toFixed(1)}" lengthAdjust="spacing"`
             : '';
-        return `<tspan x="${x.toFixed(2)}" dy="${i ? tLH(t).toFixed(2) : 0}"${just}>${richLine(t, l)}</tspan>`;
+        /* a line that starts raised or lowered (^{a} of a footnote) starts with an empty letter, so the step down to the line holds
+           (the raised letter's own step would take its place) */
+        const body = richLine(t, l),
+          lead = i && /^<tspan dy=/.test(body) ? '\u200b' : '';
+        return `<tspan x="${x.toFixed(2)}" dy="${i ? tLH(t).toFixed(2) : 0}"${just}>${lead}${body}</tspan>`;
       }).join('');
     }
     if (!t.fs) return esc(t.text);
@@ -15365,6 +15426,7 @@ function kdOf(st) {
   }
   function render() {
     if (mol.arrows.some(r => r.sru)) sruPlace();
+    for (const r of mol.arrows) if (r.kind === 'grid') gridLayout(r);
     const own = !RIDX;
     if (own) {
       RIDX = new Map(mol.atoms.map(a => [a.id, a]));
@@ -15497,7 +15559,12 @@ function kdOf(st) {
                 `<rect x="${B.x0 - 6}" y="${B.y0 - 6}" width="${B.x1 - B.x0 + 12}" height="${B.y1 - B.y0 + 12}" fill="none" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>`)(
                 chartBox(r)
               )
-            : r.kind === 'tbl'
+            : r.kind === 'grid'
+              ? (B =>
+                  `<rect x="${B.x0 - 6}" y="${B.y0 - 6}" width="${B.x1 - B.x0 + 12}" height="${B.y1 - B.y0 + 12}" fill="none" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>`)(
+                  gridBox(r)
+                )
+              : r.kind === 'tbl'
               ? `<rect x="${Math.min(r.x1, r.x2) - 6}" y="${Math.min(r.y1, r.y2) - 6}" width="${Math.abs(r.x2 - r.x1) + 12}" height="${Math.abs(r.y2 - r.y1) + 12}" fill="none" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="4 3" opacity=".7"/>`
               : r.kind === 'orb'
                 ? '<g opacity=".55">' +
@@ -19004,9 +19071,9 @@ function kdOf(st) {
         P = [A, B];
       } else
         P =
-          h.arrow.kind === 'tbl'
+          h.arrow.kind === 'tbl' || h.arrow.kind === 'grid'
             ? (() => {
-                const r = h.arrow;
+                const r = h.arrow.kind === 'grid' ? (B => ({ x1: B.x0, y1: B.y0, x2: B.x1, y2: B.y1 }))(gridBox(h.arrow)) : h.arrow;
                 return [
                   { x: r.x1, y: r.y1 },
                   { x: r.x1, y: r.y2 },
@@ -20521,6 +20588,47 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const h of sbHandles(sb)) if (Math.abs(p.x - h.x) <= tol && Math.abs(p.y - h.y) <= tol) return h;
     return null;
   }
+  /* the width of a text set by its side handles (t.ww): the right side (or the left, keeping the right edge) sets it as it
+     goes; the bottom (or the top, keeping the last line) asks for as many lines as fit the height, and the narrowest width
+     that gives no more lines than that is taken. Out at the width of its longest own line, the text has no width of its own */
+  function twrapStart(t, k, p) {
+    const full = textW({ ...t, ww: undefined });
+    return { mode: 'twrap', t, k, p0: p, moved: false, x0: t.x, y0: t.y, right: t.x + textW(t), bottom: t.y + tExtra(t), full, ww0: t.ww || full };
+  }
+  function twrapMove(d, p) {
+    const t = d.t,
+      lh = tLH(t),
+      words = String(t.text)
+        .split(/[\s]+/)
+        .filter(Boolean),
+      minW = Math.max(tSize(t) * 1.5, ...words.map(w => lineW({ ...t, ww: undefined }, w)).slice(0, 200));
+    const setW = w => {
+      w = Math.max(minW, w);
+      if (w >= d.full - 0.5) delete t.ww;
+      else t.ww = Math.round(w * 10) / 10;
+    };
+    if (d.k === 'e') setW(d.ww0 + (p.x - d.p0.x));
+    else if (d.k === 'w') {
+      setW(d.ww0 - (p.x - d.p0.x));
+      t.x = d.right - textW(t);
+    } else {
+      /* the number of lines the new height holds, then the narrowest width with no more lines than that */
+      const h = d.bottom - d.y0 + (d.k === 's' ? p.y - d.p0.y : d.p0.y - p.y),
+        want = Math.max(1, Math.round(h / lh) + 1);
+      let lo = minW,
+        hi = d.full;
+      const lines = w => tLines({ ...t, ww: w >= d.full - 0.5 ? undefined : w }).length;
+      if (lines(lo) <= want) hi = lo;
+      else
+        for (let i = 0; i < 18 && hi - lo > 1; i++) {
+          const m = (lo + hi) / 2;
+          if (lines(m) <= want) hi = m;
+          else lo = m;
+        }
+      setW(hi);
+      if (d.k === 'n') t.y = d.bottom - tExtra(t);
+    }
+  }
   function startScale(h, sb, p) {
     const o = snapshotSel(),
       solo = o.atoms.length + o.arrows.length + o.texts.length === 1 && !o.arrows.length;
@@ -21280,6 +21388,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       svg.setPointerCapture(e.pointerId);
       return;
     }
+    if (tool === 'table') {
+      e.preventDefault();
+      gridPut(p);
+      return;
+    }
     if (tool === 'shape' || tool === 'chart') {
       e.preventDefault();
       drag = { mode: 'shp', p0: p, moved: false };
@@ -21378,6 +21491,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const sh = sb && hitSbHandle(p, sb);
         if (sh && (!h || Math.max(Math.abs(p.x - sh.x), Math.abs(p.y - sh.y)) <= 4) && !(h && e.shiftKey)) {
           e.preventDefault();
+          /* a lone text, by a side: narrower or wider, lower or higher, the letters as they are and the lines flowing again */
+          const tw = 'ewns'.includes(sh.k) && !sel.size && !selArr.size && selTxt.size === 1 && mol.texts.find(t => selTxt.has(t.id));
+          if (tw && /\s/.test(tw.text.trim())) {
+            drag = twrapStart(tw, sh.k, p);
+            svg.setPointerCapture(e.pointerId);
+            return;
+          }
           drag = startScale(sh, sb, p);
           svg.setPointerCapture(e.pointerId);
           return;
@@ -21878,7 +21998,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         drag.mode === 'r3d' ||
         drag.mode === 'chgdrag' ||
         drag.mode === 'decdrag' ||
-        drag.mode === 'scale'
+        drag.mode === 'scale' ||
+        drag.mode === 'twrap'
       )
         snap();
       if (drag.mode === 'move') tblUnflow();
@@ -21929,6 +22050,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     const s = drag.p0;
+    if (drag.mode === 'twrap') {
+      twrapMove(drag, p);
+      render();
+      return;
+    }
     if (drag.mode === 'scale') {
       if (drag.moved) {
         dragScale(drag, p, e.shiftKey);
@@ -22313,6 +22439,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         } catch (e) {}
       if (d.moved) commit();
       else render();
+      return;
+    }
+    if (d.mode === 'twrap') {
+      if (d.moved) {
+        commit();
+        const n = tLines(d.t).length;
+        toast(d.t.ww ? n + ' line' + (n > 1 ? 's' : '') + ' (drag a side out to the full width to take its own width off)' : 'The text keeps its own lines');
+      } else render();
       return;
     }
     if (d.mode === 'scale') {
@@ -23022,6 +23156,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     'tool:bracket': 'Brackets',
     'tool:shape': 'Shapes and lines',
     'tool:chart': 'Charts',
+    'tool:table': 'Tables',
     'tool:orbital': 'Orbitals',
     'tool:cutRad': 'Break bonds into radicals',
     'tool:cutRetro': 'Retrosynthetic disconnection',
@@ -24160,6 +24295,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (map[o.at]) o.at = map[o.at].id;
         else delete o.at;
       }
+      /* a table holds the copies of the structures in its cells; a structure left out of the copy stays in the original only */
+      if (o.kind === 'grid')
+        for (const row of o.cells)
+          for (const c of row)
+            if (c.at != null) {
+              if (map[c.at]) c.at = map[c.at].id;
+              else delete c.at;
+            }
       /* a repeat unit keeps its atoms (the copies of them), or becomes plain brackets */
       if (r.sru) {
         const m2 = id => map[id] && map[id].id,
@@ -32799,7 +32942,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } finally {
         ks.forEach(i => sel.add(i));
       }
-      return { mol: all, sdf, rxn, smi, cdxml: cdxmlOf(m, sch) };
+      return { mol: all, sdf, rxn, smi, cdxml: cdxmlOf(withGridsOut(m), sch) };
     } finally {
       mol = saved;
       MOL_SRU = false;
@@ -33645,7 +33788,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* a centred or right-aligned caption is placed by its centre or right end, as CDXML keeps it; the n of a repeat unit is
        the bracket group's own label (SRULabel), not a text */
     const sruTxt = new Set(m.arrows.filter(r => r.sru && sruOf(r)).map(r => r.id));
-    for (const t of m.texts.filter(t => !(t.sruOf != null && sruTxt.has(t.sruOf))))
+    /* a text with a width of its own goes out in the lines it is drawn in */
+    for (const t of m.texts.filter(t => !(t.sruOf != null && sruTxt.has(t.sruOf))).map(t => (t.ww ? { ...t, text: tLines(t).join('\n'), ww: undefined } : t)))
       out.push(
         `<t id="${id++}" p="${P(t.x + (t.align === 'center' ? textW(t) / 2 : t.align === 'right' ? textW(t) : 0), t.y)}"${t.align ? ` Justification="${{ center: 'Center', right: 'Right', justify: 'Full' }[t.align]}"` : ''}>${(() => {
           let r = cdxRuns(t, ((10 * tSize(t)) / (STY().label || 15)).toFixed(1)),
@@ -38636,7 +38780,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      Esc, Enter or the bar's Done ends it; a click on the sheet away from them too. Clear takes the order away */
   let CORD = null;
   function cordStart() {
-    const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || '')).concat(gridMarkTexts());
     if (!T.length) {
       toast('There are no [[key]] marks on this drawing: write one in a text under a compound, e.g. [[aldehyde]]', true);
       return;
@@ -38653,7 +38797,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     document.body.appendChild(b);
     b.querySelector('[data-k=done]').onclick = () => cordEnd();
     b.querySelector('[data-k=clear]').onclick = () => {
-      for (const t of mol.texts) delete t.cord;
+      for (const t of mol.texts.concat(gridMarkTexts())) delete t.cord;
       CORD.n = 0;
       render();
     };
@@ -38667,7 +38811,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     render();
   }
   function cordClick(p) {
-    const t = findText(p);
+    let t = findText(p);
+    /* a cell of a table with marks */
+    if (!t) {
+      const r = mol.arrows.find(x => x.kind === 'grid' && gridCellAt(x, p)),
+        q = r && gridCellAt(r, p);
+      if (q) t = gridMarkTexts().find(x => x.cell === r.cells[q.i][q.j]) || null;
+    }
     if (!t || !/\[\[/.test(t.ctpl || t.text || '')) {
       if (!t) cordEnd();
       return;
@@ -38689,7 +38839,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      hand in the accent colour, the others after them in grey); otherwise only those set by hand. On the screen only */
   function cordSVG() {
     if (renderPlain) return '';
-    if (!CORD && !mol.texts.some(t => t.cord)) return '';
+    if (!CORD && !mol.texts.concat(gridMarkTexts()).some(t => t.cord)) return '';
     let s = '',
       i = 0;
     for (const t of cmpdTexts()) {
@@ -38704,7 +38854,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* the texts of the sheet now that carry marks, in reading order (rows top to bottom, left to right) */
   function cmpdTexts() {
-    const all = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || ''));
+    const all = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || '')).concat(gridMarkTexts());
     /* an order set by hand (File → Word files → Order of the marks on this drawing: a catalytic cycle read round) comes
        first, the other texts after it in reading order */
     const set = all.filter(t => t.cord).sort((a, b) => a.cord - b.cord),
@@ -45911,6 +46061,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return { cx, cy, R, a1, D, bx, by };
   }
   function arrowPts(r, n) {
+    if (r.kind === 'grid') {
+      const B = gridBox(r);
+      return [
+        { x: B.x0, y: B.y0 },
+        { x: B.x1, y: B.y1 }
+      ];
+    }
     if (r.kind === 'tbl')
       return [
         { x: r.x1, y: r.y1 },
@@ -45974,6 +46131,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function arrowBox(r) {
     if (r.kind === 'tbl') return { x0: r.x1, y0: r.y1, x1: r.x2, y1: r.y2 };
+    if (r.kind === 'grid') return gridBox(r);
     if (r.kind === 'pie' || r.kind === 'radar') return chartBox(r);
     if (r.kind === 'img') return imgBox(r);
     if (r.kind === 'orb') return orbBox(r);
@@ -45992,6 +46150,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function arrowDist(p, r) {
     if (r.kind === 'tbl') return p.x >= r.x1 && p.x <= r.x2 && p.y >= r.y1 && p.y <= r.y2 ? 0 : 99;
+    if (r.kind === 'grid') {
+      const B = gridBox(r);
+      return p.x >= B.x0 && p.x <= B.x1 && p.y >= B.y0 && p.y <= B.y1 ? 0 : 99;
+    }
     if (r.kind === 'pie' || r.kind === 'radar') {
       const B = chartBox(r);
       return Math.hypot(Math.max(B.x0 - p.x, 0, p.x - B.x1), Math.max(B.y0 - p.y, 0, p.y - B.y1));
@@ -46199,6 +46361,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (r.kind === 'pie') return pieSVG(r, o);
     if (r.kind === 'radar') return radSVG(r, o);
     if (r.kind === 'orb') return orbitalSVG(r, o);
+    if (r.kind === 'grid') return gridSVG(r);
     if (r.kind === 'tbl') {
       /* tables placed together stay in a column, one per step: each starts below the previous one, however tall it grows */
       if (r.flow != null && r.ord > 0) {
@@ -46872,7 +47035,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function handlesSVG() {
     const r = soloArrow();
-    if (!r || !isSelTool() || r.kind === 'tbl') return '';
+    if (!r || !isSelTool() || r.kind === 'tbl' || r.kind === 'grid') return '';
     if (r.kind === 'orb') {
       const H = orbHandles(r);
       let s = '';
@@ -46891,7 +47054,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function hitHandle(p) {
     const r = soloArrow();
-    if (!r || r.kind === 'tbl') return null;
+    if (!r || r.kind === 'tbl' || r.kind === 'grid') return null;
     if (r.kind === 'orb') {
       const H = orbHandles(r);
       if (H.rot && Math.hypot(p.x - H.rot.x, p.y - H.rot.y) < 7) return { r, k: 'orot' };
@@ -47039,7 +47202,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       let q = { x: p.x, y: p.y };
       const o = d.k === 'e1' ? { x: r.x2, y: r.y2 } : { x: r.x1, y: r.y1 };
       /* Alt on an end of a straight arrow or line: longer or shorter along its own direction, however it is turned */
-      if (alt && !r.curve && !['img', 'shp', 'orb', 'tbl', 'pie', 'radar'].includes(r.kind)) {
+      if (alt && !r.curve && !['img', 'shp', 'orb', 'tbl', 'grid', 'pie', 'radar'].includes(r.kind)) {
         if (!d.dir) {
           const e0 = d.k === 'e1' ? { x: r.x1, y: r.y1 } : { x: r.x2, y: r.y2 },
             l = Math.hypot(e0.x - o.x, e0.y - o.y) || 1;
@@ -49759,6 +49922,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   TARGET.shape = '[data-tool=shape]';
   ACTIONS.push({ id: 'tool:chart', ctx: 'tool', label: 'Chart tool (pie, radar)', def: '' });
   TARGET.chart = '[data-tool=chart]';
+  ACTIONS.push({ id: 'tool:table', ctx: 'tool', label: 'Table tool (rows, columns, rules, a structure in a cell)', def: '' });
+  TARGET.table = '[data-tool=table]';
 
   /* ===== groups and stacking order ===== */
   function expandGroups() {
@@ -65304,6 +65469,657 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const used = defs.filter(d => !compact || d.core || cols.some(c => !c.cell[d.k].na && c.cell[d.k].v));
     return { cols, used };
   }
+  /* ===== tables (Table tool): a table of text cells, as journals set a table of conditions (Entry, Solvent, Yield…): rows and
+     columns that size themselves to what is in them, rules (journal style: above and under the head, under the last row;
+     any cell's sides can be set), fills, bold and coloured rows, a structure standing in a cell, footnotes under it
+     (a, b written as ^{a} in a cell). One object on the sheet (kind 'grid'): r.cells[row][col] = {t: text, b: bold, col:
+     colour, fill, al: left|center|right, bt/bb/bl/br: rules on its sides, at: an atom of the structure in it}; r.cw[col]:
+     a width set by hand; r.notes: the footnotes; r.fz: its letter size. Click a cell to pick it (Shift: a range), type or
+     double-click to write in it, Tab and Enter go on; right-click for rows, columns, rules, fill and the structure ===== */
+  let GRIDSEL = null,
+    GRIDEDIT = null;
+  /* where the columns and rows of each table fall (made afresh on each drawing, not kept in the file) */
+  const GRIDL = new WeakMap();
+  const GRID_PAD = 7;
+  function gridNew(x, y, nr, nc) {
+    const cells = [];
+    for (let i = 0; i < nr; i++) {
+      const row = [];
+      for (let j = 0; j < nc; j++) row.push({ t: '' });
+      cells.push(row);
+    }
+    /* journal rules: above the head, under it, under the last row */
+    for (const c of cells[0]) c.bt = c.bb = 1;
+    for (const c of cells[nr - 1]) c.bb = 1;
+    return { id: mol.next++, kind: 'grid', x1: x, y1: y, x2: x + 100, y2: y + 60, cells, cw: [], notes: '' };
+  }
+  const gridFz = r => r.fz || textDef.size || STY().text || 14;
+  /* a cell's text as a text object (to measure and draw); a compound number or a [[key]] mark in it is no formula */
+  const gridTxt = (r, c) => ({ text: c.t || '', size: gridFz(r), bold: !!c.b, color: c.col || null, fs: !c.nochem && !/\[\[/.test(c.t || ''), x: 0, y: 0 });
+  /* where a cell's text is drawn: its left end and its first line's baseline */
+  function gridTextAt(r, i, j) {
+    const { X, Y } = GRIDL.get(r) || (gridLayout(r), GRIDL.get(r)),
+      c = r.cells[i][j],
+      t = gridTxt(r, c),
+      lh = gridFz(r) * 1.25,
+      w = textW(t),
+      al = c.al || 'center',
+      n = String(c.t || '').split('\n').length;
+    return {
+      x: al === 'left' ? X[j] + GRID_PAD : al === 'right' ? X[j + 1] - GRID_PAD - w : (X[j] + X[j + 1]) / 2 - w / 2,
+      y: c.at != null && atomById(c.at) ? Y[i] + GRID_PAD * 0.6 + tSize(t) * 0.85 : (Y[i] + Y[i + 1]) / 2 - ((n - 1) * lh) / 2 + tSize(t) * 0.35
+    };
+  }
+  /* the cells with [[key]] marks, as texts for numbering compounds in Word: what is read or written through them (the text,
+     its marks, its place in a hand-set order) is the cell's own */
+  function gridMarkTexts() {
+    const out = [];
+    for (const r of mol.arrows) {
+      if (r.kind !== 'grid') continue;
+      r.cells.forEach((row, i) =>
+        row.forEach((c, j) => {
+          if (!/\[\[/.test(c.ctpl || c.t || '')) return;
+          const base = { ...gridTxt(r, c), ctpl: c.ctpl, cord: c.cord, nochem: c.nochem, cell: c },
+            own = { text: 't', ctpl: 'ctpl', cord: 'cord', nochem: 'nochem' };
+          out.push(
+            new Proxy(base, {
+              get(o, k) {
+                if (k in own) return c[own[k]];
+                if (k === 'fs') return !c.nochem && !/\[\[/.test(c.t || '');
+                if (k === 'x' || k === 'y') return gridTextAt(r, i, j)[k];
+                return o[k];
+              },
+              set(o, k, v) {
+                if (k in own) c[own[k]] = v;
+                else if (k !== 'x' && k !== 'y' && k !== 'fs') o[k] = v;
+                return true;
+              },
+              deleteProperty(o, k) {
+                if (k in own) delete c[own[k]];
+                else delete o[k];
+                return true;
+              }
+            })
+          );
+        })
+      );
+    }
+    return out;
+  }
+  /* the structure of a cell: the atoms of its fragment, while that atom is still on the sheet */
+  function gridFrag(c) {
+    if (c.at == null) return null;
+    const a = atomById(c.at);
+    if (!a) {
+      delete c.at;
+      return null;
+    }
+    return fragmentOf(a);
+  }
+  /* sizes and places: the columns as wide as their widest cell (or as set), the rows as tall as their tallest; a cell's
+     structure set in its middle */
+  function gridLayout(r) {
+    const nr = r.cells.length,
+      nc = r.cells[0].length,
+      lh = gridFz(r) * 1.25,
+      W = Array(nc).fill(0),
+      H = Array(nr).fill(0),
+      FB = r.cells.map(row => row.map(c => {
+        const f = gridFrag(c);
+        return f && f.length ? { f, b: fragBox(f) } : null;
+      }));
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        const t = gridTxt(r, c),
+          n = Math.max(1, String(c.t || '').split('\n').length),
+          fb = FB[i][j];
+        let w = c.t ? textW(t) : 0,
+          h = c.t ? n * lh : lh;
+        if (fb) {
+          w = Math.max(w, fb.b.x1 - fb.b.x0);
+          h = (c.t ? h : 0) + fb.b.y1 - fb.b.y0 + (c.t ? 6 : 0);
+        }
+        /* an empty column still has room to click into and write */
+        W[j] = Math.max(W[j], w + 2 * GRID_PAD + 4, gridFz(r) * 2.8);
+        H[i] = Math.max(H[i], h + 2 * GRID_PAD * 0.6);
+      })
+    );
+    (r.cw || []).forEach((w, j) => {
+      if (w != null && j < nc) W[j] = Math.max(16, w);
+    });
+    const X = [r.x1],
+      Y = [r.y1];
+    W.forEach(w => X.push(X[X.length - 1] + w));
+    H.forEach(h => Y.push(Y[Y.length - 1] + h));
+    GRIDL.set(r, { X, Y });
+    r.x2 = X[nc];
+    r.y2 = Y[nr];
+    /* each structure in the middle of its cell (under the text when the cell has both) */
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        const fb = FB[i][j];
+        if (!fb) return;
+        const cx = (X[j] + X[j + 1]) / 2,
+          top = Y[i] + GRID_PAD * 0.6 + (c.t ? String(c.t).split('\n').length * lh + 6 : 0),
+          dx = cx - (fb.b.x0 + fb.b.x1) / 2,
+          dy = top - fb.b.y0;
+        if (Math.abs(dx) > 0.01 || Math.abs(dy) > 0.01)
+          for (const a of fb.f) {
+            a.x += dx;
+            a.y += dy;
+            if (a.zx !== undefined) {
+              a.zx += dx;
+              a.zy += dy;
+            }
+          }
+      })
+    );
+    return r;
+  }
+  /* the footnotes' box under the table */
+  function gridNotes(r) {
+    if (!r.notes) return null;
+    const t = { text: r.notes, size: gridFz(r) * 0.8, fs: true, x: r.x1, y: r.y2 + gridFz(r) * 1.1 };
+    return { t, x0: r.x1, y0: r.y2, x1: r.x1 + textW(t), y1: t.y + tExtra(t) + tSize(t) * 0.3 };
+  }
+  const gridBox = r => {
+    gridLayout(r);
+    const N = gridNotes(r);
+    return { x0: r.x1, y0: r.y1, x1: Math.max(r.x2, N ? N.x1 : r.x2), y1: N ? N.y1 : r.y2 };
+  };
+  function gridCellAt(r, p) {
+    if (!GRIDL.has(r)) gridLayout(r);
+    const { X, Y } = GRIDL.get(r);
+    if (p.x < X[0] || p.x > X[X.length - 1] || p.y < Y[0] || p.y > Y[Y.length - 1]) return null;
+    let i = 0,
+      j = 0;
+    while (i < Y.length - 2 && p.y > Y[i + 1]) i++;
+    while (j < X.length - 2 && p.x > X[j + 1]) j++;
+    return { i, j };
+  }
+  const gridSelOf = r => (GRIDSEL && GRIDSEL.id === r.id ? GRIDSEL : null);
+  function gridSelCells(r) {
+    const g = gridSelOf(r);
+    if (!g) return [];
+    const out = [];
+    for (let i = Math.min(g.r0, g.r1); i <= Math.max(g.r0, g.r1); i++)
+      for (let j = Math.min(g.c0, g.c1); j <= Math.max(g.c0, g.c1); j++) if (r.cells[i] && r.cells[i][j]) out.push({ i, j, c: r.cells[i][j] });
+    return out;
+  }
+  function gridSVG(r) {
+    gridLayout(r);
+    const { X, Y } = GRIDL.get(r),
+      lh = gridFz(r) * 1.25,
+      lw = Math.max(1, (STY().line || 1.6) * 0.9);
+    let s = '';
+    /* fills, then texts, then rules */
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        if (c.fill) s += `<rect x="${X[j]}" y="${Y[i]}" width="${X[j + 1] - X[j]}" height="${Y[i + 1] - Y[i]}" style="fill:${c.fill}"/>`;
+      })
+    );
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        if (!c.t) return;
+        const t = gridTxt(r, c),
+          w = textW(t),
+          al = c.al || 'center',
+          x = al === 'left' ? X[j] + GRID_PAD : al === 'right' ? X[j + 1] - GRID_PAD - w : (X[j] + X[j + 1]) / 2 - w / 2,
+          n = String(c.t).split('\n').length,
+          fb = c.at != null && atomById(c.at),
+          y = fb ? Y[i] + GRID_PAD * 0.6 + tSize(t) * 0.85 : (Y[i] + Y[i + 1]) / 2 - ((n - 1) * lh) / 2 + tSize(t) * 0.35;
+        t.x = x;
+        t.y = y;
+        t.align = al === 'center' ? 'center' : al === 'right' ? 'right' : undefined;
+        s += `<text x="${t.x}" y="${t.y}" style="fill:${t.color || 'var(--ink)'};font:${t.bold ? 700 : STY().weight === 400 ? 400 : 500} ${tSize(t)}px ${txtFont(t)}">${textHTML(t)}</text>`;
+      })
+    );
+    const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--ink)" stroke-width="${lw}" stroke-linecap="square"/>`;
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        if (c.bt && !(i > 0 && r.cells[i - 1][j].bb)) s += ln(X[j], Y[i], X[j + 1], Y[i]);
+        if (c.bb) s += ln(X[j], Y[i + 1], X[j + 1], Y[i + 1]);
+        if (c.bl && !(j > 0 && row[j - 1].br)) s += ln(X[j], Y[i], X[j], Y[i + 1]);
+        if (c.br) s += ln(X[j + 1], Y[i], X[j + 1], Y[i + 1]);
+      })
+    );
+    const N = gridNotes(r);
+    if (N) s += `<text x="${N.t.x}" y="${N.t.y}" style="fill:var(--ink);font:400 ${tSize(N.t)}px ${txtFont(N.t)}">${textHTML(N.t)}</text>`;
+    /* the picked cells, and the grid's lines faintly, on the screen only */
+    if (!renderPlain && selArr.has(r.id)) {
+      for (let j = 0; j <= X.length - 1; j++) s += `<line x1="${X[j]}" y1="${Y[0]}" x2="${X[j]}" y2="${Y[Y.length - 1]}" style="stroke:var(--accent)" stroke-width="0.6" opacity=".35"/>`;
+      for (let i = 0; i <= Y.length - 1; i++) s += `<line x1="${X[0]}" y1="${Y[i]}" x2="${X[X.length - 1]}" y2="${Y[i]}" style="stroke:var(--accent)" stroke-width="0.6" opacity=".35"/>`;
+      for (const { i, j } of gridSelCells(r))
+        s += `<rect x="${X[j] + 1}" y="${Y[i] + 1}" width="${X[j + 1] - X[j] - 2}" height="${Y[i + 1] - Y[i] - 2}" style="fill:var(--accent);stroke:var(--accent)" fill-opacity=".1" stroke-width="1.2"/>`;
+    }
+    return s;
+  }
+  /* writing in a cell: the text editor over it; Enter keeps the text and goes down, Tab right (Shift+Tab left) */
+  function gridEdit(r, i, j, first) {
+    gridLayout(r);
+    GRIDSEL = { id: r.id, r0: i, c0: j, r1: i, c1: j };
+    GRIDEDIT = { id: r.id, i, j };
+    render();
+    const c = r.cells[i][j];
+    const { X, Y } = GRIDL.get(r);
+    openOverlay(X[j] + 4, (Y[i] + Y[i + 1]) / 2 + 6, first != null ? first : c.ctpl || c.t || '', v => {
+      const e = GRIDEDIT;
+      GRIDEDIT = null;
+      if ((c.ctpl || c.t || '') !== v) {
+        snap();
+        c.t = v.replace(/\s+$/, '');
+        /* written again by hand: the numbers it showed are its text now */
+        delete c.ctpl;
+        delete c.nochem;
+        commit();
+      } else render();
+      if (e && e.next) {
+        const [ni, nj] = e.next;
+        if (r.cells[ni] && r.cells[ni][nj]) {
+          if (e.go) gridEdit(r, ni, nj);
+          else {
+            GRIDSEL = { id: r.id, r0: ni, c0: nj, r1: ni, c1: nj };
+            render();
+          }
+        }
+      }
+    });
+    if (first != null) {
+      /* the first letter typed starts the cell: the cursor after it */
+      try {
+        const sel = window.getSelection();
+        sel.selectAllChildren(ovl);
+        sel.collapseToEnd();
+      } catch (e) {}
+    }
+  }
+  ovl.addEventListener(
+    'keydown',
+    e => {
+      if (!GRIDEDIT) return;
+      const r = mol.arrows.find(x => x.id === GRIDEDIT.id);
+      if (!r) return;
+      const { i, j } = GRIDEDIT,
+        nr = r.cells.length,
+        nc = r.cells[0].length;
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        e.stopPropagation();
+        let ni = i,
+          nj = j + (e.shiftKey ? -1 : 1);
+        if (nj >= nc) ((nj = 0), ni++);
+        if (nj < 0) ((nj = nc - 1), ni--);
+        if (ni >= 0 && ni < nr) GRIDEDIT.next = [ni, nj];
+        GRIDEDIT.go = true;
+        closeOverlay(true);
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        if (i + 1 < nr) GRIDEDIT.next = [i + 1, j];
+      }
+    },
+    true
+  );
+  /* picking cells with the Select tool (the table is selected as an object too, so it can be dragged) */
+  svg.addEventListener(
+    'pointerdown',
+    e => {
+      if (e.button !== 0 || !isSelTool()) return;
+      const p = pt(e),
+        r = mol.arrows.find(x => x.kind === 'grid' && gridCellAt(x, p));
+      if (!r) return;
+      const q = gridCellAt(r, p),
+        g = gridSelOf(r);
+      if (e.shiftKey && g && selArr.has(r.id)) {
+        /* Shift: the picked cells grow to this one (the table stays selected) */
+        GRIDSEL = { ...g, r1: q.i, c1: q.j };
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        render();
+        return;
+      }
+      GRIDSEL = { id: r.id, r0: q.i, c0: q.j, r1: q.i, c1: q.j };
+    },
+    true
+  );
+  svg.addEventListener('dblclick', e => {
+    if (!isSelTool() || findAtom(pt(e), 10)) return;
+    const p = pt(e),
+      r = mol.arrows.find(x => x.kind === 'grid' && gridCellAt(x, p));
+    if (!r) return;
+    const q = gridCellAt(r, p);
+    e.stopImmediatePropagation();
+    gridEdit(r, q.i, q.j);
+  }, true);
+  /* keys while cells are picked: a letter starts writing, Enter or F2 opens the cell, arrows move, Delete empties them */
+  document.addEventListener(
+    'keydown',
+    e => {
+      if (!GRIDSEL || !ovl.hidden) return;
+      GRIDEDIT = null;
+      const tg = e.target;
+      if (tg && (tg.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(tg.tagName)) && tg !== document.body) return;
+      const r = mol.arrows.find(x => x.id === GRIDSEL.id && x.kind === 'grid');
+      if (!r || !selArr.has(r.id)) return;
+      const nr = r.cells.length,
+        nc = r.cells[0].length,
+        g = GRIDSEL;
+      const mv = (di, dj) => {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        const ni = Math.max(0, Math.min(nr - 1, g.r1 + di)),
+          nj = Math.max(0, Math.min(nc - 1, g.c1 + dj));
+        GRIDSEL = e.shiftKey ? { ...g, r1: ni, c1: nj } : { id: r.id, r0: ni, c0: nj, r1: ni, c1: nj };
+        render();
+      };
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key === 'ArrowDown') return mv(1, 0);
+      if (e.key === 'ArrowUp') return mv(-1, 0);
+      if (e.key === 'ArrowLeft') return mv(0, -1);
+      if (e.key === 'ArrowRight') return mv(0, 1);
+      if (e.key === 'Tab') return mv(0, e.shiftKey ? -1 : 1);
+      if (e.key === 'Enter' || e.key === 'F2') {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return gridEdit(r, g.r1, g.c1);
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        /* empty cells: Delete goes on to the table itself */
+        if (!gridSelCells(r).some(x => x.c.t)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        snap();
+        for (const { c } of gridSelCells(r)) c.t = '';
+        commit();
+        return;
+      }
+      if (e.key.length === 1 && !e.repeat) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        gridEdit(r, g.r1, g.c1, e.key);
+      }
+    },
+    true
+  );
+  /* the table's menu (right-click on it): rows, columns, rules, fill, bold, alignment, the structure, footnotes */
+  const gridPop = document.createElement('div');
+  gridPop.className = 'pop';
+  gridPop.id = 'gridpop';
+  gridPop.hidden = true;
+  gridPop.style.cssText = 'position:fixed;z-index:70;display:block;padding:6px;min-width:230px;max-height:80vh;overflow:auto';
+  document.body.appendChild(gridPop);
+  const GRID_FILLS = ['#dbeaf7', '#fde2c4', '#e2f2d9', '#f3e0f7', '#fff3b0', '#e6e6e6'];
+  function gridMenu(r, cx, cy) {
+    const B = (k, l, t) => `<button type="button" class="btn ghost sm" data-g="${k}" style="text-align:left;justify-content:flex-start"${t ? ` title="${esc(t)}"` : ''}>${l}</button>`,
+      H = l => `<div class="note" style="margin:6px 2px 2px;font-weight:600">${l}</div>`;
+    gridPop.innerHTML =
+      H('Rows') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">' +
+      B('rowAbove', 'Insert above') + B('rowBelow', 'Insert below') + B('rowUp', 'Move up') + B('rowDown', 'Move down') + B('rowDel', 'Delete row') +
+      '</div>' + H('Columns') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:2px">' +
+      B('colLeft', 'Insert left') + B('colRight', 'Insert right') + B('colMoveL', 'Move left') + B('colMoveR', 'Move right') + B('colDel', 'Delete column') + B('colAuto', 'Width to fit') +
+      '</div>' + H('Rules of the picked cells') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">' +
+      B('bT', 'Top') + B('bB', 'Bottom') + B('bL', 'Left') + B('bR', 'Right') + B('bOut', 'Outside') + B('bAll', 'All') + B('bNone', 'None') + B('bJournal', 'Journal', 'Rules above and under the head and under the last row only') +
+      '</div>' + H('Text and fill') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px">' +
+      B('bold', '<b>Bold</b>') + B('alL', 'Left') + B('alC', 'Centre') + B('alR', 'Right') + B('colBlue', '<span style="color:#1f5fb4">Blue</span>') + B('colInk', 'Black') +
+      '</div><div style="display:flex;gap:4px;margin:4px 2px;flex-wrap:wrap">' +
+      GRID_FILLS.map(f => `<button type="button" data-g="fill" data-f="${f}" title="Fill" style="width:22px;height:22px;border:1px solid #aaa;border-radius:4px;background:${f}"></button>`).join('') +
+      `<button type="button" class="btn ghost sm" data-g="fill" data-f="">No fill</button></div>` +
+      H('Structure') +
+      B('fragIn', 'Put the selected structure in this cell') + B('fragOut', 'Take the structure out of the cell') +
+      H('Table') +
+      B('notes', 'Footnotes under the table…', 'One line each, e.g. ^{a} Isolated yield. Write ^{a} in a cell for the mark') + B('size', 'Letter size…') + B('del', 'Delete the table');
+    gridPop.hidden = false;
+    const W = gridPop.offsetWidth,
+      Hh = gridPop.offsetHeight;
+    gridPop.style.left = Math.max(4, Math.min(innerWidth - W - 4, cx)) + 'px';
+    gridPop.style.top = Math.max(4, Math.min(innerHeight - Hh - 4, cy)) + 'px';
+    gridPop.onclick = e => {
+      const b = e.target.closest('[data-g]');
+      if (!b) return;
+      gridPop.hidden = true;
+      gridAct(r, b.dataset.g, b.dataset.f);
+    };
+  }
+  document.addEventListener('pointerdown', e => {
+    if (!gridPop.hidden && !gridPop.contains(e.target)) gridPop.hidden = true;
+  });
+  svg.addEventListener(
+    'contextmenu',
+    e => {
+      if (!isSelTool()) return;
+      const p = pt(e),
+        r = mol.arrows.find(x => x.kind === 'grid' && gridCellAt(x, p));
+      if (!r) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const q = gridCellAt(r, p),
+        g = gridSelOf(r);
+      /* a right-click outside the picked cells picks the one under the pointer */
+      if (!g || !gridSelCells(r).some(x => x.i === q.i && x.j === q.j)) GRIDSEL = { id: r.id, r0: q.i, c0: q.j, r1: q.i, c1: q.j };
+      if (!selArr.has(r.id)) {
+        clearSel();
+        selArr.add(r.id);
+      }
+      render();
+      gridMenu(r, e.clientX, e.clientY);
+    },
+    true
+  );
+  function gridAct(r, k, f) {
+    const g = gridSelOf(r) || { r0: 0, c0: 0, r1: 0, c1: 0 },
+      i0 = Math.min(g.r0, g.r1),
+      i1 = Math.max(g.r0, g.r1),
+      j0 = Math.min(g.c0, g.c1),
+      j1 = Math.max(g.c0, g.c1),
+      nr = r.cells.length,
+      nc = r.cells[0].length,
+      cells = gridSelCells(r);
+    const blankRow = () => r.cells[0].map(() => ({ t: '' })),
+      setSel = (a, b, c, d) => (GRIDSEL = { id: r.id, r0: a, c0: b, r1: c, c1: d });
+    if (k === 'notes') {
+      const v = prompt('Footnotes under the table, one line each (^{a} for a raised a):', r.notes || '');
+      if (v == null) return;
+      snap();
+      r.notes = v.replace(/\r/g, '').replace(/\s+$/, '');
+      commit();
+      return;
+    }
+    if (k === 'size') {
+      const v = prompt('Letter size of the table (the texts of the sheet are ' + (textDef.size || 14) + '):', String(gridFz(r)));
+      if (v == null || !(+v > 4)) return;
+      snap();
+      r.fz = +v;
+      commit();
+      return;
+    }
+    if (k === 'fragIn') {
+      const fr = fragments().find(x => x.some(a => sel.has(a.id)));
+      if (!fr) {
+        toast('Select a structure first (it goes into the picked cell)', true);
+        return;
+      }
+      snap();
+      for (const row of r.cells) for (const c of row) if (c.at != null && fr.some(a => a.id === c.at)) delete c.at;
+      r.cells[i0][j0].at = fr[0].id;
+      commit();
+      return;
+    }
+    snap();
+    if (k === 'rowAbove' || k === 'rowBelow') {
+      const at = k === 'rowAbove' ? i0 : i1 + 1,
+        row = blankRow();
+      /* the journal rule under the last row moves to the new last row */
+      if (at === nr) for (let j = 0; j < nc; j++) if (r.cells[nr - 1][j].bb && nr > 1) ((row[j].bb = 1), delete r.cells[nr - 1][j].bb);
+      r.cells.splice(at, 0, row);
+      setSel(at, j0, at, j1);
+    } else if (k === 'rowDel') {
+      if (i1 - i0 + 1 >= nr) {
+        mol.arrows = mol.arrows.filter(x => x !== r);
+        GRIDSEL = null;
+      } else {
+        const last = i1 === nr - 1;
+        const kept = r.cells[i1].map(c => c.bb);
+        r.cells.splice(i0, i1 - i0 + 1);
+        if (last) r.cells[r.cells.length - 1].forEach((c, j) => kept[j] && (c.bb = 1));
+        const ni = Math.min(i0, r.cells.length - 1);
+        setSel(ni, j0, ni, j0);
+      }
+    } else if (k === 'rowUp' || k === 'rowDown') {
+      const d = k === 'rowUp' ? -1 : 1;
+      if ((d < 0 && i0 > 0) || (d > 0 && i1 < nr - 1)) {
+        const block = r.cells.splice(i0, i1 - i0 + 1);
+        r.cells.splice(i0 + d, 0, ...block);
+        setSel(i0 + d, j0, i1 + d, j1);
+      }
+    } else if (k === 'colLeft' || k === 'colRight') {
+      const at = k === 'colLeft' ? j0 : j1 + 1;
+      r.cells.forEach((row, i) => {
+        const nb = { t: '' };
+        const ref = row[Math.min(at, nc - 1)] || row[nc - 1];
+        /* the new column takes the rules running across (top and bottom) of its neighbour */
+        if (ref.bt) nb.bt = 1;
+        if (ref.bb) nb.bb = 1;
+        row.splice(at, 0, nb);
+      });
+      (r.cw || (r.cw = [])).splice(at, 0, null);
+      setSel(i0, at, i1, at);
+    } else if (k === 'colDel') {
+      if (j1 - j0 + 1 >= nc) {
+        mol.arrows = mol.arrows.filter(x => x !== r);
+        GRIDSEL = null;
+      } else {
+        r.cells.forEach(row => row.splice(j0, j1 - j0 + 1));
+        (r.cw || []).splice(j0, j1 - j0 + 1);
+        const nj = Math.min(j0, r.cells[0].length - 1);
+        setSel(i0, nj, i0, nj);
+      }
+    } else if (k === 'colMoveL' || k === 'colMoveR') {
+      const d = k === 'colMoveL' ? -1 : 1;
+      if ((d < 0 && j0 > 0) || (d > 0 && j1 < nc - 1)) {
+        r.cells.forEach(row => {
+          const b = row.splice(j0, j1 - j0 + 1);
+          row.splice(j0 + d, 0, ...b);
+        });
+        if (r.cw) {
+          const b = r.cw.splice(j0, j1 - j0 + 1);
+          r.cw.splice(j0 + d, 0, ...b);
+        }
+        setSel(i0, j0 + d, i1, j1 + d);
+      }
+    } else if (k === 'colAuto') {
+      for (let j = j0; j <= j1; j++) if (r.cw) r.cw[j] = null;
+    } else if (k === 'bT' || k === 'bB' || k === 'bL' || k === 'bR') {
+      const s = { bT: 'bt', bB: 'bb', bL: 'bl', bR: 'br' }[k];
+      /* one side of the picked block: on, or off when it is all on already */
+      const edge = cells.filter(x => (s === 'bt' ? x.i === i0 : s === 'bb' ? x.i === i1 : s === 'bl' ? x.j === j0 : x.j === j1));
+      const on = !edge.every(x => x.c[s]);
+      for (const x of edge) {
+        if (on) x.c[s] = 1;
+        else delete x.c[s];
+        /* the same line seen from the cell on its other side */
+        const o = s === 'bt' ? r.cells[x.i - 1] && r.cells[x.i - 1][x.j] : s === 'bl' ? r.cells[x.i][x.j - 1] : null;
+        if (!on && o) delete o[s === 'bt' ? 'bb' : 'br'];
+      }
+    } else if (k === 'bOut' || k === 'bAll' || k === 'bNone') {
+      for (const x of cells) {
+        if (k === 'bNone') {
+          for (const s of ['bt', 'bb', 'bl', 'br']) delete x.c[s];
+          if (x.i === i0 && r.cells[x.i - 1]) delete r.cells[x.i - 1][x.j].bb;
+          if (x.j === j0 && r.cells[x.i][x.j - 1]) delete r.cells[x.i][x.j - 1].br;
+          continue;
+        }
+        if (k === 'bAll' || x.i === i0) x.c.bt = 1;
+        if (k === 'bAll' || x.i === i1) x.c.bb = 1;
+        if (k === 'bAll' || x.j === j0) x.c.bl = 1;
+        if (k === 'bAll' || x.j === j1) x.c.br = 1;
+      }
+    } else if (k === 'bJournal') {
+      r.cells.forEach((row, i) =>
+        row.forEach(c => {
+          for (const s of ['bt', 'bb', 'bl', 'br']) delete c[s];
+          if (i === 0) c.bt = c.bb = 1;
+          if (i === r.cells.length - 1) c.bb = 1;
+        })
+      );
+    } else if (k === 'bold') {
+      const on = !cells.every(x => x.c.b);
+      for (const x of cells) on ? (x.c.b = 1) : delete x.c.b;
+    } else if (k === 'alL' || k === 'alC' || k === 'alR') {
+      for (const x of cells) x.c.al = { alL: 'left', alC: 'center', alR: 'right' }[k];
+    } else if (k === 'colBlue' || k === 'colInk') {
+      for (const x of cells) k === 'colBlue' ? (x.c.col = '#1f5fb4') : delete x.c.col;
+    } else if (k === 'fill') {
+      for (const x of cells) f ? (x.c.fill = f) : delete x.c.fill;
+    } else if (k === 'fragOut') {
+      for (const x of cells) delete x.c.at;
+    } else if (k === 'del') {
+      mol.arrows = mol.arrows.filter(x => x !== r);
+      GRIDSEL = null;
+    }
+    commit();
+  }
+  /* the Table tool: a click puts a table there (a head row and four rows, four columns), ready to be written in */
+  function gridPut(p) {
+    snap();
+    const r = gridNew(p.x, p.y, 5, 4);
+    mol.arrows.push(r);
+    clearSel();
+    selArr.add(r.id);
+    commit();
+    setTool('select', true);
+    selArr.add(r.id);
+    gridEdit(r, 0, 0);
+    toast('Table: type in a cell, Tab and Enter go on; right-click for rows, columns, rules, fill, a structure and footnotes');
+  }
+  /* for files: the table written out as texts, lines and filled boxes (other programs read those) */
+  function gridExplode(r) {
+    gridLayout(r);
+    const { X, Y } = GRIDL.get(r),
+      lh = gridFz(r) * 1.25,
+      texts = [],
+      lines = [],
+      boxes = [];
+    let id = 1e9;
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        if (c.fill) boxes.push({ id: id++, kind: 'shp', sh: 'rect', st: 'filled', col: c.fill, x1: X[j], y1: Y[i], x2: X[j + 1], y2: Y[i + 1] });
+        if (c.t) {
+          const t = gridTxt(r, c),
+            w = textW(t),
+            al = c.al || 'center',
+            n = String(c.t).split('\n').length;
+          t.id = id++;
+          t.x = al === 'left' ? X[j] + GRID_PAD : al === 'right' ? X[j + 1] - GRID_PAD - w : (X[j] + X[j + 1]) / 2 - w / 2;
+          t.y = c.at != null && atomById(c.at) ? Y[i] + GRID_PAD * 0.6 + tSize(t) * 0.85 : (Y[i] + Y[i + 1]) / 2 - ((n - 1) * lh) / 2 + tSize(t) * 0.35;
+          if (al !== 'left') t.align = al;
+          if (!t.color) delete t.color;
+          texts.push(t);
+        }
+        const L = (x1, y1, x2, y2) => lines.push({ id: id++, x1, y1, x2, y2, head: 'none' });
+        if (c.bt && !(i > 0 && r.cells[i - 1][j].bb)) L(X[j], Y[i], X[j + 1], Y[i]);
+        if (c.bb) L(X[j], Y[i + 1], X[j + 1], Y[i + 1]);
+        if (c.bl && !(j > 0 && row[j - 1].br)) L(X[j], Y[i], X[j], Y[i + 1]);
+        if (c.br) L(X[j + 1], Y[i], X[j + 1], Y[i + 1]);
+      })
+    );
+    const N = gridNotes(r);
+    if (N) texts.push({ ...N.t, id: id++ });
+    return { texts, arrows: [...boxes, ...lines] };
+  }
+  /* a drawing with its tables written out (for the files that have no table of their own) */
+  function withGridsOut(m) {
+    if (!m.arrows.some(r => r.kind === 'grid')) return m;
+    const o = Object.assign({}, m, { arrows: m.arrows.filter(r => r.kind !== 'grid'), texts: m.texts.slice() });
+    for (const r of m.arrows) {
+      if (r.kind !== 'grid') continue;
+      const x = gridExplode(r);
+      o.arrows.push(...x.arrows);
+      o.texts.push(...x.texts);
+    }
+    return o;
+  }
   function tableSVG(r) {
     tblBindSteps();
     return withStep(r.step, () => tableSVG1(r));
@@ -67719,6 +68535,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   window.__rd = {
     tableSVG,
+    gridAct,
+    gridLayout,
+    gridExplode,
+    get GRIDSEL() {
+      return GRIDSEL;
+    },
+    set GRIDSEL(v) {
+      GRIDSEL = v;
+    },
     switchStep,
     wordNumber,
     rdCliRun,
@@ -67774,6 +68599,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     keyConflicts,
     textW,
+    tLines,
+    tSize,
     alignUnits,
     distributeUnits,
     doGroup,
