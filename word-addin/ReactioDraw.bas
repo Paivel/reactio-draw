@@ -7,7 +7,7 @@ Attribute VB_Name = "ReactioDraw"
 '   Update                puts drawings saved in Reactio Draw back into Word (Reactio Draw asks Word to do it by itself)
 '   Mark drawings         a hidden mark beside every Reactio Draw drawing, shown on screen, never printed; the button stays pressed while they are on
 '   Number compounds      numbers the compounds of this document from their marks ([[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1),
-'                         in the text and in Reactio Draw drawings; the document is saved, numbered in place and opened again
+'                         in the text and in Reactio Draw drawings, in the open document (it stays open; Undo takes it back)
 '   Show marks            the same document with the marks shown instead of the numbers, to see which key is which
 '   Remove marks          a copy with the numbers as plain text and no marks left (drawings stay Reactio Draw drawings), opened in Word
 '   Final copy            the same with plain vector pictures too: the copy to send
@@ -64,18 +64,68 @@ Public Sub RD_Final(control As Object)
     If RunRD("final", p, o) Then OpenResult o
 End Sub
 
-' saved, closed, numbered by Reactio Draw in place (the version before goes to Reactio Draw's own folder) and opened again.
-' The work is done a moment after the button returns (Word on a Mac may refuse to close a document from inside the button's
-' own call, error 4198), and Word gets a few tries to close and open it
+' Number compounds and Show marks: the document is saved, Reactio Draw numbers a copy of it, and that copy takes the place of
+' the document's text in the open document (one step for Undo; tracked changes are left off for it); headers and footers
+' stay as they are. With an older Reactio Draw that cannot make the copy, the document is closed, numbered in place and
+' opened again, a moment after the button returns (Word on a Mac may refuse to close a document from inside the button's
+' own call, error 4198)
 Private Sub NumberDoc(marks As Boolean)
     Listen
-    Dim p As String
+    Dim p As String, t As String, d As Object, cmd As String
     p = DocPath()
     If p = "" Then Exit Sub
-    RDNumPath = p
-    RDNumCmd = "number"
-    If marks Then RDNumCmd = "marks"
-    Application.OnTime When:=Now, Name:="RD_NumberNow"
+    Set d = ActiveDocument
+    cmd = "number"
+    If marks Then cmd = "marks"
+    t = NumberedFile()
+    On Error Resume Next
+    Kill t
+    On Error GoTo 0
+    If Not RunRD(cmd & "-here", p, t) Then Exit Sub
+    If Dir$(t) = "" Then
+        RDNumPath = p
+        RDNumCmd = cmd
+        Application.OnTime When:=Now, Name:="RD_NumberNow"
+        Exit Sub
+    End If
+    PutContent d, t
+    On Error Resume Next
+    Kill t
+End Sub
+
+' where Reactio Draw writes the numbered copy: a folder Word may read (on a Mac, Office's own)
+Private Function NumberedFile() As String
+#If Mac Then
+    NumberedFile = AskHelper("dir", "", "") & "numbered.docx"
+#Else
+    NumberedFile = Environ$("TEMP") & "\ReactioDraw numbered.docx"
+#End If
+End Function
+
+' the text of document d replaced by that of file t, where the cursor was
+Private Sub PutContent(d As Object, t As String)
+    Dim trk As Boolean, pos As Long, r As Object, e As Object, ur As Object
+    On Error Resume Next
+    Set ur = Application.UndoRecord
+    If Not ur Is Nothing Then ur.StartCustomRecord "Number compounds"
+    On Error GoTo 0
+    trk = d.TrackRevisions
+    d.TrackRevisions = False
+    pos = Selection.Start
+    Application.ScreenUpdating = False
+    Set r = d.Range(0, d.Content.End - 1)
+    r.InsertFile FileName:=t
+    ' the file's own last paragraph mark comes in before the document's: one empty paragraph too many at the end
+    If d.Content.End >= 2 Then
+        Set e = d.Range(d.Content.End - 2, d.Content.End - 1)
+        If e.Text = vbCr Then e.Delete
+    End If
+    d.TrackRevisions = trk
+    If pos > d.Content.End - 1 Then pos = d.Content.End - 1
+    d.Range(pos, pos).Select
+    Application.ScreenUpdating = True
+    On Error Resume Next
+    If Not ur Is Nothing Then ur.EndCustomRecord
 End Sub
 
 Public Sub RD_NumberNow()
@@ -480,6 +530,21 @@ Private Function RunRD(cmd As String, p As String, o As String) As Boolean
     Set sh = CreateObject("WScript.Shell")
     If cmd = "open" Then
         sh.Run """" & GetSetting("ReactioDraw", "App", "Exe", f & "\ReactioDraw.exe") & """ """ & p & """", 1, False
+        RunRD = True
+        Exit Function
+    End If
+    If cmd = "number-here" Or cmd = "marks-here" Then
+        a = ""
+        If cmd = "marks-here" Then a = " --marks"
+        code = sh.Run("""" & f & "\reactio.exe"" word-number """ & p & """ -o """ & o & """" & a, 0, True)
+        If code <> 0 Then
+            MsgBox "Reactio Draw could not number this document (exit code " & code & ").", vbExclamation, TTL
+            Exit Function
+        End If
+        If Dir$(o) = "" Then
+            MsgBox "There are no [[key]] marks in this document: write [[name]] where a compound's number goes.", vbInformation, TTL
+            Exit Function
+        End If
         RunRD = True
         Exit Function
     End If

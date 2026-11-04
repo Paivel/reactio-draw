@@ -43,6 +43,20 @@ on |rd|(p)
 				return "There is nothing to take out of this document: no [[key]] marks and no Reactio Draw drawings."
 			end try
 			do shell script "open -a 'Microsoft Word' " & quoted form of out
+		else if cmd is "number-here" or cmd is "marks-here" then
+			-- the compounds numbered from their [[key]] marks, in a copy in Reactio Draw's folder: the Word tab puts its text in
+			-- place of the open document's (the document itself stays open and as it was saved)
+			do shell script "mkdir -p " & quoted form of xdir
+			set tmp to xdir & "numbered.docx"
+			set opt to ""
+			if cmd is "marks-here" then set opt to " --marks"
+			do shell script "rm -f " & quoted form of tmp
+			do shell script quoted form of cli & " word-number " & quoted form of src & " -o " & quoted form of tmp & opt
+			try
+				do shell script "test -f " & quoted form of tmp
+			on error
+				return "There are no [[key]] marks in this document: write [[name]] where a compound's number goes."
+			end try
 		else if cmd is "number" or cmd is "marks" then
 			-- the compounds numbered from their [[key]] marks, in place: Word has closed the document; the version before
 			-- is kept in Reactio Draw's folder
