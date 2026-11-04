@@ -41423,7 +41423,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       save();
       const p = pt(g.getAttribute('p'));
       const t = { id: mol.next++, kind: 'tbl', x1: p.x + ox, y1: p.y, x2: 0, y2: 0 };
-      if (ar && rxnArrows().length > 1) t.step = ar.id;
+      if (ar) t.step = ar.id;
       mol.arrows.push(t);
     }
     commit();
@@ -64013,7 +64013,32 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return { cols, used };
   }
   function tableSVG(r) {
+    tblBindSteps();
     return withStep(r.step, () => tableSVG1(r));
+  }
+  /* every table on a sheet with several reactions shows its own step: a table made while the sheet had one reaction (no
+     step of its own, so it showed whichever step was open, and changed with the other table) takes the reaction nearest
+     above it that no other table shows */
+  function tblBindSteps() {
+    const R = rxnArrows();
+    if (R.length < 2) return;
+    const T = mol.arrows.filter(r => r.kind === 'tbl');
+    const loose = T.filter(r => r.step == null || !R.some(a => a.id === r.step));
+    if (!loose.length) return;
+    const taken = new Set(T.filter(r => !loose.includes(r)).map(r => r.step));
+    for (const r of loose.sort((a, b) => a.y1 - b.y1)) {
+      let best = null,
+        bd = Infinity;
+      for (const a of R) {
+        if (taken.has(a.id)) continue;
+        const ay = Math.max(a.y1, a.y2),
+          d = Math.hypot((a.x1 + a.x2) / 2 - (r.x1 + Math.max(r.x2, r.x1)) / 2, ay - r.y1) + (ay > r.y1 ? 1e4 : 0);
+        if (d < bd) ((bd = d), (best = a));
+      }
+      if (!best) break;
+      r.step = best.id;
+      taken.add(best.id);
+    }
   }
   function tableSVG1(r) {
     const compact = !!r.compact;
@@ -64234,7 +64259,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ys = [...pts.map(p => p.y), ...mol.arrows.filter(r => selArr.has(r.id)).flatMap(r => [r.y1, r.y2])],
       xs = [...pts.map(p => p.x), ...mol.arrows.filter(r => selArr.has(r.id)).flatMap(r => [r.x1, r.x2])];
     const r = { id: mol.next++, kind: 'tbl', x1: Math.min(...xs), y1: Math.max(...ys) + 40, x2: 0, y2: 0 };
-    if (ar && R.length > 1) r.step = ar.id;
+    /* bound to its reaction even when it is the only one: a second reaction drawn later gets a table of its own */
+    if (ar) r.step = ar.id;
     syncTable();
     tableSVG(r);
     mol.arrows.push(r);
@@ -64261,7 +64287,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     const bb = contentBox(),
-      A = rxnArrows().length > 1 ? orderedArrows() : [null];
+      A = rxnArrows().length ? orderedArrows() : [null];
     const x = bb ? bb.x0 : 40;
     let y = bb ? bb.y1 + (A.length > 1 ? 44 : 30) : 40;
     const flow = mol.next;
