@@ -132,6 +132,18 @@ def icons():
             xa = x0 + k * j
             d.line([(xa + k * 18, 160), (xa, 160), (xa, 236), (xa + k * 18, 236)], fill=acc, width=10)
     out['rdMarks'] = im
+    im = Image.new('RGBA', (S, S)); d = ImageDraw.Draw(im); hexagon(d, 128, 92, 52, 11, ink)  # remove marks: [[ ]] crossed out
+    for x0, k in ((40, 1), (216, -1)):
+        for j in (0, 22):
+            xa = x0 + k * j
+            d.line([(xa + k * 18, 160), (xa, 160), (xa, 236), (xa + k * 18, 236)], fill=ink, width=10)
+    d.line([(30, 246), (226, 150)], fill=acc, width=16)
+    out['rdUnmark'] = im
+    im = Image.new('RGBA', (S, S)); d = ImageDraw.Draw(im)  # final copy: a page with a ring and a tick
+    d.polygon([(48, 18), (160, 18), (208, 66), (208, 238), (48, 238)], outline=ink, width=12); d.line([(158, 20), (158, 68), (206, 68)], fill=ink, width=12)
+    hexagon(d, 118, 116, 40, 10, ink)
+    d.line([(96, 196), (124, 222), (180, 160)], fill=acc, width=18)
+    out['rdFinal'] = im
     app = os.path.join(HERE, '..', 'linux-app', 'reactiodraw.png')
     out['rdOpen'] = Image.open(app).convert('RGBA')
     res = {}
@@ -158,6 +170,10 @@ CUSTOM_UI = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             screentip="Number compounds" supertip="Numbers the compounds from their marks, in the text and in Reactio Draw drawings: [[aldehyde]] 7, [[aldehyde.OMe.letter]] 7a, [[aldehyde.OMe.num]] 7.1, by first appearance. [[#format S{n}]] and [[#start 5]] in the document set the style. The document is saved, numbered and opened again; the marks stay, so press again after adding compounds."/>
           <button id="rdMarks" label="Show marks" size="large" image="rdMarks" onAction="RD_ShowMarks"
             screentip="Show marks" supertip="Shows the marks ([[aldehyde]]) instead of the numbers, in the text and in the drawings, to see which mark to write. Number compounds puts the numbers back."/>
+          <button id="rdUnmark" label="Remove marks" size="large" image="rdUnmark" onAction="RD_Unmark"
+            screentip="Remove marks" supertip="Makes a copy of the document with the numbers as plain text and no marks left, in the text and in the drawings (they stay Reactio Draw drawings), and opens it. This document keeps its marks."/>
+          <button id="rdFinal" label="Final copy" size="large" image="rdFinal" onAction="RD_Final"
+            screentip="Final copy" supertip="Makes a copy to send: numbers as plain text, no marks, and plain vector pictures without Reactio Draw data; opens it. This document keeps its marks and drawings."/>
         </group>
         <group id="rdDrawing" label="Drawing">
           <button id="rdEdit" label="Edit drawing" size="large" image="rdEdit" onAction="RD_Edit"

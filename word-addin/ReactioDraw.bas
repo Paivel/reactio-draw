@@ -9,6 +9,8 @@ Attribute VB_Name = "ReactioDraw"
 '   Number compounds      numbers the compounds of this document from their marks ([[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1),
 '                         in the text and in Reactio Draw drawings; the document is saved, numbered in place and opened again
 '   Show marks            the same document with the marks shown instead of the numbers, to see which key is which
+'   Remove marks          a copy with the numbers as plain text and no marks left (drawings stay Reactio Draw drawings), opened in Word
+'   Final copy            the same with plain vector pictures too: the copy to send
 ' Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
 Option Explicit
 
@@ -42,6 +44,24 @@ End Sub
 
 Public Sub RD_ShowMarks(control As Object)
     NumberDoc True
+End Sub
+
+Public Sub RD_Unmark(control As Object)
+    Listen
+    Dim p As String, o As String
+    p = DocPath()
+    If p = "" Then Exit Sub
+    o = Left$(p, Len(p) - 5) & " (no marks).docx"
+    If RunRD("unmark", p, o) Then OpenResult o
+End Sub
+
+Public Sub RD_Final(control As Object)
+    Listen
+    Dim p As String, o As String
+    p = DocPath()
+    If p = "" Then Exit Sub
+    o = Left$(p, Len(p) - 5) & " (final).docx"
+    If RunRD("final", p, o) Then OpenResult o
 End Sub
 
 ' saved, closed, numbered by Reactio Draw in place (the version before goes to Reactio Draw's own folder) and opened again.
@@ -483,6 +503,8 @@ Private Function RunRD(cmd As String, p As String, o As String) As Boolean
         RunRD = True
         Exit Function
     End If
+    If cmd = "unmark" Then code = sh.Run("""" & f & "\reactio.exe"" word-number """ & p & """ -o """ & o & """ --strip", 0, True)
+    If cmd = "final" Then code = sh.Run("""" & f & "\reactio.exe"" word-clean """ & p & """ -o """ & o & """ --strip", 0, True)
     If cmd = "plain" Then code = sh.Run("""" & f & "\reactio.exe"" word-clean """ & p & """ -o """ & o & """", 0, True)
     If cmd = "cdxml" Then code = sh.Run("""" & f & "\reactio.exe"" convert """ & p & """ -o """ & o & """", 0, True)
     If code <> 0 Then

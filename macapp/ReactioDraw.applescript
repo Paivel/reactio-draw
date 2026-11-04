@@ -29,6 +29,20 @@ on |rd|(p)
 				return "There are no Reactio Draw drawings in this document."
 			end try
 			do shell script "open -a 'Microsoft Word' " & quoted form of out
+		else if cmd is "unmark" or cmd is "final" then
+			-- a copy without the compound marks (final: with plain pictures too), opened in Word
+			do shell script "rm -f " & quoted form of out
+			if cmd is "unmark" then
+				do shell script quoted form of cli & " word-number " & quoted form of src & " -o " & quoted form of out & " --strip"
+			else
+				do shell script quoted form of cli & " word-clean " & quoted form of src & " -o " & quoted form of out & " --strip"
+			end if
+			try
+				do shell script "test -f " & quoted form of out
+			on error
+				return "There is nothing to take out of this document: no [[key]] marks and no Reactio Draw drawings."
+			end try
+			do shell script "open -a 'Microsoft Word' " & quoted form of out
 		else if cmd is "number" or cmd is "marks" then
 			-- the compounds numbered from their [[key]] marks, in place: Word has closed the document; the version before
 			-- is kept in Reactio Draw's folder

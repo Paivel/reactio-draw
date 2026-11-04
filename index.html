@@ -37626,9 +37626,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const wT = (rPr, t) => (t ? `<w:r>${rPr}<w:t xml:space="preserve">${t}</w:t></w:r>` : '');
   const wSdt = (rPr, spec, num) =>
     `<w:sdt><w:sdtPr>${rPr}<w:alias w:val="Compound ${spec}"/><w:tag w:val="rdcmpd:${spec}"/></w:sdtPr><w:sdtContent><w:r>${rPr}<w:t xml:space="preserve">${num}</w:t></w:r></w:sdtContent></w:sdt>`;
-  /* marks: the marks shown instead of numbers ([[aldehyde]] in the text and on the drawings), to see which key is which;
-     numbering again puts the numbers back */
+  /* marks: true, the marks shown instead of numbers ([[aldehyde]] in the text and on the drawings), to see which key is
+     which; numbering again puts the numbers back. 'strip': the numbers as plain text, the marks gone from the text and the
+     drawings, the settings lines taken out (a copy that is not numbered again) */
   async function wordNumber(u, tpl, start, job, marks) {
+    const mode = marks;
     const z = await unzipAll(u),
       td = new TextDecoder(),
       te = new TextEncoder(),
@@ -37679,11 +37681,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         g.at = pos;
         pos += g.run.text.length;
       }
-      const marks = [];
-      for (const m of full.matchAll(CMPD_RX)) marks.push({ s: m.index, e: m.index + m[0].length, key: m[1], sub: m[2] || '', fmt: m[3] || (m[2] ? 'letter' : '') });
-      for (const m of full.matchAll(CMPD_SET)) marks.push({ s: m.index, e: m.index + m[0].length, set: true });
-      marks.sort((a, b) => a.s - b.s);
-      for (const mk of marks) if (!mk.set) N.take(mk.key, mk.sub);
+      const mks = [];
+      for (const m of full.matchAll(CMPD_RX)) mks.push({ s: m.index, e: m.index + m[0].length, key: m[1], sub: m[2] || '', fmt: m[3] || (m[2] ? 'letter' : '') });
+      for (const m of full.matchAll(CMPD_SET)) mks.push({ s: m.index, e: m.index + m[0].length, set: true });
+      mks.sort((a, b) => a.s - b.s);
+      for (const mk of mks) if (!mk.set) N.take(mk.key, mk.sub);
       /* written again: the runs cut at the marks; a mark takes the properties of the run it starts in */
       const rPrAt = i => {
         for (let k = runs.length - 1; k >= 0; k--) if (runs[k].at <= i) return runs[k].run.rPr;
@@ -37700,13 +37702,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         return o;
       };
-      for (const mk of marks) {
+      for (const mk of mks) {
         xml += textUpTo(cur, mk.s);
         const rp = rPrAt(mk.s);
         if (mk.set) {
-          /* a setting stays, as hidden text */
+          /* a setting stays, as hidden text (and goes when the marks are taken out) */
           const hp = rp ? rp.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>';
-          xml += wT(hp, full.slice(mk.s, mk.e));
+          if (mode !== 'strip') xml += wT(hp, full.slice(mk.s, mk.e));
         } else {
           const sp = spec(mk.key, mk.sub, mk.sub ? mk.fmt : '');
           xml += '\u0000M' + textMarks.length + '\u0000';
@@ -37820,6 +37822,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .join('')
       .replace(/\u0000M(\d+)\u0000/g, (m0, i) => {
         const t = textMarks[+i];
+        if (marks === 'strip') return wT(t.rPr, N.text(t.key, t.sub, t.fmt));
         return wSdt(t.rPr, t.spec, marks ? '[[' + t.spec + ']]' : N.text(t.key, t.sub, t.fmt));
       });
     /* the drawings: their texts show the numbers, the marks kept; drawn again */
@@ -37851,7 +37854,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           t.nochem = true;
           t.fs = false;
           const cx = t.x + textW(t) / 2;
-          t.text = marks ? t.ctpl : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
+          t.text = marks === true ? t.ctpl : t.ctpl.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : '')));
+          if (marks === 'strip') delete t.ctpl;
           t.x = cx - textW(t) / 2;
         }
         const kd = JSON.stringify(it.kd && it.kd.clip && !it.kd.state ? { rd: 1, state: S } : { ...(it.kd || { rd: 1 }), state: S }),
@@ -37950,7 +37954,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
 <div class="note" style="margin-bottom:8px">Marks in the text and in Reactio Draw drawings: <b>[[key]]</b> → 7, <b>[[key.sub.letter]]</b> → 7a, <b>[[key.sub.num]]</b> → 7.1. Numbers go by first appearance. A copy of the file is written; the marks stay in it, so it can be numbered again.</div>
 <div style="display:flex;gap:6px;align-items:center"><span class="note">Number</span><input id="wnumTpl" style="width:96px" aria-label="Number style"><span class="note">from</span><input id="wnumStart" style="width:52px" aria-label="First number"><span class="note" style="flex:1">{n} the number, e.g. S{n}</span></div>
 <div class="note" id="wnumFrom" style="margin-top:4px"></div>
-<div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="marks" title="A copy that shows [[key]] instead of each number, in the text and on the drawings: to see which mark to write. Number it again for the numbers">Show the marks</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
+<div class="row" style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px"><button type="button" class="btn sm" data-w="go">Number</button><button type="button" class="btn ghost sm" data-w="marks" title="A copy that shows [[key]] instead of each number, in the text and on the drawings: to see which mark to write. Number it again for the numbers">Show the marks</button><button type="button" class="btn ghost sm" data-w="strip" title="A copy with the numbers as plain text and no marks left (the drawings stay Reactio Draw drawings): to send. Keep the file with the marks for numbering again">Remove the marks</button><button type="button" class="btn ghost sm" data-w="no">Cancel</button></div>`;
     document.body.appendChild(d);
     const T = d.querySelector('#wnumTpl'),
       Sx = d.querySelector('#wnumStart');
@@ -37967,7 +37971,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (b.dataset.w === 'no') return d.remove();
       const tpl = T.value.trim() || '{n}',
         st = parseInt(Sx.value, 10) || 1,
-        mk = b.dataset.w === 'marks';
+        mk = b.dataset.w === 'marks' ? true : b.dataset.w === 'strip' ? 'strip' : false;
       d.remove();
       try {
         localStorage.setItem('rd-wnum', JSON.stringify({ tpl, start: String(st) }));
@@ -37981,11 +37985,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           return;
         }
         offerFile(
-          f.name.replace(/\.docx$/i, '').replace(/ \((numbered|marks)\)$/, '') + (mk ? ' (marks).docx' : ' (numbered).docx'),
+          f.name.replace(/\.docx$/i, '').replace(/ \((numbered|marks)\)$/, '') +
+            (mk === 'strip' ? ' (no marks).docx' : mk ? ' (marks).docx' : ' (numbered).docx'),
           new Blob([r.bytes], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })
         );
         toast(
-          r.compounds + ' compound' + (r.compounds > 1 ? 's' : '') + (mk ? ' with their marks shown: ' : ' numbered: ') + r.marks + ' mark(s) in the text, ' + r.drawings + ' drawing(s)' +
+          r.compounds + ' compound' + (r.compounds > 1 ? 's' : '') + (mk === 'strip' ? ' numbered, marks removed: ' : mk ? ' with their marks shown: ' : ' numbered: ') + r.marks + ' mark(s) in the text, ' + r.drawings + ' drawing(s)' +
             (r.once.length ? '. Met only once (a typing slip?): ' + r.once.slice(0, 6).join(', ') : '')
         );
       } catch (er) {
@@ -62961,6 +62966,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   reactio word-number <file.docx> [-o <out.docx>] [--number S{n}] [--start 1]
                                the compounds numbered from their marks: [[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1
                                (--marks: the marks shown instead of the numbers, to see which key is which)
+                               (--strip: the numbers as plain text, no marks left: a copy to send; word-clean --strip also
+                               makes the pictures plain)
   reactio op <command> ['{"json": "args"}'] [-i <input>]           any command of the local API (see Local API.txt)
 
   <input> is a file (.reactio .mol .sdf .rxn .smi .cdxml .cdx .json) or a SMILES in quotes. A Word file (.docx) gives all its
@@ -63039,7 +63046,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         opt.json = true;
         continue;
       }
-      if (a === '--png' || a === '--props' || a === '--colors' || a === '--inchikey' || a === '--name' || a === '--nmr' || a === '--smiles' || a === '--marks') {
+      if (a === '--png' || a === '--props' || a === '--colors' || a === '--inchikey' || a === '--name' || a === '--nmr' || a === '--smiles' || a === '--marks' || a === '--strip') {
         opt[a.slice(2)] = true;
         continue;
       }
@@ -63181,7 +63188,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         try {
           set = cmpdSettings(new TextDecoder().decode((await unzipAll(u)).get('word/document.xml')));
         } catch (e) {}
-        const r = await wordNumber(u, String(opt.number || set.format || '{n}'), parseInt(opt.start || set.start || '1', 10) || 1, null, !!opt.marks);
+        const r = await wordNumber(
+          u,
+          String(opt.number || set.format || '{n}'),
+          parseInt(opt.start || set.start || '1', 10) || 1,
+          null,
+          opt.strip ? 'strip' : !!opt.marks
+        );
         if (!r.compounds) {
           say('nothing to number: no [[key]] marks in ' + f.name);
           return res;
@@ -63190,7 +63203,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             ? isDir(outp)
               ? outp.replace(/[\\/]?$/, '/') + base(pos[0]) + ' (numbered).docx'
               : outp
-            : String(pos[0]).replace(/\.docx$/i, ' (numbered).docx'),
+            : String(pos[0]).replace(/\.docx$/i, opt.strip ? ' (no marks).docx' : ' (numbered).docx'),
           bu = r.bytes instanceof Blob ? new Uint8Array(await r.bytes.arrayBuffer()) : r.bytes;
         res.writes.push({ path, b64: window.rdNative ? window.rdNative.b64(bu) : '' });
         res.err +=
@@ -63201,18 +63214,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (cmd === 'word-clean') {
         if (pos.length !== 1 || !files[pos[0]] || !/\.docx$/i.test(pos[0]))
           return fail('reactio word-clean: give one Word file (.docx)', 2);
-        const f = files[pos[0]],
-          r = await wordClean(Uint8Array.from(atob(f.b64), c => c.charCodeAt(0)));
-        if (!r.bytes) {
+        const f = files[pos[0]];
+        let u0 = Uint8Array.from(atob(f.b64), c => c.charCodeAt(0)),
+          stripped = false;
+        /* --strip: the compound marks out first (numbers as plain text), then the plain pictures: a final copy */
+        if (opt.strip) {
+          let set = {};
+          try {
+            set = cmpdSettings(new TextDecoder().decode((await unzipAll(u0)).get('word/document.xml')));
+          } catch (e) {}
+          const n = await wordNumber(u0, String(set.format || '{n}'), parseInt(set.start || '1', 10) || 1, null, 'strip');
+          if (n.compounds) u0 = n.bytes instanceof Blob ? new Uint8Array(await n.bytes.arrayBuffer()) : n.bytes;
+          stripped = !!n.compounds;
+        }
+        const r = await wordClean(u0);
+        if (!r.bytes && !stripped) {
           say('nothing to clean: no Reactio Draw drawings in ' + f.name);
           return res;
         }
-        const path = outp
+        const tail = opt.strip ? ' (final).docx' : ' (plain).docx',
+          path = outp
             ? isDir(outp)
-              ? outp.replace(/[\\/]?$/, '/') + base(pos[0]) + ' (plain).docx'
+              ? outp.replace(/[\\/]?$/, '/') + base(pos[0]) + tail
               : outp
-            : String(pos[0]).replace(/\.docx$/i, ' (plain).docx'),
-          u = new Uint8Array(await r.bytes.arrayBuffer());
+            : String(pos[0]).replace(/\.docx$/i, tail),
+          u = r.bytes ? new Uint8Array(await r.bytes.arrayBuffer()) : u0;
         res.writes.push({ path, b64: window.rdNative ? window.rdNative.b64(u) : '' });
         res.err += 'wrote ' + path + ' (' + r.objects + ' objects, ' + r.pictures + ' pictures made plain)\n';
         return res;
@@ -66426,6 +66452,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    tableSVG,
+    switchStep,
     wordNumber,
     rdUntag,
     molBlock,

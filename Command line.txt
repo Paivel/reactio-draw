@@ -21,8 +21,9 @@ Where it is:
   reactio check   <input…>     valence and drawing problems (exit code 3 when there are errors or warnings)
   reactio name    <input…>     IUPAC name (needs Python with openclatura)
   reactio smiles  <name…>      SMILES from a name (common names built in; others need Java for OPSIN)
-  reactio word-clean <file.docx> [-o <out.docx>]                   the Word file with plain vector pictures (no Reactio Draw data)
-  reactio word-number <file.docx> [-o <out.docx>] [--number S{n}] [--start 1] [--marks]
+  reactio word-clean <file.docx> [-o <out.docx>] [--strip]         the Word file with plain vector pictures (no Reactio Draw data;
+                               --strip: compound marks out too, numbers as plain text)
+  reactio word-number <file.docx> [-o <out.docx>] [--number S{n}] [--start 1] [--marks | --strip]
                                the compounds numbered from their marks: [[key]] 7, [[key.sub.letter]] 7a, [[key.sub.num]] 7.1
   reactio op <command> ['{"json": "args"}'] [-i <input>]           any command of the local API (see Local API.txt)
 
