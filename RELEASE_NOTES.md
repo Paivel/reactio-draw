@@ -1,10 +1,15 @@
+# Next version
+
+## Fixed
+
+- **A pasted copy keeps its own texts.** A reaction copied and pasted: the pasted arrow took hold of the original's texts over the arrow (Et3N, iPrOH), so they jumped to the copy and the original's reagent table lost them. Each copy now holds its own texts, and the original stays as it was.
+
 # Reactio Draw 1.10
 
 ## New
 
 - **Repeat units.** A SMILES with a piece repeated ten times or more (poly-L-alanine, PEG, polystyrene, isotactic polypropylene) asks first: one repeat unit in brackets with its n, H–[NH–CH(CH3)–CO]50–OH, or the whole chain. The unit sits centred between its brackets, the bonds through them level, its side groups clear of them; n stands at the foot of the right bracket and can be typed over. Formula, mass, SMILES, InChI and name are those of the whole chain, with its configuration (each unit's wedges checked against the SMILES); the brackets follow the unit when it is moved or cleaned up and come along when it is copied. Pieces that cannot be one unit as written (a double bond into the first one, a ring running through) are drawn whole.
 - **Repeat units in files.** Molfile, SDF and RXN write a repeat unit as a polymer Sgroup (SRU: its atoms, the two bonds through the brackets, head-to-tail, n as its label); CDXML and CDX as a bracket group (BracketUsage SRU, RepeatCount, the crossing bonds). Both are read back as a repeat unit, from any program that writes them.
-- **Compound numbers in a Word file.** File → Word files → Number the compounds: marks written in the text and in Reactio Draw drawings, [[aldehyde]] for 7, [[aldehyde.OMe.letter]] for 7a, [[aldehyde.OMe.num]] for 7.1, get their numbers by first appearance (text and drawings in reading order); the same key is the same number everywhere. The style is asked for ({n}, S{n}, from any number) or set in the file with [[#format S{n}]] and [[#start 5]]. A copy is written: in the text each mark becomes a small content control holding its number, in the drawings the numbers are drawn and the marks kept, so the copy can be numbered again after compounds are added. Works with Reactio Draw objects (Windows) and pictures (Mac); keys met only once are named, as a possible typing slip. Show the marks writes a copy with [[key]] in place of every number, to see which mark to write; numbering again puts the numbers back. On the Word tab: Number compounds and Show marks do it to the open document (the version before is kept in Reactio Draw's folder); on the command line: reactio word-number paper.docx [--number S{n}] [--start 1] [--marks]. Remove the marks (in the dialog) writes a copy with the numbers as plain text and no marks left, the drawings still Reactio Draw drawings; on the command line reactio word-clean --strip does the same with plain pictures, the copy to send (reactio word-number --strip without them).
 - Abbreviations Morph (morpholino) and Th (2-thienyl, typed on an atom); thorium is an element of its own in files and the periodic table.
 
 ## Fixed

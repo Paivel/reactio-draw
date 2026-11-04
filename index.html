@@ -23412,10 +23412,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       sel.add(na.id);
     }
     for (const b of clip.bonds) mol.bonds.push({ ...b, id: mol.next++, a: map[b.a].id, b: map[b.b].id });
-    const arrMap = new Map();
+    const arrMap = new Map(),
+      txtMap = new Map();
     for (const r of clip.arrows || []) {
-      const o = { ...r, id: mol.next++, x1: r.x1 + dx, y1: r.y1 + dy, x2: r.x2 + dx, y2: r.y2 + dy };
+      /* a copy of its own (the clipboard can be pasted again), tied to the copies only: its texts, atoms and orbitals */
+      const o = Object.assign(JSON.parse(JSON.stringify(r)), { id: mol.next++, x1: r.x1 + dx, y1: r.y1 + dy, x2: r.x2 + dx, y2: r.y2 + dy });
       arrMap.set(r.id, o.id);
+      if (o.ga) o.ga = { x1: o.ga.x1 + dx, y1: o.ga.y1 + dy, x2: o.ga.x2 + dx, y2: o.ga.y2 + dy };
+      if (o.teth) {
+        const t2 = o.teth,
+          m2 = id => map[id] && map[id].id;
+        delete t2.at;
+        if (t2.deloc) {
+          const ids = t2.deloc.ids.map(m2);
+          if (ids.every(Boolean)) {
+            t2.deloc.ids = ids;
+            if (t2.deloc.rest) t2.deloc.rest = t2.deloc.rest.map(m2).filter(Boolean);
+          } else delete o.teth;
+        }
+        if (o.teth && t2.a != null) {
+          if (m2(t2.a) && m2(t2.b)) {
+            t2.a = m2(t2.a);
+            t2.b = m2(t2.b);
+          } else delete o.teth;
+        }
+      }
       if (r.gid != null) o.gid = ng(r.gid);
       if (o.at != null) {
         if (map[o.at]) o.at = map[o.at].id;
@@ -23434,7 +23455,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       selArr.add(o.id);
     }
     for (const t of clip.texts || []) {
-      const o = { ...t, id: mol.next++, x: t.x + dx, y: t.y + dy };
+      const o = Object.assign(JSON.parse(JSON.stringify(t)), { id: mol.next++, x: t.x + dx, y: t.y + dy });
+      txtMap.set(t.id, o.id);
+      if (o.gp) o.gp = { x: o.gp.x + dx, y: o.gp.y + dy };
+      for (const k of ['cornerOf', 'delocOf'])
+        if (o[k] != null) {
+          if (arrMap.has(o[k])) o[k] = arrMap.get(o[k]);
+          else delete o[k];
+        }
+      for (const k of ['onArr', 'orb'])
+        if (o[k]) {
+          if (arrMap.has(o[k].id)) o[k].id = arrMap.get(o[k].id);
+          else delete o[k];
+        }
       if (t.sruOf != null) {
         if (arrMap.has(t.sruOf)) o.sruOf = arrMap.get(t.sruOf);
         else delete o.sruOf;
@@ -23452,6 +23485,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       mol.texts.push(o);
       selTxt.add(o.id);
+    }
+    /* the copy's arrows hold the copies of their texts, not the original's */
+    for (const id of arrMap.values()) {
+      const o = mol.arrows.find(x => x.id === id);
+      if (!o) continue;
+      if (o.gl) {
+        o.gl = o.gl.filter(g => txtMap.has(g.t)).map(g => ({ ...g, t: txtMap.get(g.t) }));
+        if (!o.gl.length) {
+          delete o.gl;
+          delete o.ga;
+        }
+      }
+      for (const k of ['fromTxt', 'toTxt'])
+        if (o[k]) {
+          if (txtMap.has(o[k].id)) o[k].id = txtMap.get(o[k].id);
+          else delete o[k];
+        }
     }
     setTool('select', true);
     commit();
