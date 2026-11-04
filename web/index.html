@@ -3255,7 +3255,7 @@ html {
           <div class="tlabel" style="margin-bottom:4px" title="Bold compound numbers under the selected structures, in reading order (left to right, then the next row); a salt counts as one compound. They renumber themselves as the scheme changes: number a new compound and the later ones move on; type a letter after a number (2a, 2b) to share it">Compound numbers</div>
           <div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap"><input id="cnumTpl" value="{n}" style="width:96px;min-width:0" aria-label="Number template"><span class="note" style="white-space:nowrap">from</span><input id="cnumStart" value="1" style="width:52px;min-width:0" aria-label="First number"><button class="btn sm" id="cnumGo">Number</button></div>
           <div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap;margin-top:4px"><span class="note" style="white-space:nowrap">then, not bold</span><input id="cnumSuf" placeholder="(85%)" style="flex:1;min-width:0" aria-label="Text after the number, not bold"></div>
-          <div class="note" style="margin-top:2px">{n}: 1, 2, 3… {a}: a, b, c… Examples: 4.{n} → 4.1, 4.2; S{n} → S1, S2; 3{a} → 3a, 3b. The second box is written after the number in plain type: (85%) gives <b>4.1</b> (85%). Numbers the selected structures; numbering again replaces their numbers.</div>
+          <div class="note" style="margin-top:2px">{n}: 1, 2, 3… {a}: a, b, c… Examples: 4.{n} → 4.1, 4.2; S{n} → S1, S2; 3{a} → 3a, 3b. The second box is written after the number in plain type: (85%) gives <b>4.1</b> (85%). Numbers the selected structures; numbering again replaces their numbers. For Word: [[amine.{n}.letter]] writes a mark under each ([[amine.1.letter]], [[amine.2.letter]]…), which Number compounds in Word turns into 3a, 3b…</div>
         </div>
         </div></details>
         <details class="agrp" data-agrp="add" open><summary>Add a structure</summary><div class="agbody">
@@ -15875,10 +15875,16 @@ function kdOf(st) {
     for (const t of mol.texts)
       if (textCounts(t))
         s += `<line x1="${t.x}" y1="${t.y + 3.5}" x2="${t.x + textW(t)}" y2="${t.y + 3.5}" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="1 2" opacity=".7"><title>${t.smi ? 'Counted as the structure ' + esc(t.smi) + ': included in the stoichiometry grid' : 'Recognized as a compound: included in the stoichiometry grid'}</title></line>`;
+    const MS = renderPlain ? null : markShort();
     for (const t of mol.texts)
       if (t.fchg != null) s += freeChgSVG(t);
       else if (t.fsym) s += fsymSVG(t);
-      else {
+      else if (MS && MS.has(t.id)) {
+        /* a long mark shown as the number it would get, grey, in the middle of where the mark is; the mark on hover */
+        const v = { ...t, text: MS.get(t.id), color: '#8a94a0' };
+        v.x = t.x + (textW(t) - textW(v)) / 2;
+        s += `<text x="${v.x}" y="${v.y}" style="fill:${v.color};font:${v.italic ? 'italic ' : ''}${v.bold ? 700 : STYo(v).weight === 400 ? 400 : 500} ${tSize(v)}px ${txtFont(v)}${v.ul ? ';text-decoration:underline' : ''}"><title>${esc(t.text)}</title>${textHTML(v)}</text>`;
+      } else {
         s += `<text x="${t.x}" y="${t.y}" style="fill:${t.color || 'var(--ink)'};font:${t.italic ? 'italic ' : ''}${t.bold ? 700 : STYo(t).weight === 400 ? 400 : 500} ${tSize(t)}px ${txtFont(t)}${t.ul ? ';text-decoration:underline' : ''}">${textHTML(t)}</text>`;
         if (t.attach) s += textAttachSVG(t);
       }
@@ -17290,7 +17296,13 @@ function kdOf(st) {
       if (!at.some(a => sel.has(a.id))) continue;
       const xs = at.map(a => a.x),
         ys = at.map(a => a.y);
-      out.push({ at, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) });
+      /* the lowest ink: a label under the structure (OMe, CO2Me) goes below its atom, and the number below that */
+      let lb = -Infinity;
+      for (const a of at) {
+        const L = labeled(a) && labRect(a);
+        if (L) lb = Math.max(lb, L.y1);
+      }
+      out.push({ at, x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys), lb });
     }
     /* reading order: rows from top to bottom (a compound joins a row when it overlaps it vertically), left to right inside a row */
     out.sort((a, b) => a.y0 + a.y1 - (b.y0 + b.y1));
@@ -17342,7 +17354,7 @@ function kdOf(st) {
         t = {
           id: mol.next++,
           x: 0,
-          y: g.y1 + 30,
+          y: Math.max(g.y1 + 30, g.lb + (textDef.size || STY().text) * 1.05),
           text: txt,
           size: textDef.size,
           bold: !tail,
@@ -38628,7 +38640,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['w-all', 'All structures of a Word file on one sheet, one under another (then Save as CDXML)…'],
     ['w-clean', 'Copy of a Word file with plain vector pictures, without Reactio Draw data…'],
     ['w-num', 'Number the compounds of a Word file ([[key]] marks in the text and drawings)…'],
-    ['w-ord', 'Order of the [[key]] marks on this drawing (click them in turn)…']
+    ['w-ord', 'Order of the [[key]] marks on this drawing (click them in turn)…'],
+    ['w-help', 'How to write the [[key]] marks…']
   ];
   const filePop = document.createElement('div');
   filePop.className = 'pop filepop';
@@ -38697,23 +38710,56 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      only in the text come after them, in its order. In the text a mark becomes a content control (tag
      rdcmpd:<mark>) holding the number, so a second run finds it again; in a drawing the text keeps its marks (t.ctpl) and
      shows the numbers. The file written is a copy. */
-  const CMPD_RX = /\[\[([A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num))?)?\]\]/g,
+  const CMPD_RX = /\[\[((?:[AaIi]:)?[A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num|dash))?)?\]\]/g,
     CMPD_SET = /\[\[#(format|start)\s+([^\]]+?)\s*\]\]/g;
+  /* a series of its own, written before the key: [[A:cat]] A, B, C…; [[a:…]] a, b, c…; [[I:…]] I, II, III…; [[i:…]] i, ii, iii… */
+  const romanOf = n => {
+    let r = '';
+    for (const [v, l] of [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']])
+      while (n >= v) {
+        r += l;
+        n -= v;
+      }
+    return r;
+  };
+  const seriesLabel = (p, n) => (p === 'A' ? cnumLetter(n).toUpperCase() : p === 'a' ? cnumLetter(n) : p === 'I' ? romanOf(n) : romanOf(n).toLowerCase());
   function cmpdNumberer(tpl, start) {
     const main = new Map(),
-      subs = new Map();
-    let next = start;
+      subs = new Map(),
+      series = new Map(),
+      keyTpl = new Map();
+    let next = start,
+      curTpl = tpl;
     const keyNo = key => {
-      if (!main.has(key)) main.set(key, next++);
+      const sp = /^([AaIi]):/.exec(key);
+      if (sp) {
+        if (!series.has(sp[1])) series.set(sp[1], new Map());
+        const m = series.get(sp[1]);
+        if (!m.has(key)) m.set(key, m.size + 1);
+        return m.get(key);
+      }
+      if (!main.has(key)) {
+        main.set(key, next++);
+        keyTpl.set(key, curTpl);
+      }
       return main.get(key);
     };
     return {
       main,
       subs,
+      /* a part of the document numbered on its own (a chapter: [[#format 2-{n}]] further down): new compounds from here
+         take its style and count from its first number; one numbered before keeps its number */
+      section(t, s0) {
+        curTpl = t;
+        next = s0;
+      },
       reset() {
         main.clear();
         subs.clear();
+        series.clear();
+        keyTpl.clear();
         next = start;
+        curTpl = tpl;
       },
       take(key, sub) {
         keyNo(key);
@@ -38724,12 +38770,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       },
       text(key, sub, fmt) {
-        const n = cnumText(tpl, keyNo(key));
+        const sp = /^([AaIi]):/.exec(key),
+          n = sp ? seriesLabel(sp[1], keyNo(key)) : cnumText(keyTpl.get(key) || curTpl, keyNo(key));
         if (!sub) return n;
         const m = subs.get(key),
           i = m && m.get(sub);
         if (!i) return n;
-        return fmt === 'num' ? n + '.' + i : n + cnumLetter(i);
+        return fmt === 'num' ? n + '.' + i : fmt === 'dash' ? n + '-' + i : n + cnumLetter(i);
       }
     };
   }
@@ -38793,6 +38840,39 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* the order of the compound marks on a drawing, set by hand: each text with [[key]] marks clicked in turn gets the next
      place (t.cord, 1, 2, 3…) and a small numbered badge while this lasts; the texts not clicked follow in reading order.
      Esc, Enter or the bar's Done ends it; a click on the sheet away from them too. Clear takes the order away */
+  /* what the marks are and how they are written: File → Word files → How to write the [[key]] marks */
+  function marksHelp() {
+    const b = document.createElement('div');
+    b.className = 'askbox';
+    const c = s => `<code style="font:600 12.5px var(--mono);background:var(--accent-soft);border-radius:4px;padding:0 3px">${s}</code>`;
+    b.innerHTML =
+      '<div class="card" style="max-width:620px"><b>Compound numbers in a Word file</b><div class="tx" style="line-height:1.55">' +
+      'Write a mark where a number goes, in the text and in Reactio Draw drawings; Number compounds (Word tab, or File → Word files) puts the numbers in. The same key gets the same number everywhere.<ul style="margin:6px 0 6px 18px;padding:0">' +
+      `<li>${c('[[aldehyde]]')} → 1, 2, 3…</li>` +
+      `<li>${c('[[aldehyde.OMe]]')} or ${c('[[aldehyde.OMe.letter]]')} → 1a, 1b…; ${c('[[aldehyde.OMe.num]]')} → 1.1, 1.2…; ${c('[[aldehyde.OMe.dash]]')} → 1-1, 1-2…</li>` +
+      `<li>${c('[[A:catalyst]]')} → A, B, C…, a series of its own (catalysts, intermediates); ${c('[[a:…]]')} → a, b, c…; ${c('[[I:…]]')} → I, II, III…; ${c('[[i:…]]')} → i, ii, iii…</li>` +
+      '<li>Keys: letters, digits, _ and -.</li></ul>' +
+      'Order: the drawings first, in their order in the document, each read line by line; compounds only in the text come after. Set the order on a drawing by hand with the button at the end of the Text group (Ctrl+Shift+O).<br>' +
+      `Style and first number: the boxes on the Word tab, or a line ${c('[[#format S{n}]]')} or ${c('[[#start 5]]')} in the document. Chapters: put ${c('[[#format 2-{n}]]')} at the start of chapter 2 (and ${c('[[#format 3-{n}]]')} at chapter 3…); from there new compounds are 2-1, 2-2…, each chapter counted on its own and its own drawings first, while a compound met in an earlier chapter keeps its number.<br>` +
+      'On the sheet, marks that run into each other are shown as grey numbers (this drawing alone); point at one to see its mark, open it to edit the mark.' +
+      '</div><div class="row"><button class="pri" data-k="ok">OK</button></div></div>';
+    document.body.appendChild(b);
+    const close = () => {
+      b.remove();
+      document.removeEventListener('keydown', key, true);
+    };
+    const key = e => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', key, true);
+    b.querySelector('[data-k=ok]').onclick = close;
+    b.addEventListener('click', e => {
+      if (e.target === b) close();
+    });
+  }
   let CORD = null;
   function cordStart() {
     const T = mol.texts.filter(t => /\[\[/.test(t.ctpl || t.text || '')).concat(gridMarkTexts());
@@ -38849,6 +38929,32 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     CORD = null;
     commit();
     toast(n ? n + ' mark text' + (n > 1 ? 's' : '') + ' in the order you clicked; Number compounds in Word follows it' : 'No order set: the marks go in reading order');
+  }
+  /* [[key]] marks on the sheet that run into each other (long keys side by side): then every mark is shown as the number
+     it would get on this drawing alone, in grey, the mark itself on hover and when the text is opened; null when they fit */
+  function markShort() {
+    const T = mol.texts.filter(t => !t.ctpl && !t.fsym && /\[\[/.test(t.text || ''));
+    if (!T.length) return null;
+    const box = t => ({ x0: t.x, x1: t.x + textW(t), y0: t.y - tSize(t), y1: t.y + tExtra(t) + 4 }),
+      over = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
+    const B = T.map(box),
+      others = mol.texts.filter(t => !T.includes(t) && String(t.text || '').trim()).map(box);
+    let hit = false;
+    for (let i = 0; i < B.length && !hit; i++) {
+      for (let j = i + 1; j < B.length && !hit; j++) if (over(B[i], B[j])) hit = true;
+      for (const o of others) if (!hit && over(B[i], o)) hit = true;
+      for (const a of mol.atoms)
+        if (!hit && labeled(a)) {
+          const L = labRect(a);
+          if (L && over(B[i], L)) hit = true;
+        }
+    }
+    if (!hit) return null;
+    const N = cmpdNumberer('{n}', 1);
+    for (const t of cmpdTexts()) if (!t.cell) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
+    const out = new Map();
+    for (const t of T) out.set(t.id, t.text.replace(CMPD_RX, (m0, a, b, c) => N.text(a, b || '', c || (b ? 'letter' : ''))));
+    return out;
   }
   /* the places, as a small index after each text with marks ([[ald]]₁): while the order is being set every one (set by
      hand in the accent colour, the others after them in grey); otherwise only those set by hand. On the screen only */
@@ -38930,13 +39036,34 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (last < doc.length) pieces.push({ xml: doc.slice(last), other: true });
     const spec = (k, s, f) => k + (s ? '.' + s + (f ? '.' + f : '') : '');
     const parseSpec = x => {
-      const m = /^([A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num))?)?$/.exec(x);
+      const m = /^((?:[AaIi]:)?[A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num|dash))?)?$/.exec(x);
       return m ? { key: m[1], sub: m[2] || '', fmt: m[3] || (m[2] ? 'letter' : '') } : null;
     };
     /* groups of plain runs (a mark can run across runs Word split) between other pieces */
     const out = [];
     let group = [];
     const textMarks = [];
+    /* the parts numbered on their own: a [[#format …]] or [[#start …]] line after compounds opens a new one */
+    const secs = [{ tpl, start }],
+      secUsed = [false];
+    let sect = 0;
+    const setting = txt => {
+      const m = /\[\[#(format|start)\s+([^\]]+?)\s*\]\]/.exec(txt);
+      if (!m) return;
+      if (!secUsed[sect]) {
+        /* before any compound of this part: it sets this part (the first part's style and number are those given) */
+        if (sect === 0) return;
+      } else {
+        secs.push({ tpl: secs[sect].tpl, start: 1 });
+        secUsed.push(false);
+        sect = secs.length - 1;
+      }
+      if (m[1] === 'format') secs[sect].tpl = m[2];
+      else {
+        const st = m[2].trim();
+        secs[sect].start = /^[a-z]$/i.test(st) ? st.toLowerCase().charCodeAt(0) - 96 : parseInt(st, 10) || 1;
+      }
+    };
     const flush = () => {
       if (!group.length) return;
       const runs = group.filter(g => g.run),
@@ -38976,14 +39103,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       for (const mk of mks) {
         xml += textUpTo(cur, mk.s);
         const rp = rPrAt(mk.s);
+        if (mk.set) setting(full.slice(mk.s, mk.e));
+        else secUsed[sect] = true;
         if (mk.set) {
           /* a setting stays, as hidden text (and goes when the marks are taken out) */
           const hp = rp ? rp.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>';
-          if (mode !== 'strip') xml += wT(hp, full.slice(mk.s, mk.e));
+          xml += mode === 'strip' ? '\u0000S\u0000' : wT(hp, full.slice(mk.s, mk.e));
         } else {
           const sp = spec(mk.key, mk.sub, mk.sub ? mk.fmt : '');
           xml += '\u0000M' + textMarks.length + '\u0000';
-          textMarks.push({ rPr: rp, spec: sp, key: mk.key, sub: mk.sub, fmt: mk.fmt });
+          textMarks.push({ rPr: rp, spec: sp, key: mk.key, sub: mk.sub, fmt: mk.fmt, sect });
         }
         cur = mk.e;
       }
@@ -39001,14 +39130,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           N.take(q.key, q.sub);
           const rp = (/<w:sdtContent>[\s\S]*?<w:r(?:\s[^>]*)?>(<w:rPr>[\s\S]*?<\/w:rPr>)?/.exec(p.xml) || [])[1] || '';
           out.push({ xml: '\u0000M' + textMarks.length + '\u0000' });
-          textMarks.push({ rPr: rp, spec: p.sdt, key: q.key, sub: q.sub, fmt: q.fmt });
+          secUsed[sect] = true;
+          textMarks.push({ rPr: rp, spec: p.sdt, key: q.key, sub: q.sub, fmt: q.fmt, sect });
         } else out.push({ xml: p.xml });
         continue;
       }
       const d = /\u0000D(\d+)\u0000/.exec(p.xml);
       if (d) {
         flush();
-        out.push({ xml: p.xml, item: +d[1] });
+        out.push({ xml: p.xml, item: +d[1], sect });
         order.push(+d[1]);
         continue;
       }
@@ -39064,17 +39194,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     {
       const seq = [];
       out.forEach((o, i) => {
-        for (const m of o.xml.matchAll(/\u0000M(\d+)\u0000/g)) seq.push([i, textMarks[+m[1]]]);
+        for (const m of o.xml.matchAll(/\u0000M(\d+)\u0000/g)) seq.push([i, textMarks[+m[1]], textMarks[+m[1]].sect]);
         if (o.item != null) {
           const it = its.find(t => t.idx === o.item);
-          if (it) seq.push([i, it]);
+          if (it) seq.push([i, it, o.sect || 0]);
         }
       });
       /* taken again from the start: the drawings first, in the order they come in the document (each read line by line),
          then what is only in the text, in its order; a mark in the text takes the number its compound got in a drawing */
       N.reset();
-      seq.sort((a, b) => (a[1].spec ? 1 : 0) - (b[1].spec ? 1 : 0) || a[0] - b[0]);
-      for (const [, x] of seq) {
+      /* part by part (chapters), each as the whole was: its drawings first, then its text */
+      seq.sort((a, b) => a[2] - b[2] || (a[1].spec ? 1 : 0) - (b[1].spec ? 1 : 0) || a[0] - b[0]);
+      let curSec = 0;
+      for (const [, x, sc] of seq) {
+        if (sc !== curSec) {
+          curSec = sc;
+          N.section(secs[sc].tpl, secs[sc].start);
+        }
         if (x.spec) {
           N.take(x.key, x.sub);
           uses.set(x.key, (uses.get(x.key) || 0) + 1);
@@ -39099,6 +39235,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (marks === 'strip') return wT(rp, N.text(t.key, t.sub, t.fmt));
         return wSdt(rp, t.spec, marks ? '[[' + t.spec + ']]' : N.text(t.key, t.sub, t.fmt));
       });
+    /* a paragraph that holds only a setting line ([[#format 2-{n}]] on its own) leaves no empty line: its paragraph mark is
+       hidden too, and in a copy without marks the paragraph goes */
+    body = body.replace(/<w:p\b[^>]*?(?:\/>|>(?:(?!<w:p[\s>])[\s\S])*?<\/w:p>)/g, P => {
+      const setHid = /<w:vanish\/><\/w:rPr><w:t[^>]*>\[\[#/.test(P),
+        setGone = P.includes('\u0000S\u0000');
+      if (!setHid && !setGone) return P;
+      const rest = P.replace(/<w:r>(?:(?!<\/w:r>)[\s\S])*?<w:vanish\/>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>/g, '').replace(/\u0000S\u0000/g, '');
+      const vis = (rest.match(/<w:t(?:\s[^>]*)?>[^<]*<\/w:t>/g) || []).map(x => x.replace(/<[^>]+>/g, '')).join('');
+      const empty = !vis.trim() && !/<w:(drawing|pict|object|sdt|tab|br)\b/.test(rest) && !/\u0000/.test(rest);
+      if (setGone) return empty ? '' : P.replace(/\u0000S\u0000/g, '');
+      if (!empty) return P;
+      if (/<w:pPr>/.test(P)) {
+        if (/<w:pPr>(?:(?!<\/w:pPr>)[\s\S])*<w:rPr>/.test(P)) return P.replace(/(<w:pPr>(?:(?!<\/w:pPr>)[\s\S])*?<w:rPr>)/, '$1<w:vanish/>');
+        return P.replace('</w:pPr>', '<w:rPr><w:vanish/></w:rPr></w:pPr>');
+      }
+      return P.replace(/^(<w:p\b[^>]*>)/, '$1<w:pPr><w:rPr><w:vanish/></w:rPr></w:pPr>');
+    });
     /* the drawings: their texts show the numbers, the marks kept; drawn again */
     let k = 0,
       nDraw = 0;
@@ -39314,6 +39467,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (k === 'w-ord') {
       cordStart();
+      return;
+    }
+    if (k === 'w-help') {
+      marksHelp();
       return;
     }
     if (k === 'w-all' || k === 'w-clean' || k === 'w-num') {
@@ -65766,6 +65923,43 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       for (let j = Math.min(g.c0, g.c1); j <= Math.max(g.c0, g.c1); j++) if (r.cells[i] && r.cells[i][j]) out.push({ i, j, c: r.cells[i][j] });
     return out;
   }
+  /* the rules of a table as whole lines: the sides of cells next to each other joined into one line each, so a rule shows
+     no breaks where cells meet */
+  function gridRules(r) {
+    const { X, Y } = GRIDL.get(r) || (gridLayout(r), GRIDL.get(r)),
+      H = new Map(),
+      V = new Map(),
+      add = (M, k, a, b) => {
+        if (!M.has(k)) M.set(k, []);
+        M.get(k).push([a, b]);
+      };
+    r.cells.forEach((row, i) =>
+      row.forEach((c, j) => {
+        if (c.bt && !(i > 0 && r.cells[i - 1][j].bb)) add(H, i, j, j + 1);
+        if (c.bb) add(H, i + 1, j, j + 1);
+        if (c.bl && !(j > 0 && row[j - 1].br)) add(V, j, i, i + 1);
+        if (c.br) add(V, j + 1, i, i + 1);
+      })
+    );
+    const out = [],
+      join = (M, put) => {
+        for (const [k, segs] of M) {
+          segs.sort((a, b) => a[0] - b[0]);
+          let cur = null;
+          for (const sg of segs) {
+            if (cur && sg[0] <= cur[1]) cur[1] = Math.max(cur[1], sg[1]);
+            else {
+              if (cur) put(k, cur);
+              cur = sg.slice();
+            }
+          }
+          if (cur) put(k, cur);
+        }
+      };
+    join(H, (i, [a, b]) => out.push([X[a], Y[i], X[b], Y[i]]));
+    join(V, (j, [a, b]) => out.push([X[j], Y[a], X[j], Y[b]]));
+    return out;
+  }
   function gridSVG(r) {
     gridLayout(r);
     const { X, Y } = GRIDL.get(r),
@@ -65774,7 +65968,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* fills, then texts, then rules */
     r.cells.forEach((row, i) =>
       row.forEach((c, j) => {
-        if (c.fill) s += `<rect x="${X[j]}" y="${Y[i]}" width="${X[j + 1] - X[j]}" height="${Y[i + 1] - Y[i]}" style="fill:${c.fill}"/>`;
+        /* a hair wider and taller, so fills side by side show no seam */
+        if (c.fill) s += `<rect x="${X[j] - 0.3}" y="${Y[i] - 0.3}" width="${X[j + 1] - X[j] + 0.6}" height="${Y[i + 1] - Y[i] + 0.6}" style="fill:${c.fill}"/>`;
       })
     );
     r.cells.forEach((row, i) =>
@@ -65790,14 +65985,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       })
     );
     const ln = (x1, y1, x2, y2) => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" style="stroke:var(--ink)" stroke-width="${lw}" stroke-linecap="square"/>`;
-    r.cells.forEach((row, i) =>
-      row.forEach((c, j) => {
-        if (c.bt && !(i > 0 && r.cells[i - 1][j].bb)) s += ln(X[j], Y[i], X[j + 1], Y[i]);
-        if (c.bb) s += ln(X[j], Y[i + 1], X[j + 1], Y[i + 1]);
-        if (c.bl && !(j > 0 && row[j - 1].br)) s += ln(X[j], Y[i], X[j], Y[i + 1]);
-        if (c.br) s += ln(X[j + 1], Y[i], X[j + 1], Y[i + 1]);
-      })
-    );
+    for (const [x1, y1, x2, y2] of gridRules(r)) s += ln(x1, y1, x2, y2);
     const N = gridNotes(r);
     if (N) s += `<text x="${N.t.x}" y="${N.t.y}" style="fill:var(--ink);font:400 ${tSize(N.t)}px ${txtFont(N.t)}">${textHTML(N.t)}</text>`;
     /* the picked cells, and the grid's lines faintly, on the screen only */
@@ -66215,13 +66403,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (!t.color) delete t.color;
           texts.push(t);
         }
-        const L = (x1, y1, x2, y2) => lines.push({ id: id++, x1, y1, x2, y2, head: 'none' });
-        if (c.bt && !(i > 0 && r.cells[i - 1][j].bb)) L(X[j], Y[i], X[j + 1], Y[i]);
-        if (c.bb) L(X[j], Y[i + 1], X[j + 1], Y[i + 1]);
-        if (c.bl && !(j > 0 && row[j - 1].br)) L(X[j], Y[i], X[j], Y[i + 1]);
-        if (c.br) L(X[j + 1], Y[i], X[j + 1], Y[i + 1]);
       })
     );
+    for (const [x1, y1, x2, y2] of gridRules(r)) lines.push({ id: id++, x1, y1, x2, y2, head: 'none' });
     const N = gridNotes(r);
     if (N) texts.push({ ...N.t, id: id++ });
     return { texts, arrows: [...boxes, ...lines] };
