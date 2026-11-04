@@ -4857,7 +4857,24 @@ function kdOf(st) {
   /* while the sheet is drawn, atoms are looked up in an index made at its start (a big sheet asks thousands of times) */
   let RIDX = null;
   const atomById = id => (RIDX && RIDX.get(id)) || mol.atoms.find(a => a.id === id);
-  const bondsOf = a => mol.bonds.filter(b => b.a === a.id || b.b === a.id);
+  /* and each atom's bonds in one made the same way, as long as the bonds stay the same list (a big sheet asks this tens of
+     thousands of times a frame) */
+  let BIDX = null;
+  const bondsOf = a => {
+    if (BIDX && BIDX.arr === mol.bonds && BIDX.n === mol.bonds.length) {
+      const l = BIDX.m.get(a.id);
+      return l ? l.slice() : [];
+    }
+    return mol.bonds.filter(b => b.a === a.id || b.b === a.id);
+  };
+  function bondIndex() {
+    const m = new Map();
+    for (const b of mol.bonds) {
+      (m.get(b.a) || m.set(b.a, []).get(b.a)).push(b);
+      if (b.b !== b.a) (m.get(b.b) || m.set(b.b, []).get(b.b)).push(b);
+    }
+    return { arr: mol.bonds, n: mol.bonds.length, m };
+  }
   const other = (b, a) => atomById(b.a === a.id ? b.b : b.a);
   const neighbors = a => bondsOf(a).map(b => other(b, a));
   function valenceOf(el, c) {
@@ -15363,11 +15380,14 @@ function kdOf(st) {
   function render() {
     if (mol.arrows.some(r => r.sru)) sruPlace();
     const own = !RIDX;
-    if (own) RIDX = new Map(mol.atoms.map(a => [a.id, a]));
+    if (own) {
+      RIDX = new Map(mol.atoms.map(a => [a.id, a]));
+      BIDX = bondIndex();
+    }
     try {
       return render0();
     } finally {
-      if (own) RIDX = null;
+      if (own) RIDX = BIDX = null;
     }
   }
   function render0() {
@@ -18775,6 +18795,8 @@ function kdOf(st) {
   const glueArrow = r =>
     r &&
     !r.kind &&
+    /* a plain line (a table's rule) holds no texts: they stay where they are put */
+    r.head !== 'none' &&
     !r.curve &&
     !r.bz &&
     !r.pen &&
@@ -41809,7 +41831,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             ? 'deloc'
             : o === 'dative' && !/Wedge|Hash|Bold|Dash|Wavy/.test(d)
               ? 'dative'
-            : /WedgeBegin/.test(d) && !/Hash/.test(d)
+            : /Wedge(Begin|End)$/.test(d) && !/Hash/.test(d)
               ? 'wedge'
               : /WedgedHash/.test(d)
                 ? 'hash'
@@ -41823,6 +41845,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
                         ? 'hashplain'
                         : null
       };
+      /* WedgeEnd, WedgedHashEnd: the narrow end at the bond's end atom (as a bridge drawn from both bridgeheads has it) */
+      if (/^(Wedge|WedgedHash)End$/.test(d) && (nb.stereo === 'wedge' || nb.stereo === 'hash')) {
+        nb.a = B.id;
+        nb.b = A.id;
+      }
       {
         const c = colOf(b.getAttribute('color')),
           h = offWhite(colOf(b.getAttribute('highlightColor')) || '', HL_A) || null;
@@ -41834,6 +41861,72 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       mol.bonds.push(nb);
       bondMap.set(b.getAttribute('id'), [A, B]);
     };
+    /* a CDXML text (a caption, or the label of a lone node: a reagent or a table cell) as a text of the sheet: style runs back to
+       Reactio Draw's marks (digits after a symbol stay plain, formula style subscripts them), its size, colour and alignment */
+    const cdxText = (t, label) => {
+      const p = pt(t.getAttribute('p'));
+      const ss = [...t.querySelectorAll(':scope > s')];
+      let txt = '';
+      const f0 = ss.length ? +(ss[0].getAttribute('face') || 0) : 0;
+      for (const r of ss) {
+        const f = +(r.getAttribute('face') || 0);
+        let v = r.textContent;
+        const ex = f & ~f0 & 7;
+        if (ex && v.trim()) {
+          if (ex & 4) v = '\\u{' + v + '}';
+          if (ex & 2) v = '\\i{' + v + '}';
+          if (ex & 1) v = '\\b{' + v + '}';
+        }
+        /* face 96 (subscript and superscript together) is the formula style: the text as it is, its digits are set as a formula's;
+         a subscript or superscript run that spans lines is marked line by line */
+        const wrap = m =>
+          v
+            .split('\n')
+            .map(x => (x ? m + '{' + x + '}' : x))
+            .join('\n');
+        if ((f & 96) === 96) txt += v;
+        else if (f & 32 && !(/^\d+$/.test(r.textContent) && /[A-Za-z)\]]$/.test(txt))) txt += wrap('_');
+        else if (f & 64) txt += wrap('^');
+        else txt += v;
+      }
+      if (!ss.length) txt = t.textContent;
+      txt = txt.replace(/\r/g, '\n').trim();
+      if (!txt) return null;
+      /* the conditions caption written next to a stoichiometry grid ("Temperature: rt", "Atmosphere: Air"…) goes back into the conditions, not onto the sheet */
+      if (hasGrid && !label) {
+        const ls = plainText(txt)
+          .split('\n')
+          .map(x => x.trim())
+          .filter(Boolean);
+        if (ls.length && ls.every(l => /^(Temperature|Time|Atmosphere|Other):\s*/.test(l))) {
+          condCapt.push(...ls);
+          return null;
+        }
+      }
+      const sz0 = ss.length
+        ? parseFloat(ss[0].getAttribute('size'))
+        : NaN; /* point size kept: export writes 10 pt per label size, so a file goes out the way it came in */
+      const o = {
+        id: mol.next++,
+        x: p.x + ox,
+        y: p.y,
+        text: txt,
+        size: sz0 > 0 ? +((sz0 * (STY().label || 15)) / 10).toFixed(2) : textDef.size,
+        fs: true
+      };
+      if (f0 & 1) o.bold = true;
+      if (f0 & 2) o.italic = true;
+      if (f0 & 4) o.ul = true;
+      const c = ss.length && colOf(ss[0].getAttribute('color'));
+      if (c) o.color = c;
+      /* a label is aligned as its LabelJustification says when it has no Justification of its own */
+      const j = t.getAttribute('Justification') || (label ? t.getAttribute('LabelJustification') : null);
+      if (j && j !== 'Left' && j !== 'Auto') o.align = { Center: 'center', Right: 'right', Full: 'justify' }[j];
+      /* CDXML places a centred caption by its centre, a right-aligned one by its right end */
+      if (o.align === 'center') o.x -= textW(o) / 2;
+      else if (o.align === 'right') o.x -= textW(o);
+      return o;
+    };
     for (const fr of doc.querySelectorAll('page > fragment')) {
       const made = [];
       const ns = [...fr.querySelectorAll(':scope > n')],
@@ -41843,8 +41936,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const lab = ns[0].querySelector(':scope > t');
         const txt = lab ? lab.textContent.trim() : '';
         if (txt) {
-          const p = pt(lab.getAttribute('p') || ns[0].getAttribute('p'));
-          const t = { id: mol.next++, x: p.x + ox, y: p.y, text: txt, size: textDef.size, fs: true };
+          /* with its size, styles, colour and alignment, as a caption (a table's cells are often such labels) */
+          const t = cdxText(lab, true) || { id: mol.next++, x: pt(ns[0].getAttribute('p')).x + ox, y: pt(ns[0].getAttribute('p')).y, text: txt, size: textDef.size, fs: true };
           mol.texts.push(t);
           fragText.set(fr.getAttribute('id'), t.id);
           {
@@ -42020,69 +42113,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a.hUsed = usedVal(a);
       }
     }
-    /* captions: style runs back to Reactio Draw's marks (digits after a symbol stay plain, formula style subscripts them) */
     for (const t of doc.querySelectorAll('page > t')) {
-      const p = pt(t.getAttribute('p'));
-      const ss = [...t.querySelectorAll(':scope > s')];
-      let txt = '';
-      const f0 = ss.length ? +(ss[0].getAttribute('face') || 0) : 0;
-      for (const r of ss) {
-        const f = +(r.getAttribute('face') || 0);
-        let v = r.textContent;
-        const ex = f & ~f0 & 7;
-        if (ex && v.trim()) {
-          if (ex & 4) v = '\\u{' + v + '}';
-          if (ex & 2) v = '\\i{' + v + '}';
-          if (ex & 1) v = '\\b{' + v + '}';
-        }
-        /* face 96 (subscript and superscript together) is the formula style: the text as it is, its digits are set as a formula's;
-         a subscript or superscript run that spans lines is marked line by line */
-        const wrap = m =>
-          v
-            .split('\n')
-            .map(x => (x ? m + '{' + x + '}' : x))
-            .join('\n');
-        if ((f & 96) === 96) txt += v;
-        else if (f & 32 && !(/^\d+$/.test(r.textContent) && /[A-Za-z)\]]$/.test(txt))) txt += wrap('_');
-        else if (f & 64) txt += wrap('^');
-        else txt += v;
-      }
-      if (!ss.length) txt = t.textContent;
-      txt = txt.replace(/\r/g, '\n').trim();
-      if (!txt) continue;
-      /* the conditions caption written next to a stoichiometry grid ("Temperature: rt", "Atmosphere: Air"…) goes back into the conditions, not onto the sheet */
-      if (hasGrid) {
-        const ls = plainText(txt)
-          .split('\n')
-          .map(x => x.trim())
-          .filter(Boolean);
-        if (ls.length && ls.every(l => /^(Temperature|Time|Atmosphere|Other):\s*/.test(l))) {
-          condCapt.push(...ls);
-          continue;
-        }
-      }
-      const sz0 = ss.length
-        ? parseFloat(ss[0].getAttribute('size'))
-        : NaN; /* point size kept: export writes 10 pt per label size, so a file goes out the way it came in */
-      const o = {
-        id: mol.next++,
-        x: p.x + ox,
-        y: p.y,
-        text: txt,
-        size: sz0 > 0 ? +((sz0 * (STY().label || 15)) / 10).toFixed(2) : textDef.size,
-        fs: true
-      };
-      if (f0 & 1) o.bold = true;
-      if (f0 & 2) o.italic = true;
-      if (f0 & 4) o.ul = true;
-      const c = ss.length && colOf(ss[0].getAttribute('color'));
-      if (c) o.color = c;
-      const j = t.getAttribute('Justification');
-      if (j && j !== 'Left') o.align = { Center: 'center', Right: 'right', Full: 'justify' }[j];
-      /* CDXML places a centred caption by its centre, a right-aligned one by its right end */
-      if (o.align === 'center') o.x -= textW(o) / 2;
-      else if (o.align === 'right') o.x -= textW(o);
-      mol.texts.push(o);
+      const o = cdxText(t, false);
+      if (o) mol.texts.push(o);
     }
     /* pictures (embedded objects of a CDX or CDXML file) that carry a PNG, JPEG or GIF file */
     for (const e of doc.querySelectorAll('embeddedobject')) {
@@ -42356,6 +42389,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         return v.split(/\s+/);
       };
+      /* drawn in the file's own order (Z: a coloured ball over the black one that rims it), not the order they are written in */
+      const shps = [];
       for (const g of doc.querySelectorAll('graphic[GraphicType="Rectangle"],graphic[GraphicType="Oval"]')) {
         const v = (g.getAttribute('BoundingBox') || '').split(/\s+/).map(Number);
         if (v.length !== 4 || !v.every(isFinite)) continue;
@@ -42413,8 +42448,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         };
         const c = colOf && colOf(g.getAttribute('color'));
         if (c) r.col = c;
-        mol.arrows.push(r);
+        shps.push([parseFloat(g.getAttribute('Z')) || 0, shps.length, r]);
       }
+      shps.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+      for (const [, , r] of shps) mol.arrows.push(r);
     }
     /* orbitals: the box runs from the lobe's end to the centre */
     for (const g of doc.querySelectorAll('graphic[GraphicType="Orbital"]')) {

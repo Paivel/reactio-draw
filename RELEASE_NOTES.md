@@ -18,6 +18,9 @@
 
 - File → Export as → Word document: the drawing goes in whole (as Ctrl+Shift+D puts it), not only as CDX, so nothing of it is lost when it is opened again.
 - **A pasted copy keeps its own texts.** A reaction copied and pasted: the pasted arrow took hold of the original's texts over the arrow (Et3N, iPrOH), so they jumped to the copy and the original's reagent table lost them. Each copy now holds its own texts, and the original stays as it was.
+- **CDXML from other editors.** A bridge drawn with WedgeEnd bonds keeps both its wedges, their narrow ends at the bridgehead (one was drawn plain); a hashed wedge drawn from its far end the same. A label standing alone (a cell of a table, a reagent) comes in centred where it was written, at its size, bold and coloured as written, with its sub- and superscripts (R1, iPrOH, PF6−). Filled circles and boxes lie in the file's order (a coloured ball over its black rim).
+- A text dragged next to a plain line (a rule of a table) stays where it is put; it held on to the line and moved by itself.
+- Zoom and dragging on large sheets are faster.
 
 # Reactio Draw 1.10
 
