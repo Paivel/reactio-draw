@@ -34747,6 +34747,233 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ''
     ].join('\n');
   }
+  /* PDF for LaTeX (pdflatex takes it as it is) and journals: the EPS drawn again as PDF, the same vector drawing, the
+     same fonts (the standard PDF fonts, Helvetica, Times, Symbol), pictures as images. The EPS commands are read one by one
+     and written as their PDF equivalents */
+  async function pdfOf() {
+    const eps = await epsOf(),
+      bb = /%%HiResBoundingBox: 0 0 ([\d.]+) ([\d.]+)/.exec(eps),
+      W = +bb[1],
+      H = +bb[2],
+      i0 = eps.indexOf('\n10 setmiterlimit\n'),
+      i1 = eps.lastIndexOf('\nrestore\nshowpage');
+    const src = eps.slice(i0 + 18, i1);
+    let p = 0;
+    const isWs = c => c === ' ' || c === '\n' || c === '\r' || c === '\t';
+    /* the next token: a number, /name, (string), [ or ], or an operator */
+    const next = () => {
+      while (p < src.length && isWs(src[p])) p++;
+      if (p >= src.length) return null;
+      const c = src[p];
+      if (c === '(') {
+        let d = 0,
+          q = p;
+        for (; q < src.length; q++) {
+          if (src[q] === '\\') {
+            q++;
+            continue;
+          }
+          if (src[q] === '(') d++;
+          else if (src[q] === ')' && --d === 0) break;
+        }
+        const t = { s: src.slice(p, q + 1) };
+        p = q + 1;
+        return t;
+      }
+      if (c === '[' || c === ']') {
+        p++;
+        return { op: c };
+      }
+      let q = p;
+      while (q < src.length && !isWs(src[q]) && !'()[]'.includes(src[q])) q++;
+      const w = src.slice(p, q);
+      p = q;
+      if (w[0] === '/') return { name: w.slice(1) };
+      if (/^-?[\d.]+(e-?\d+)?$/i.test(w)) return { n: +w };
+      return { op: w };
+    };
+    const out = [],
+      st = [],
+      fonts = new Map(),
+      images = [];
+    let g = { col: '0 0 0', path: '', cx: 0, cy: 0, font: null },
+      stack = [];
+    const fontRef = nm => {
+      if (!fonts.has(nm)) fonts.set(nm, 'F' + (fonts.size + 1));
+      return fonts.get(nm);
+    };
+    const num = v => epsNum(v);
+    const nums = k => stack.splice(stack.length - k, k).map(t => t.n);
+    const text = (str, mode) => {
+      if (!g.font) return;
+      out.push(
+        'BT /' + fontRef(g.font.name) + ' ' + num(g.font.size) + ' Tf ' + mode + ' Tr ' + num(g.cx) + ' ' + num(g.cy) + ' Td ' + str + ' Tj ET'
+      );
+    };
+    for (let t = next(); t; t = next()) {
+      if (t.n != null || t.name != null || t.s != null) {
+        stack.push(t);
+        continue;
+      }
+      if (t.op === '[') {
+        stack.push({ mark: true });
+        continue;
+      }
+      if (t.op === ']') {
+        const k = stack.map(x => !!x.mark).lastIndexOf(true),
+          arr = stack.splice(k).slice(1);
+        stack.push({ arr: arr.map(x => x.n) });
+        continue;
+      }
+      switch (t.op) {
+        case 'newpath':
+          g.path = '';
+          break;
+        case 'm': {
+          const [x, y] = nums(2);
+          g.path += num(x) + ' ' + num(y) + ' m ';
+          g.cx = x;
+          g.cy = y;
+          break;
+        }
+        case 'l': {
+          const [x, y] = nums(2);
+          g.path += num(x) + ' ' + num(y) + ' l ';
+          break;
+        }
+        case 'c':
+          g.path += nums(6).map(num).join(' ') + ' c ';
+          break;
+        case 'h':
+          g.path += 'h ';
+          break;
+        case 'setrgbcolor':
+          g.col = nums(3).map(num).join(' ');
+          break;
+        case 'fill':
+        case 'eofill':
+          out.push(g.col + ' rg ' + g.path + (t.op === 'fill' ? 'f' : 'f*'));
+          g.path = '';
+          break;
+        case 'stroke':
+          out.push(g.col + ' RG ' + g.path + 'S');
+          g.path = '';
+          break;
+        case 'clip':
+          out.push(g.path + 'W n');
+          break;
+        case 'w':
+        case 'J':
+        case 'j':
+          out.push(num(nums(1)[0]) + ' ' + t.op);
+          break;
+        case 'd': {
+          const ph = stack.pop().n,
+            a = stack.pop().arr || [];
+          out.push('[' + a.map(num).join(' ') + '] ' + num(ph) + ' d');
+          break;
+        }
+        case 'gsave':
+          st.push({ ...g });
+          out.push('q');
+          break;
+        case 'grestore':
+          g = st.pop() || g;
+          out.push('Q');
+          break;
+        case 'concat':
+          out.push(stack.pop().arr.map(num).join(' ') + ' cm');
+          break;
+        case 'translate': {
+          const [x, y] = nums(2);
+          out.push('1 0 0 1 ' + num(x) + ' ' + num(y) + ' cm');
+          break;
+        }
+        case 'selectfont': {
+          const size = stack.pop().n,
+            name = stack.pop().name;
+          g.font = { name, size };
+          break;
+        }
+        case 'show':
+          out.push(g.col + ' rg');
+          text(stack.pop().s, 0);
+          break;
+        case 'charpath': {
+          /* "(str) false charpath stroke newpath": the letters outlined */
+          stack.pop();
+          const s2 = stack.pop().s;
+          next();
+          next();
+          out.push(g.col + ' RG');
+          text(s2, 1);
+          g.path = '';
+          break;
+        }
+        case 'currentfile':
+        case 'filter':
+        case 'false':
+          stack.push(t);
+          break;
+        case 'colorimage': {
+          /* w h 8 [matrix] currentfile /ASCIIHexDecode filter false 3 colorimage, then the hex data up to > */
+          const w = stack[stack.length - 9].n,
+            h = stack[stack.length - 8].n;
+          stack.length -= 9;
+          const e = src.indexOf('>', p),
+            hex = src.slice(p, e).replace(/\s+/g, '');
+          p = e + 1;
+          images.push({ w, h, hex });
+          out.push('/Im' + images.length + ' Do');
+          break;
+        }
+        default:
+          break;
+      }
+    }
+    /* the file: catalog, pages, the page, its drawing, fonts and images; the byte offsets in the table at the end */
+    const objs = [];
+    const add = s => (objs.push(s), objs.length);
+    const contents = out.join('\n') + '\n';
+    const enc =
+      '<< /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [39 /quotesingle 96 /grave 128 ' +
+      EPS_EXTRA.map(n => '/' + n).join(' ') +
+      '] >>';
+    add('<< /Type /Catalog /Pages 2 0 R >>');
+    add('');
+    add('');
+    const cIx = add('<< /Length ' + contents.length + ' >>\nstream\n' + contents + 'endstream');
+    const encIx = add(enc);
+    const fontIx = [...fonts].map(([nm, ref]) => {
+      const base = nm.replace(/-RD$/, '');
+      return [ref, add('<< /Type /Font /Subtype /Type1 /BaseFont /' + base + (base === 'Symbol' ? '' : ' /Encoding ' + encIx + ' 0 R') + ' >>')];
+    });
+    const imIx = images.map((im, i) => {
+      const data = im.hex + '>';
+      return [
+        'Im' + (i + 1),
+        add('<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /ASCIIHexDecode /Length ' + data.length + ' >>\nstream\n' + data + '\nendstream')
+      ];
+    });
+    objs[1] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
+    objs[2] =
+      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + num(W) + ' ' + num(H) + '] /Contents ' + cIx + ' 0 R /Resources << /ProcSet [/PDF /Text /ImageC]' +
+      (fontIx.length ? ' /Font << ' + fontIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
+      (imIx.length ? ' /XObject << ' + imIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
+      ' >> >>';
+    const info = add('<< /Producer (Reactio Draw) /Title (' + docName().replace(/[()\\\\]/g, '') + ') >>');
+    let pdf = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
+    const off = [];
+    objs.forEach((o, i) => {
+      off.push(pdf.length);
+      pdf += i + 1 + ' 0 obj\n' + o + '\nendobj\n';
+    });
+    const xref = pdf.length;
+    pdf += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n' + off.map(o => String(o).padStart(10, '0') + ' 00000 n \n').join('');
+    pdf += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R /Info ' + info + ' 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
+    /* one byte per character (the file is ASCII apart from the four marks of its second line) */
+    return Uint8Array.from(pdf, ch => ch.charCodeAt(0) & 255);
+  }
   /* TIFF: RGB, LZW + horizontal predictor, strips of about 64 KB, resolution in pixels per inch */
   function tiffLzw(data) {
     const out = [];
@@ -38076,8 +38303,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['svg', 'Image (.svg)'],
     ['png', 'Image (.png, 3×)'],
     ['eps', 'Vector image for journals (.eps)'],
+    ['pdf', 'Vector image for LaTeX and journals (.pdf)'],
     ['tif', 'Image for journals (.tiff, 600 dpi)'],
     ['f-xyz', 'XYZ, 3D coordinates for quantum chemistry (.xyz): conformer search, charge and multiplicity'],
+    ['f-sdf3', 'SDF with the 3D shape and its bonds (.sdf): for Avogadro and other 3D programs'],
     ['h', 'Copy to clipboard'],
     ['c-cdxml', 'CDXML'],
     ['c-mol', 'Molfile'],
@@ -38092,6 +38321,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         : 'Embedded object for Word / PowerPoint (Ctrl+Shift+D)'
     ],
     ['c-xyz', 'XYZ, 3D coordinates'],
+    ['c-sdf3', 'SDF with the 3D shape'],
     ['h', 'Settings, labels and templates'],
     ['setx', 'Export hotkeys, button layout, my labels and templates (.json)'],
     ['seti', 'Import hotkeys, button layout, my labels and templates…'],
@@ -38706,7 +38936,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       saveDocx();
       return;
     }
-    if (k === 'f-xyz' || k === 'c-xyz') {
+    if (k === 'f-xyz' || k === 'c-xyz' || k === 'f-sdf3' || k === 'c-sdf3') {
       xyzBox(k);
       return;
     }
@@ -38739,13 +38969,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       return;
     }
-    if (k === 'eps' || k === 'tif') {
+    if (k === 'eps' || k === 'tif' || k === 'pdf') {
       const direct = window.rdDesktop || !window.claude;
       try {
         let name, body;
         if (k === 'eps') {
           name = docName() + '.eps';
           body = await epsOf();
+        } else if (k === 'pdf') {
+          name = docName() + '.pdf';
+          body = await pdfOf();
         } else {
           toast('Rendering at 600 dpi…');
           const r = await tiffExport(600);
@@ -38757,7 +38990,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         else offerFile(name + '.zip', zipOf([[name, body]]));
       } catch (err) {
         toast(
-          'Could not make the ' + (k === 'eps' ? 'EPS' : 'TIFF') + ': ' + ((err && err.message) || err),
+          'Could not make the ' + (k === 'eps' ? 'EPS' : k === 'pdf' ? 'PDF' : 'TIFF') + ': ' + ((err && err.message) || err),
           true
         );
       }
@@ -40466,6 +40699,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (let i = 0; i < c.getAllAtoms(); i++) {
       const z = c.getAtomicNo(i);
       atoms.push({ el: z === 1 ? 'H' : c.getAtomLabel(i), x: c.getAtomX(i), y: c.getAtomY(i), z: c.getAtomZ(i) });
+      if (c.getAtomCharge(i)) atoms[i].chg = c.getAtomCharge(i);
+      if (c.getAtomRadical(i)) atoms[i].rad = c.getAtomRadical(i) === M.cAtomRadicalStateD ? 2 : c.getAtomRadical(i) === M.cAtomRadicalStateT ? 3 : 1;
       q += c.getAtomCharge(i);
       elec += z;
       const r = c.getAtomRadical(i);
@@ -40514,8 +40749,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         close = Math.min(close, Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z));
       }
     if (close < 0.7) notes.push('atoms closer than 0.7 Å');
+    /* the bonds, for an SDF with the 3D shape (Molfile atom numbers, from 1) */
+    const bonds = [];
+    for (let i = 0; i < c.getAllBonds(); i++) bonds.push([c.getBondAtom(0, i) + 1, c.getBondAtom(1, i) + 1, c.getBondOrder(i) || 1]);
     return {
       atoms,
+      bonds,
       charge: q,
       multiplicity: unp + 1,
       energy: best.e,
@@ -40541,22 +40780,74 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .join(' ');
     return r.atoms.length + '\n' + head + '\n' + r.atoms.map(a => a.el.padEnd(3) + f(a.x) + f(a.y) + f(a.z)).join('\n') + '\n';
   }
+  /* one SDF record with the 3D shape (Å): the atoms with their bonds, charges and radicals, so a program that reads it
+     (Avogadro, a quantum chemistry program) needs not guess the bonds as from an .xyz; V3000 above 999 atoms */
+  function sdf3DRecord(r, title) {
+    const f = v => v.toFixed(4).padStart(10),
+      A = r.atoms,
+      B = r.bonds || [],
+      info = ['charge=' + r.charge, 'mult=' + r.multiplicity, r.energy != null ? 'E(' + r.forceField + ')=' + r.energy.toFixed(3) + ' kcal/mol' : ''].filter(Boolean).join(' ');
+    /* the second line marks the coordinates as 3D (columns 21–22), and the chiral flag says the configuration is the one
+       the coordinates give */
+    const head = [String(title || '').slice(0, 80), '  Reactio ' + ' '.repeat(10) + '3D', info.slice(0, 80)];
+    let body;
+    if (A.length <= 999 && B.length <= 999) {
+      const n3 = v => String(v).padStart(3);
+      body = [
+        n3(A.length) + n3(B.length) + '  0  0  1  0  0  0  0  0999 V2000',
+        ...A.map(a => f(a.x) + f(a.y) + f(a.z) + ' ' + a.el.padEnd(3) + ' 0  0  0  0  0  0  0  0  0  0  0  0'),
+        ...B.map(([i, j, o]) => n3(i) + n3(j) + n3(o) + '  0'),
+        ...chunks(A.map((a, i) => [i + 1, a.chg]).filter(x => x[1]), 8).map(c => 'M  CHG' + n3(c.length) + c.map(([i, v]) => ' ' + n3(i) + ' ' + n3(v)).join('')),
+        ...chunks(A.map((a, i) => [i + 1, a.rad]).filter(x => x[1]), 8).map(c => 'M  RAD' + n3(c.length) + c.map(([i, v]) => ' ' + n3(i) + ' ' + n3(v)).join('')),
+        'M  END'
+      ];
+    } else {
+      const V = t => 'M  V30 ' + t;
+      body = [
+        '  0  0  0     0  0            999 V3000',
+        V('BEGIN CTAB'),
+        V('COUNTS ' + A.length + ' ' + B.length + ' 0 0 0'),
+        V('BEGIN ATOM'),
+        ...A.map((a, i) => V(i + 1 + ' ' + a.el + ' ' + a.x.toFixed(4) + ' ' + a.y.toFixed(4) + ' ' + a.z.toFixed(4) + ' 0' + (a.chg ? ' CHG=' + a.chg : '') + (a.rad ? ' RAD=' + a.rad : ''))),
+        V('END ATOM'),
+        V('BEGIN BOND'),
+        ...B.map(([i, j, o], k) => V(k + 1 + ' ' + o + ' ' + i + ' ' + j)),
+        V('END BOND'),
+        V('END CTAB'),
+        'M  END'
+      ];
+    }
+    return [...head, ...body, '> <charge>', String(r.charge), '', '> <multiplicity>', String(r.multiplicity), '', ...(r.energy != null ? ['> <energy_kcal_mol>', r.energy.toFixed(3), ''] : []), '$$$$', ''].join('\n');
+  }
+  const chunks = (a, n) => {
+    const out = [];
+    for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n));
+    return out;
+  };
   /* a structure that has a 3D shape on the sheet: its atoms in Å (x right, y up, z toward the viewer) with every hydrogen */
   function xyzSheet(f) {
     const k = L / 1.5,
       P = new Map(f.map(a => [a.id, [a.x / k, -a.y / k, (a.z || 0) / k]])),
       atoms = [],
+      hs = [],
       nb = a => neighbors(a).filter(o => P.has(o.id));
     let q = 0,
       elec = 0,
       unp = 0;
+    const bonds = [],
+      ix = new Map();
     const put = (el, p) => {
       atoms.push({ el, x: p[0], y: p[1], z: p[2] });
       elec += ZOF(el);
+      return atoms.length;
     };
+    for (const a of f) ix.set(a.id, f.indexOf(a) + 1);
+    for (const b of mol.bonds) if (ix.has(b.a) && ix.has(b.b)) bonds.push([ix.get(b.a), ix.get(b.b), b.order === 1.5 ? 4 : Math.max(1, Math.round(b.order || 1))]);
     for (const a of f) {
       const p = P.get(a.id);
       put(a.el === 'D' ? 'H' : a.el, p);
+      if (a.chg) atoms[atoms.length - 1].chg = a.chg;
+      if (a.rad) atoms[atoms.length - 1].rad = a.rad === 2 ? 3 : 2;
       q += a.chg || 0;
       unp += a.rad === 2 ? 2 : a.rad ? 1 : 0;
       const nH = a.el === 'H' ? 0 : implicitH(a);
@@ -40585,15 +40876,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       }
       const len = XH_LEN[a.el] || 1.1;
-      for (const dv of hDirs3D(U, nH, hyb, ref)) put('H', p.map((v, t) => v + dv[t] * len));
+      for (const dv of hDirs3D(U, nH, hyb, ref)) hs.push([ix.get(a.id), p.map((v, t) => v + dv[t] * len)]);
     }
+    /* the hydrogens after the drawn atoms, so the drawn ones keep their numbers */
+    for (const [at, pp] of hs) bonds.push([at, put('H', pp), 1]);
     elec -= q;
     const notes = [];
     if ((elec - unp) % 2) {
       unp++;
       notes.push('odd number of electrons: taken as a doublet');
     }
-    return { atoms, charge: q, multiplicity: unp + 1, energy: null, forceField: null, conformers: 0, stereoKept: null, notes, sheet: true };
+    return { atoms, bonds, charge: q, multiplicity: unp + 1, energy: null, forceField: null, conformers: 0, stereoKept: null, notes, sheet: true };
   }
   /* the 3D work runs in a worker made from the same OpenChemLib text, so the page stays responsive; where a worker
      cannot start (a sandboxed view), it runs in the page */
@@ -40698,6 +40991,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       budget = Math.max(1000, +a.maxSeconds * 1000 || 30000),
       t0 = Date.now(),
       frames = [],
+      sdfs = [],
       out = [],
       todo = jobs.filter(j => j.mb).length;
     let k = 0;
@@ -40722,6 +41016,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         if (r) {
           frames.push(xyzFrame(r, 'compound ' + j.n + ' ' + j.formula));
+          sdfs.push(sdf3DRecord(r, 'compound ' + j.n + ' ' + j.formula));
           Object.assign(it, {
             atoms: r.atoms.length,
             charge: r.charge,
@@ -40738,7 +41033,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       out.push(it);
     }
     if (!frames.length) throw new Error(out.map(x => 'compound ' + (x.index + 1) + ': ' + x.error).join('; '));
-    return { xyz: frames.join(''), structures: out };
+    return { xyz: frames.join(''), sdf: sdfs.join(''), structures: out };
   }
   /* File menu: a box at the bottom right shows which structure and conformer is being worked on, with Cancel; when it
      is done, Save and Copy are buttons in it. The browser shows a Save dialog only right after a click, and a conformer
@@ -40753,7 +41048,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const box = document.createElement('div');
     box.className = 'askbox xyzbox';
     box.setAttribute('role', 'status');
-    box.innerHTML = '<div class="card"><b>3D coordinates (XYZ)</b><div class="tx"></div><ul class="warn"></ul><div class="row"></div></div>';
+    box.innerHTML = '<div class="card"><b>3D coordinates (XYZ, SDF)</b><div class="tx"></div><ul class="warn"></ul><div class="row"></div></div>';
     document.body.appendChild(box);
     const tx = box.querySelector('.tx'),
       ul = box.querySelector('.warn'),
@@ -40831,16 +41126,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         row.innerHTML = '';
         btn('Close', false, close);
-        btn('Copy', k === 'c-xyz', () => {
-          copyText(r.xyz, 'XYZ copied');
+        const sdf3 = k === 'f-sdf3' || k === 'c-sdf3';
+        btn(sdf3 ? 'Copy SDF' : 'Copy', k === 'c-xyz' || k === 'c-sdf3', () => {
+          if (sdf3) copyText(r.sdf, 'SDF with the 3D shape copied');
+          else copyText(r.xyz, 'XYZ copied');
           close();
         });
-        btn('Save .xyz', k !== 'c-xyz', () => {
-          const name = docName() + '.xyz';
-          if (window.rdDesktop || !window.claude) offerFile(name, r.xyz);
-          else offerFile(name + '.zip', zipOf([[name, r.xyz]]));
+        /* both files: .xyz for quantum chemistry, .sdf with the bonds (Avogadro and other 3D programs) */
+        const save = (ext, body) => {
+          const name = docName() + ext;
+          if (window.rdDesktop || !window.claude) offerFile(name, body);
+          else offerFile(name + '.zip', zipOf([[name, body]]));
           close();
-        });
+        };
+        btn('Save .xyz', k === 'f-xyz' || (!k && !sdf3), () => save('.xyz', r.xyz));
+        btn('Save .sdf', k === 'f-sdf3', () => save('.sdf', r.sdf));
         const p = row.querySelector('.pri');
         if (p) p.focus();
         return r;
@@ -59834,10 +60134,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const f = String((a && a.format) || 'smiles').toLowerCase();
       if (f === 'svg') return { svg: svgFileOf() };
       if (f === 'xyz') return xyzExport(a);
+      if (f === 'sdf3d') return xyzExport(a).then(r => ({ sdf: r.sdf, structures: r.structures }));
       if (f === 'json' || f === 'reactio') return { json: JSON.stringify({ rd: 1, state: S }) };
       const F = exportFormats();
       const v = { mol: F.mol, sdf: F.sdf, rxn: F.rxn, cdxml: F.cdxml, smiles: F.smi }[f];
-      if (v == null) throw new Error('Formats: smiles, mol, sdf, rxn, cdxml, xyz, svg, json');
+      if (v == null) throw new Error('Formats: smiles, mol, sdf, sdf3d, rxn, cdxml, xyz, svg, json');
       return { [f]: v };
     },
     table: () => apiTable(),
@@ -63234,7 +63535,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       undo: { d: 'undo the last change; answers what was undone (every command is one step)', a: {} },
       redo: { d: 'redo what undo took back', a: {} },
       clean: { d: 'Clean Up Structure (default), Clean Up 2D (flat) or Clean Up Reaction (what: reaction; the arrows grow to their texts). Answers stereoSwapped (wedges and hashes swapped to keep the molecule) and the overlaps of the structures it cleaned', a: { what: '"reaction"', flat: 'true: Clean Up 2D', index: 'only this structure (or several [0, 2])', ids: 'or these structures by id', rings: 'true: each ring system laid out whole (fused rings together), turned back onto its place; chains keep their drawn shape and go with the ring atom they hang on. "each": every ring made regular on its own, nothing else moved', keepOrientation: 'true: tidied where it is, turned and moved back onto its old place (fit to a figure kept; wedges and hashes swapped where a centre was turned over, so the molecule stays)', keepBox: 'true: as keepOrientation, and no bigger than its old box', straighten: 'true: the H (or group) at a ring junction put on the shared bond\'s line, open-chain angles made 120° (180° at a triple bond) and crooked atoms\' bonds put on the grid, the smaller side turned; nothing laid out again', bridge: 'above, below, flip or fromReference (the figure\'s side): a flat bridge (a norbornane drawn flat) put on that side of its bridgeheads\' line, the molecule kept', groups: '"fromReference": groups on one atom swapped where the figure has them the other way round (H and Ph, F and CF3), the molecule kept', level: 'true: turned by the few degrees to the nearest straight position (ring bonds and chains on the 30° grid), nothing else changed', atoms: 'with index: only these atoms cleaned up (from 1), joined to the rest where it stands; the rest does not move' } },
-      export: { d: 'the drawing as a file text', a: { format: 'smiles, mol, sdf, rxn, cdxml, xyz, svg or json', maxConformers: 'xyz: conformers tried (20)', maxSeconds: 'xyz: time for all (30)', keep3D: 'xyz: keep a 3D shape on the sheet (true)' } },
+      export: { d: 'the drawing as a file text', a: { format: 'smiles, mol, sdf, rxn, cdxml, xyz, sdf3d (the 3D shape with its bonds), svg or json', maxConformers: 'xyz, sdf3d: conformers tried (20)', maxSeconds: 'xyz, sdf3d: time for all (30)', keep3D: 'xyz, sdf3d: keep a 3D shape on the sheet (true)' } },
       table: { d: 'the reagent table', a: {} },
       picture: { d: 'a PNG of the sheet (base64), or of a part of it', a: { scale: '1 = screen size, up to 4', region: '[x0, y0, x1, y1] on the sheet: only this part', ids: 'or only round these objects (structures by any atom id, arrows, texts)', index: 'or round these structures (one or a list)', margin: 'round ids or index (20)' } },
       image: { d: 'a picture without touching the sheet: of any structure or reaction (text or smiles), of a grid of structures (items), or of a reaction laid out as addReaction does it (reaction)', a: { text: 'the content', smiles: 'or a SMILES', format: 'its format', items: 'a grid: ["CCO", …] or [{smiles, name, alias}, …]', labels: 'grid: letters (a, b, c), names or none', columns: 'grid: how many across', gutter: 'grid: space between (50)', reaction: 'addReaction\'s arguments: {reactants, products, above, below, labels, smiles…}', style: 'drawing style (journal, nature, rsc, angew, synth…)', output: 'svg or png', scale: 'png scale (2)' } },
@@ -63662,11 +63963,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     'cdxml',
     'cdx',
     'xyz',
+    'sdf3d',
     'reactio',
     'json',
     'svg',
     'png',
     'eps',
+    'pdf',
     'tiff',
     'tif'
   ];
@@ -63811,7 +64114,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             'reactio: format ' + fmt + '? One of: ' + CLI_OUT.filter(x => x !== 'tif').join(', '),
             2
           );
-        if (!outp && ['cdx', 'png', 'tiff'].includes(fmt))
+        if (!outp && ['cdx', 'png', 'tiff', 'pdf'].includes(fmt))
           return fail('reactio: ' + fmt + ' is a binary file: give -o', 2);
         for (const inp of pos) {
           await load(inp);
@@ -63822,8 +64125,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               await (await pngOf(Math.min(8, Math.max(0.25, +opt.scale || 3)))).arrayBuffer()
             );
           else if (fmt === 'eps') body = await epsOf();
+          else if (fmt === 'pdf') body = await pdfOf();
           else if (fmt === 'tiff') body = (await tiffExport(+opt.dpi || 600)).bytes;
           else if (fmt === 'xyz') body = (await xyzExport({})).xyz;
+          else if (fmt === 'sdf3d') body = (await xyzExport({})).sdf;
           else body = fileBody(fmt);
           if (body == null || body === '')
             throw new Error(
@@ -63836,7 +64141,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             say(String(body));
             continue;
           }
-          const path = isDir(outp) ? outp.replace(/[\\/]?$/, '/') + base(inp) + '.' + fmt : outp,
+          const path = isDir(outp) ? outp.replace(/[\\/]?$/, '/') + base(inp) + '.' + (fmt === 'sdf3d' ? '3d.sdf' : fmt) : outp,
             u = typeof body === 'string' ? new TextEncoder().encode(body) : body;
           res.writes.push({ path, b64: window.rdNative ? window.rdNative.b64(u) : '' });
           res.err += 'wrote ' + path + '\n';
@@ -67250,6 +67555,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     svgOf,
     zipOf,
     epsOf,
+    pdfOf,
     tiffExport,
     tiffLzw,
     isoPattern,

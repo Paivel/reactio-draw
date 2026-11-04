@@ -46,9 +46,10 @@ Documents
                                                        newDocument gives an error when no tab more fits
   set             {"text": "...", "format": "mol"}     replace the whole sheet (format found from the text if left out)
   import          {"text": "...", "format": "cdxml"}   add a file's content to the sheet
-  export          {"format": "smiles|mol|sdf|rxn|cdxml|xyz|svg|json"}   the drawing as a file text; xyz: 3D for
+  export          {"format": "smiles|mol|sdf|rxn|cdxml|xyz|sdf3d|svg|json"}   the drawing as a file text; xyz: 3D for
                                                        quantum chemistry (hydrogens added, lowest MMFF94s+ conformer;
-                                                       maxConformers 20, maxSeconds 30)
+                                                       maxConformers 20, maxSeconds 30); sdf3d: the same 3D shape as
+                                                       an SDF with its bonds, charges and configuration
   clear           {"keepReference": true}              empty the sheet (keepReference: the figure laid last stays)
                   {"resetIds": true}                   … and the ids start again at 1 (a figure kept becomes 1)
 

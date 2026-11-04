@@ -10,10 +10,12 @@ Where it is:
   Linux:   ./reactio in the "Reactio Draw" folder; install.sh also links it into ~/.local/bin as reactio.
            It needs WebKitGTK and a desktop session (on a server: xvfb-run reactio …).
 
-  reactio render  <input…> -o <out.svg|.png|.eps|.tiff | folder>   a picture of the drawing
-  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.xyz|.json|.svg|.png|.eps|.tiff | folder>
+  reactio render  <input…> -o <out.svg|.png|.eps|.pdf|.tiff | folder>   a picture of the drawing (.pdf for LaTeX)
+  reactio convert <input…> -o <out.reactio|.mol|.sdf|.rxn|.smi|.cdxml|.cdx|.xyz|.json|.svg|.png|.eps|.pdf|.tiff | folder>
   reactio convert <input>  --format smi                             (no -o: text formats go to the screen)
   reactio convert molecule.cdx -o molecule.xyz             (3D coordinates for quantum chemistry: lowest MMFF94s+ conformer)
+  reactio convert molecule.cdx --format sdf3d -o molecule.sdf   (the same 3D shape with its bonds, charges and configuration,
+                               for Avogadro and other 3D programs)
   reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis, cLogP, TPSA, R/S and E/Z of
                                every structure
   reactio nmr     <input>  [--nucleus 1H|13C|19F|31P]                predicted shifts (13C by default)
