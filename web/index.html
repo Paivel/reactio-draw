@@ -3199,7 +3199,7 @@ html {
             <dt title="Hydrogen-bond donors / acceptors (OpenChemLib)">H-bond donors / acceptors</dt><dd id="hbda">—</dd>
             <dt title="Rotatable bonds (OpenChemLib)">Rotatable bonds</dt><dd id="rotb">—</dd>
             <dt title="Lipinski's rule of five: MW ≤ 500, cLogP ≤ 5, H-bond donors ≤ 5, acceptors ≤ 10; one violation is usually allowed">Rule of five</dt><dd id="ro5">—</dd>
-            <dt title="Typical pKa of each ionizable group, by its kind: the mean ± spread of measured values for groups of that kind (Dimorphite-DL's table, Apache-2.0), not a calculation for this molecule. Bases: pKaH, the pKa of the conjugate acid, and pKb = 14 − pKaH (water, 25 °C)">pKa (typical)</dt><dd id="pka">—</dd>
+            <dt title="pKa of each ionizable group, estimated: the group found with Dimorphite-DL's table (Apache-2.0), its value from Hammett σ of the ring's substituents (benzoic acids, phenols, anilines, pyridines), Taft σ* of nearby groups (aliphatic acids and amines) or the kind of ring (aromatic N). ± is the typical error for such a group. Bases: pKaH, the pKa of the conjugate acid, and pKb = 14 − pKaH (water, 25 °C)">pKa (estimate)</dt><dd id="pka">—</dd>
           </dl>
           <div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap;margin-top:8px"><span class="tlabel" style="white-space:nowrap" title="Type the m/z of the peak you found: the closest common ion (adduct) of this structure is shown with its calculated m/z and the error in ppm">HRMS found m/z</span><input id="hrmsIn" inputmode="decimal" placeholder="e.g. 203.0318" style="min-width:0;flex:1"><button class="btn ghost sm" id="hrmsCopy" title="Copy the HRMS line for the experimental part">Copy</button></div>
           <div id="hrmsOut" class="note" style="margin-top:2px"></div>
@@ -10940,11 +10940,34 @@ function kdOf(st) {
       if (t == null) t = 0;
       h.x = q.x + Math.cos(t) * L;
       h.y = q.y + Math.sin(t) * L;
-      /* that place crowded by atoms or bonds that are not its own (a congested ring system): the freest place near it */
+      /* that place crowded by atoms or bonds that are not its own (a congested ring system): the freest place near it, but
+         never inside one of its rings (an H points out of the ring system), shorter if that makes room */
       if (hCrowd(h, q) < L * 0.45) {
-        const p = hPlace(q, h);
-        h.x = p.x;
-        h.y = p.y;
+        const t0 = t,
+          inAny = (x, y) => R.some(r => inPoly({ x, y }, r));
+        let best = null;
+        for (let i = 0; i < 72; i++) {
+          const a = t0 + ((i % 2 ? -1 : 1) * Math.ceil(i / 2) * Math.PI) / 36;
+          for (const len of [L, L * 0.8]) {
+            const x = q.x + Math.cos(a) * len,
+              y = q.y + Math.sin(a) * len;
+            if (inAny(q.x + Math.cos(a) * L * 0.4, q.y + Math.sin(a) * L * 0.4) || inAny(x, y)) continue;
+            h.x = x;
+            h.y = y;
+            let dev = Math.abs(a - t0) % (2 * Math.PI);
+            if (dev > Math.PI) dev = 2 * Math.PI - dev;
+            const sc = Math.min(hCrowd(h, q), L * 0.6) - dev * L * 0.12 - (len < L ? L * 0.05 : 0);
+            if (!best || sc > best.sc) best = { sc, x, y };
+          }
+        }
+        if (best) {
+          h.x = best.x;
+          h.y = best.y;
+        } else {
+          const p = hPlace(q, h);
+          h.x = p.x;
+          h.y = p.y;
+        }
       }
       delete h.__par;
     }
@@ -17218,6 +17241,404 @@ function kdOf(st) {
     go(0);
     return out;
   }
+  /* ===== the typical value made closer for the commonest groups, from the textbook relations: Hammett σ of the ring's
+     substituents for benzoic acids, phenols, thiophenols, anilines and pyridines (ρ from Perrin, Dempsey and Serjeant),
+     the inductive pull of nearby groups (Taft σ*, falling off 0.4 a bond) for aliphatic acids and amines, the kind of ring for
+     aromatic N, and what is on an amidine's N. Each value is a published constant; none is fitted ===== */
+  /* Hammett σm, σp and σp− (for a para group that takes the ring's charge: phenoxide, anilinium's lone pair) */
+  const HAM = {
+    NO2: [0.71, 0.78, 1.27],
+    CN: [0.56, 0.66, 0.88],
+    CF3: [0.43, 0.54, 0.65],
+    COR: [0.38, 0.5, 0.84],
+    CHO: [0.35, 0.42, 1.03],
+    CO2R: [0.37, 0.45, 0.75],
+    CO2H: [0.37, 0.45, 0.77],
+    CONH2: [0.28, 0.36, 0.63],
+    'COO-': [-0.1, 0, 0],
+    SO2R: [0.6, 0.72, 1.13],
+    SO2N: [0.46, 0.57, 0.94],
+    SO3H: [0.3, 0.35, 0.5],
+    F: [0.34, 0.06, 0.06],
+    Cl: [0.37, 0.23, 0.23],
+    Br: [0.39, 0.23, 0.23],
+    I: [0.35, 0.18, 0.18],
+    OMe: [0.12, -0.27, -0.27],
+    OH: [0.12, -0.37, -0.37],
+    'O-': [-0.47, -0.81, -0.81],
+    OAc: [0.39, 0.31, 0.31],
+    OAr: [0.25, -0.03, -0.03],
+    NH2: [-0.16, -0.66, -0.66],
+    NHR: [-0.21, -0.7, -0.7],
+    NR2: [-0.15, -0.83, -0.83],
+    NHAc: [0.21, 0, 0],
+    'NR3+': [0.88, 0.82, 0.82],
+    'N=N': [0.32, 0.39, 0.39],
+    SMe: [0.15, 0, 0.06],
+    SH: [0.25, 0.15, 0.15],
+    Me: [-0.07, -0.17, -0.17],
+    CH2X: [0.1, 0.1, 0.1],
+    Ph: [0.06, -0.01, 0.02],
+    vinyl: [0.06, -0.04, -0.04],
+    alkyne: [0.21, 0.23, 0.3]
+  };
+  /* what a ring substituent is, from the atom joined to the ring (s) and what is around it */
+  function pkaSubKind(T, s, from) {
+    const a = T[s],
+      nbs = a.nb.filter(([j]) => j !== from),
+      el = j => T[j].el,
+      heavy = nbs.filter(([j]) => el(j) !== 'H'),
+      dbl = el2 => heavy.some(([j, b]) => b.o === 2 && el(j) === el2),
+      hasH = a.nb.some(([j]) => el(j) === 'H');
+    if (a.el === 'F' || a.el === 'Cl' || a.el === 'Br' || a.el === 'I') return a.el;
+    if (a.el === 'N') {
+      const O = heavy.filter(([j]) => el(j) === 'O').length;
+      if (O >= 2) return 'NO2';
+      if (a.chg > 0 && !hasH) return 'NR3+';
+      if (a.chg > 0) return 'NR3+';
+      if (heavy.some(([j, b]) => b.o === 2 && el(j) === 'N')) return 'N=N';
+      if (heavy.some(([j]) => el(j) === 'C' && T[j].nb.some(([q, b]) => b.o === 2 && (el(q) === 'O' || el(q) === 'S'))) || heavy.some(([j]) => el(j) === 'S' && T[j].nb.filter(([q, b]) => el(q) === 'O').length >= 2)) return 'NHAc';
+      const hN = a.nb.filter(([j]) => el(j) === 'H').length;
+      return hN >= 2 ? 'NH2' : hN === 1 ? 'NHR' : 'NR2';
+    }
+    if (a.el === 'O') {
+      if (a.chg < 0) return 'O-';
+      if (hasH) return 'OH';
+      const c = heavy[0] && heavy[0][0];
+      if (c != null && T[c].nb.some(([q, b]) => b.o === 2 && el(q) === 'O')) return 'OAc';
+      if (c != null && T[c].ar) return 'OAr';
+      return 'OMe';
+    }
+    if (a.el === 'S') {
+      const O = heavy.filter(([j]) => el(j) === 'O');
+      if (O.length >= 2) return heavy.some(([j]) => el(j) === 'N') ? 'SO2N' : O.some(([j]) => T[j].h > 0 || T[j].chg < 0) ? 'SO3H' : 'SO2R';
+      return hasH ? 'SH' : 'SMe';
+    }
+    if (a.el === 'C') {
+      if (a.ar) return 'Ph';
+      if (heavy.some(([j, b]) => b.o === 3 && el(j) === 'N')) return 'CN';
+      if (heavy.some(([j, b]) => b.o === 3)) return 'alkyne';
+      if (heavy.filter(([j]) => el(j) === 'F').length >= 2) return 'CF3';
+      if (dbl('O')) {
+        const oth = heavy.filter(([j, b]) => b.o === 1);
+        if (oth.some(([j]) => el(j) === 'O' && T[j].chg < 0)) return 'COO-';
+        if (oth.some(([j]) => el(j) === 'O' && T[j].h > 0)) return 'CO2H';
+        if (oth.some(([j]) => el(j) === 'O')) return 'CO2R';
+        if (oth.some(([j]) => el(j) === 'N')) return 'CONH2';
+        return oth.length ? 'COR' : 'CHO';
+      }
+      if (heavy.some(([j, b]) => b.o === 2)) return 'vinyl';
+      if (heavy.some(([j]) => ['O', 'N', 'F', 'Cl', 'Br', 'S'].includes(el(j)))) return 'CH2X';
+      return 'Me';
+    }
+    return null;
+  }
+  /* the six-ring through ring atom `ipso`, walked from it: [ipso, o, m, p, m', o'] or null */
+  function pkaRing6(T, ipso) {
+    const ar = j => T[j].ar && T[j].el !== 'H';
+    const go = (path, depth) => {
+      const last = path[path.length - 1];
+      for (const [j] of T[last].nb) {
+        if (!ar(j)) continue;
+        if (depth === 5) {
+          if (T[j].nb.some(([q]) => q === ipso) && !path.includes(j)) return [...path, j];
+          continue;
+        }
+        if (path.includes(j)) continue;
+        const r = go([...path, j], depth + 1);
+        if (r) return r;
+      }
+      return null;
+    };
+    return T[ipso].ar ? go([ipso], 1) : null;
+  }
+  /* Σσ of a six-ring's substituents seen from ipso (σ− at para if minus): ortho ones as σp + ½σm; ring N as aza (σm 0.65,
+     σp 0.93); `skip` the site's own atoms. Also how many ortho substituents there are */
+  function pkaRingSigma(T, ring, skip, minus) {
+    let sig = 0,
+      ortho = 0,
+      oKinds = [];
+    const pos = ['', 'o', 'm', 'p', 'm', 'o'];
+    for (let i = 1; i < 6; i++) {
+      const at = ring[i],
+        P = pos[i];
+      if (T[at].el === 'N') sig += P === 'p' ? 0.93 : P === 'm' ? 0.65 : 1.0;
+      for (const [j] of T[at].nb) {
+        if (ring.includes(j) || skip.has(j) || T[j].el === 'H') continue;
+        /* a ring fused here (a ring bond out of the ring): its N pull a little (0.3 each), its C none */
+        const bOut = T[at].nb.find(([q]) => q === j);
+        if (bOut && bOut[1].ring && T[j].ar) {
+          if (T[j].el === 'N') sig += 0.3;
+          continue;
+        }
+        const k = pkaSubKind(T, j, at),
+          h = k && HAM[k];
+        if (!h) continue;
+        if (P === 'm') sig += h[0];
+        else if (P === 'p') sig += minus ? h[2] : h[1];
+        else {
+          sig += (minus ? h[2] : h[1]) + 0.5 * h[0];
+          ortho++;
+          oKinds.push(k);
+        }
+      }
+    }
+    return { sig, ortho, oKinds };
+  }
+  /* Taft σ* of a carbon's substituent Y, one carbon from the site (σ* of CH2Y); an alkyl carbon passes on 0.4 of what is on it */
+  const TAFT_Y = { F: 1.1, Cl: 1.05, Br: 1.0, I: 0.85, OH: 0.56, OMe: 0.52, OAr: 0.85, OAc: 0.68, 'O-': -0.3, NH2: 0.5, NHR: 0.4, NR2: 0.4, NHAc: 0.45, 'NR3+': 1.9, NO2: 1.4, CN: 1.3, CF3: 0.92, COR: 0.6, CHO: 0.62, CO2R: 0.71, CO2H: 0.7, 'COO-': -0.06, CONH2: 0.5, Ph: 0.22, vinyl: 0.3, alkyne: 0.8, SMe: 0.5, SH: 0.5, SO2R: 1.3, SO2N: 1.2, SO3H: 1.0, 'N=N': 0.6, CH2X: 0.25, Me: -0.1 };
+  function pkaTaft(T, c, from, depth, seen, base) {
+    /* σ* of the group R = c… seen from `from` */
+    let sum = 0;
+    for (const [j] of T[c].nb) {
+      if (j === from || seen.has(j) || T[j].el === 'H') continue;
+      if (T[j].ar && T[c].ar) continue;
+      if (T[j].el === 'C' && !T[j].ar && !T[j].nb.some(([q, b]) => b.o > 1) && T[j].nb.every(([q]) => q === c || ['C', 'H'].includes(T[q].el) || true)) {
+        /* an sp3 carbon: a small push of its own, and 0.4 of what hangs on it */
+        const k = pkaSubKind(T, j, c);
+        if (k === 'Me' || k === 'CH2X' || k === 'CF3') {
+          if (k === 'CF3') {
+            sum += TAFT_Y.CF3;
+            continue;
+          }
+          sum += depth < 3 ? 0.4 * pkaTaft(T, j, c, depth + 1, new Set([...seen, c]), base) : 0;
+          continue;
+        }
+      }
+      const k = pkaSubKind(T, j, c);
+      /* seen from an amine, a COOH nearby is already a carboxylate (glycine 9.8, β-alanine 10.2) */
+      if (base && (k === 'CO2H' || k === 'COO-')) sum += 0.25;
+      else if (k && TAFT_Y[k] != null) sum += TAFT_Y[k];
+    }
+    return sum;
+  }
+  function pkaRefine(T, r, k, m) {
+    const name = r[0],
+      el = j => T[j].el,
+      heavyNb = j => T[j].nb.filter(([q]) => el(q) !== 'H').map(([q]) => q);
+    /* carboxylic acids: on a benzene ring by Hammett (benzoic acid 4.20, ρ 1.00; an ortho group 0.35 stronger again, an
+       ortho OH or C=O by its hydrogen bond 1.0 more); otherwise by Taft (acetic acid 4.76, ρ* 1.62; formic 3.75) */
+    if (name === 'Carboxyl' || name === 'Phenyl_carboxyl') {
+      const C = heavyNb(k).find(j => el(j) === 'C');
+      if (C == null) return null;
+      const R = heavyNb(C).find(j => j !== k && !(el(j) === 'O' && T[C].nb.some(([q, b]) => q === j && b.o === 2)));
+      if (R == null) return 3.75;
+      if (T[R].ar) {
+        const ring = pkaRing6(T, R);
+        if (!ring) return 4.2 - 0.3;
+        const S = pkaRingSigma(T, ring, new Set([C]), false);
+        let v = 4.2 - S.sig - (S.ortho ? 0.35 : 0);
+        if (S.oKinds.some(x => x === 'OH' || x === 'COR' || x === 'CHO' || x === 'NO2')) v -= 1.0;
+        return v;
+      }
+      if (T[R].nb.some(([q, b]) => b.o === 2 && el(q) === 'C')) return 4.25 - 1.62 * pkaTaft(T, R, C, 1, new Set([C, k]));
+      return 4.76 - 1.62 * pkaTaft(T, R, C, 1, new Set([C, k]));
+    }
+    /* phenols (9.99, ρ 2.23) and thiophenols (6.62, ρ 2.2), with σ− */
+    if (name === 'Phenol' || name === 'Phenol_unactivated' || name === 'Phenyl_Thiol') {
+      const R = heavyNb(k).find(j => T[j].ar);
+      const ring = R != null && pkaRing6(T, R);
+      if (!ring) return null;
+      const S = pkaRingSigma(T, ring, new Set([k]), true);
+      return (el(k) === 'S' ? 6.62 - 2.2 * S.sig : 9.99 - 2.23 * S.sig) + (S.oKinds.includes('Me') ? 0.2 : 0);
+    }
+    /* anilines: ArNH3+ 4.60 (ρ 2.89), ArNH2Me+ 4.85 (ρ 3.0), ArNHMe2+ 5.07 (ρ 3.4), Ar2NH2+ 0.8; σ− at para; an ortho group
+       0.4 weaker again (it crowds the cation) */
+    if (/^Anilines/.test(name)) {
+      const ars = heavyNb(k).filter(j => T[j].ar);
+      if (!ars.length) return null;
+      if (ars.length >= 2) return 0.8;
+      const ring = pkaRing6(T, ars[0]);
+      if (!ring) return null;
+      const S = pkaRingSigma(T, ring, new Set([k]), true),
+        alk = heavyNb(k).length - 1,
+        [b0, rho] = alk >= 2 ? [5.07, 3.4] : alk === 1 ? [4.85, 3.0] : [4.6, 2.89];
+      return b0 - rho * S.sig - (S.ortho ? 0.4 : 0);
+    }
+    /* aliphatic amines: RNH2 10.6, R2NH 11.0, R3N 10.3 less ρ* (3.14, 3.23, 3.30) times Σσ* of the groups on N */
+    if (/^(Alkylamine|Amines_primary|Benzylic_amine|Beta_hydroxy_amine|Fluoroalkylamine)/.test(name)) {
+      const Rs = heavyNb(k);
+      if (Rs.some(j => T[j].ar)) return null;
+      const n = Rs.length,
+        [b0, rho] = n >= 3 ? [10.3, 3.3] : n === 2 ? [11.0, 3.23] : [10.6, 3.14];
+      let sig = 0;
+      for (const R of Rs) {
+        if (el(R) !== 'C') {
+          sig += el(R) === 'N' ? 1.2 : el(R) === 'O' ? 2.0 : 1.0;
+          continue;
+        }
+        /* an N on a C=C, C=O or C=S, or one step from it (an enamine, a vinylogous amide): not an amine any more */
+        if (T[R].nb.some(([q, b]) => b.o >= 2 && q !== k)) return T[R].nb.some(([q, b]) => b.o === 2 && (el(q) === 'O' || el(q) === 'S' || el(q) === 'N')) ? null : 5.0;
+        sig += pkaTaft(T, R, k, 1, new Set([k]), true);
+      }
+      /* in a ring: piperidine 11.1, morpholine 8.4, piperazine 9.7 come out of the same sums; a small ring is weaker
+         (aziridine 8.0) */
+      let v = b0 - rho * sig;
+      if (T[k].rmin === 3) v -= 3;
+      return v;
+    }
+    /* aromatic N of a ring: the kind of ring, then for a six-ring Hammett (pyridinium 5.25, ρ 5.9, 2-groups by their own
+       values) */
+    if (name === 'Aromatic_nitrogen_unprotonated' || name === 'Diazine') {
+      const ring = pkaRing6(T, k);
+      if (ring) {
+        const pos = ['', 'o', 'm', 'p', 'm', 'o'];
+        let extraN = 0,
+          v = 5.25;
+        for (let i = 1; i < 6; i++) if (el(ring[i]) === 'N') v += pos[i] === 'o' ? -2.9 : pos[i] === 'm' ? -3.9 : -4.6;
+        /* 2-groups: NH2 +1.6, NHR/NR2 +1.7, alkyl +0.75, OMe −2.0, halogen −4.5, CN −5.5, NO2 −7, acyl/ester −3.5, aryl −0.8 */
+        const ORTHO2 = { NH2: 1.6, NHR: 1.7, NR2: 1.7, Me: 0.75, CH2X: 0.2, OMe: -2.0, OH: -2.0, OAr: -2.5, F: -5.7, Cl: -4.5, Br: -4.4, I: -3.7, CN: -5.5, NO2: -7.0, COR: -3.5, CHO: -3.5, CO2R: -3.0, CO2H: -3.0, CONH2: -3.0, Ph: -0.8, SMe: -1.6, NHAc: -1.2, CF3: -4.5, vinyl: -0.3 };
+        for (const i of [1, 5]) {
+          const at = ring[i];
+          for (const [j, bj] of T[at].nb) {
+            if (ring.includes(j) || el(j) === 'H') continue;
+            if (bj.ring && T[j].ar) {
+              if (el(j) === 'N') v -= 1.5;
+              continue;
+            }
+            const kk = pkaSubKind(T, j, at);
+            if (kk && ORTHO2[kk] != null) v += ORTHO2[kk];
+          }
+        }
+        for (const i of [2, 3, 4]) {
+          const at = ring[i];
+          for (const [j, bj] of T[at].nb) {
+            if (ring.includes(j) || el(j) === 'H') continue;
+            if (bj.ring && T[j].ar) {
+              if (el(j) === 'N') v -= 1.5;
+              continue;
+            }
+            const kk = pkaSubKind(T, j, at),
+              h = kk && HAM[kk];
+            if (h) v -= 5.9 * (i === 3 ? (h[1] < 0 ? h[1] * 1.0 : h[1]) : h[0]);
+          }
+        }
+        return Math.max(-3, v);
+      }
+      /* five-rings: imidazole 7.0 (benzimidazole 5.5), pyrazole 2.5, 1,2,4-triazole 2.2, 1,2,3-triazole 1.2, oxazole 0.8,
+         thiazole 2.5, isoxazole −3, others from the Dimorphite-DL value */
+      const ring5 = (() => {
+        for (const [a] of T[k].nb)
+          for (const [b] of T[a].nb)
+            for (const [c] of T[b].nb)
+              for (const [d] of T[c].nb)
+                if (d !== a && d !== k && b !== k && c !== k && c !== a && T[d].nb.some(([q]) => q === k) && [a, b, c, d].every(q => T[q].ar)) return [k, a, b, c, d];
+        return null;
+      })();
+      if (!ring5) return null;
+      const het = ring5.slice(1).filter(q => el(q) !== 'C'),
+        adj = ring5.filter((q, i) => i === 1 || i === 4).filter(q => el(q) !== 'C'),
+        fusedTo = ring5.flatMap(q => T[q].nb.filter(([j, b]) => b.ring && T[j].ar && !ring5.includes(j)).map(([j]) => j)),
+        fused = fusedTo.length > 0,
+        fusedN = (() => {
+          /* the fused ring's own N (purine's pyrimidine) */
+          const seen = new Set(ring5),
+            st = [...fusedTo];
+          let n = 0;
+          while (st.length) {
+            const q = st.pop();
+            if (seen.has(q)) continue;
+            seen.add(q);
+            if (el(q) === 'N') n++;
+            for (const [j, b] of T[q].nb) if (b.ring && T[j].ar && !seen.has(j) && seen.size < 12) st.push(j);
+          }
+          return n;
+        })();
+      let v;
+      if (het.length === 1 && el(het[0]) === 'N' && !adj.length) v = fused ? (fusedN ? 3.0 - (fusedN - 1) * 0.5 : 5.5) : 7.0;
+      else if (het.length === 1 && el(het[0]) === 'N') v = fused ? 0.5 : 2.5;
+      else if (het.length === 1 && el(het[0]) === 'O') v = adj.length ? -3 : 0.8;
+      else if (het.length === 1 && el(het[0]) === 'S') v = adj.length ? -0.5 : fused ? 1.2 : 2.5;
+      else if (het.length === 2) v = adj.length === 2 ? 1.2 : 2.2;
+      else return null;
+      /* an amino group on the ring's C between the N's (2-aminoimidazole) +1.5, alkyl +0.5 each, nitro −6, halogen −3 */
+      for (const q of ring5.slice(1))
+        for (const [j, bj] of T[q].nb) {
+          /* groups on the ring's carbons (an N's own alkyl does about nothing) */
+          if (ring5.includes(j) || el(j) === 'H' || el(q) !== 'C') continue;
+          if (bj.ring && T[j].ar) continue;
+          const kk = pkaSubKind(T, j, q);
+          v += { NH2: 1.5, NHR: 1.5, NR2: 1.5, Me: 0.5, NO2: -6, Cl: -3, Br: -3, F: -3, I: -3, COR: -2.5, CHO: -2.5, CO2R: -2.5, CN: -4, CF3: -3, Ph: -0.5 }[kk] || 0;
+        }
+      return v;
+    }
+    /* amidines and guanidines: 12.4 and 13.6; an aryl on the carbon −0.8, an aryl on an N −1.5, an acyl or C=O conjugated
+       through the ring −5, a sulfonyl −12, a nitro or nitroso far lower */
+    if (/AmidineGuanidine|Amidine_carbon/.test(name)) {
+      const Ns = m.filter(q => el(q) === 'N'),
+        C = m.find(q => el(q) === 'C' && T[q].nb.filter(([x]) => el(x) === 'N').length >= 2);
+      if (C == null) return null;
+      const nN = T[C].nb.filter(([x]) => el(x) === 'N').length;
+      let v = nN >= 3 ? 13.6 : 12.4;
+      for (const [x] of T[C].nb) if (el(x) === 'C' && T[x].ar) v -= 0.8;
+      for (const n of T[C].nb.map(([x]) => x).filter(x => el(x) === 'N'))
+        for (const [y] of T[n].nb) {
+          if (y === C || el(y) === 'H') continue;
+          if (T[y].ar) v -= 1.5;
+          else if (el(y) === 'C' && T[y].nb.some(([z, b]) => b.o === 2 && (el(z) === 'O' || el(z) === 'S'))) v -= 5;
+          else if (el(y) === 'C' && T[y].nb.some(([z, b]) => b.o === 2 && el(z) === 'C' && T[z].nb.some(([w, bb]) => w !== y && el(w) === 'C' && T[w].nb.some(([u, b3]) => b3.o === 2 && el(u) === 'O')))) v -= 4;
+          else if (el(y) === 'C' && T[y].nb.some(([z]) => el(z) === 'O' && z !== n)) v -= 5;
+          else if (el(y) === 'C' && T[y].nb.some(([z, b]) => b.o === 2 && el(z) === 'N')) v -= 3;
+          else if (el(y) === 'S' && T[y].nb.filter(([z]) => el(z) === 'O').length >= 2) v -= 12;
+          else if (el(y) === 'N' && T[y].nb.some(([z]) => el(z) === 'O')) v -= 14;
+          else if (el(y) === 'O') v -= 6;
+        }
+      return v;
+    }
+    /* azole N–H acids: by the ring's N count (pyrrole 17, imidazole/pyrazole 14.4, triazoles 9.5, tetrazole 4.9) */
+    /* azole N–H acids by the ring's N: pyrrole 17.5 (indole 16.9), imidazole/pyrazole 14.3 (benzimidazole 12.8),
+       triazoles 9.8 (benzotriazole 8.4), each N of a fused ring 1.5 lower (purine 8.9), a nitro 4 lower, a halogen 1 */
+    if (name === 'Azole_NH' || name === 'Indole_pyrrole') {
+      const ring5 = (() => {
+        for (const [a] of T[k].nb)
+          for (const [b] of T[a].nb)
+            for (const [c] of T[b].nb)
+              for (const [d] of T[c].nb)
+                if (d !== a && d !== k && b !== k && c !== k && c !== a && T[d].nb.some(([q]) => q === k) && [a, b, c, d].every(q => T[q].ar)) return [k, a, b, c, d];
+        return null;
+      })();
+      if (!ring5) return null;
+      const nN = ring5.filter(q => el(q) === 'N').length;
+      let v = nN === 1 ? 17.5 : nN === 2 ? 14.3 : nN === 3 ? 9.8 : 4.9;
+      for (const q of ring5)
+        for (const [j, bj] of T[q].nb) {
+          if (ring5.includes(j) || el(j) === 'H') continue;
+          if (bj.ring && T[j].ar) {
+            /* the fused ring: a benzene 1.5 lower, each of its N 1.5 more */
+            const seen = new Set(ring5),
+              st = [j];
+            let nf = 0;
+            while (st.length) {
+              const x = st.pop();
+              if (seen.has(x)) continue;
+              seen.add(x);
+              if (el(x) === 'N') nf++;
+              for (const [y, by] of T[x].nb) if (by.ring && T[y].ar && !seen.has(y) && seen.size < 12) st.push(y);
+            }
+            v -= 1.5 + 1.5 * nf;
+            continue;
+          }
+          const kk = pkaSubKind(T, j, q);
+          v += { NO2: -4, Cl: -1, Br: -1, I: -1, F: -1, CN: -2.5, CF3: -1.5, COR: -1.5, CHO: -1.5, CO2R: -1.5, CO2H: -1, SO2R: -2, Me: 0.4, NH2: 0.5, Ph: -0.5 }[kk] || 0;
+        }
+      return v;
+    }
+    /* imides: an N–H between two C=O, as in succinimide 9.6, uracil 9.5, hydantoin 9.1, phthalimide (both C=O on a ring) 8.3 */
+    if (name === 'Ringed_imide1' || name === 'Ringed_imide2' || name === 'Imide2') {
+      const flank = heavyNb(k).filter(j => el(j) === 'C' && T[j].nb.some(([q, b]) => (b.o === 2 || T[q].ar) && (el(q) === 'O' || el(q) === 'S')));
+      if (flank.length < 2) return null;
+      return flank.every(c => T[c].nb.some(([q]) => T[q].ar && el(q) === 'C')) ? 8.3 : 9.5;
+    }
+    /* an acyl N–H with another heteroatom on the N: an acylsulfonamide 4.5, a hydroxamic acid 9.0, a hydrazide 12.8 */
+    if (name === 'Amide_electronegative') {
+      const o = heavyNb(k).filter(j => el(j) !== 'C' || !T[j].nb.some(([q, b]) => b.o === 2 && el(q) === 'O'));
+      if (o.some(j => el(j) === 'S' && T[j].nb.filter(([q]) => el(q) === 'O').length >= 2)) return 4.5;
+      if (o.some(j => el(j) === 'N')) return 12.8;
+      if (o.some(j => el(j) === 'O')) return 9.0;
+      return null;
+    }
+    return null;
+  }
   let PKA_Q = null;
   /* the groups of a SMILES: [{name, label, kind 'a'|'b', pKa, sd, atom (index in the SMILES)}] */
   function pkaSites(smi) {
@@ -17243,7 +17664,18 @@ function kdOf(st) {
             /* an aromatic N already carrying three bonds (N-methylimidazole's N1) has no lone pair to take a proton */
             const k = sites[i],
               threeN = r[2] === 'b' && T[k].el === 'N' && T[k].ar && T[k].nb.filter(([j]) => T[j].el !== 'H').length >= 3;
-            if (s[1] > -100 && !threeN) out.push({ name: r[0], label: r[1], kind: r[2], pKa: s[1], sd: s[2], atom: k });
+            if (s[1] > -100 && !threeN) {
+              let v = s[1],
+                sd = s[2];
+              try {
+                const w = pkaRefine(T, r, k, m);
+                if (w != null && isFinite(w)) {
+                  v = Math.round(w * 100) / 100;
+                  sd = Math.min(sd, 1);
+                }
+              } catch (e) {}
+              out.push({ name: r[0], label: r[1], kind: r[2], pKa: v, sd, atom: k });
+            }
           });
         }
         /* the heteroatoms around the sites are the group's own: later patterns leave them */
@@ -22907,6 +23339,36 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       let dx = p.x - s.x,
         dy = p.y - s.y;
+      /* Shift on a group that hangs on the rest by one bond (a substituent, or one end atom): it turns about the atom it
+         hangs on, its bond keeping its length (15° steps with Ctrl/Cmd as well) */
+      if (e.shiftKey && drag.pivot === undefined) {
+        drag.pivot = null;
+        const O = drag.orig;
+        if (O && O.atoms && O.atoms.length && !(O.arrows && O.arrows.length) && !(O.texts && O.texts.length)) {
+          const ids = new Set(O.atoms.map(q => q[0].id)),
+            out = mol.bonds.filter(b => ids.has(b.a) !== ids.has(b.b));
+          if (out.length === 1) {
+            const pv = atomById(ids.has(out[0].a) ? out[0].b : out[0].a);
+            if (pv) drag.pivot = { x: pv.x, y: pv.y };
+          }
+        }
+      }
+      if (e.shiftKey && drag.pivot) {
+        const P = drag.pivot;
+        let t = Math.atan2(p.y - P.y, p.x - P.x) - Math.atan2(s.y - P.y, s.x - P.x);
+        if (e.ctrlKey || e.metaKey) t = Math.round(t / (Math.PI / 12)) * (Math.PI / 12);
+        const c = Math.cos(t),
+          sn = Math.sin(t);
+        for (const [a, x0, y0] of drag.orig.atoms) {
+          const vx = x0 - P.x,
+            vy = y0 - P.y;
+          a.x = P.x + vx * c - vy * sn;
+          a.y = P.y + vx * sn + vy * c;
+        }
+        render();
+        setHover(null);
+        return;
+      }
       if (e.shiftKey) {
         if (Math.abs(dx) > Math.abs(dy)) dy = 0;
         else dx = 0;
@@ -70844,6 +71306,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    smartsTarget,
     jabParts,
     pkaSites,
     pkaSummary,
