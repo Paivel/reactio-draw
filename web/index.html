@@ -19049,11 +19049,20 @@ function kdOf(st) {
           mid = (top(t) + bot(t)) / 2;
         g.s = mid < cy ? 'a' : 'b';
       }
-      /* as long as the widest text needs: the end on the right goes out, and what lies right of it moves along */
+      /* as long as the widest text needs: the end on the right goes out (or in, for shorter texts, down to the length of an
+         arrow drawn with a click), and what lies right of it moves along; an arrow set to keep its length (r.noFit) stays */
       const texts = r.gl.map(g => tById(g.t)),
-        need = Math.max(...texts.map(t => textW(t))) + 2 * Math.max(10, L * 0.35);
-      if (x1 - x0 < need - 0.5) {
-        const dx = need - (x1 - x0),
+        need = Math.max(...texts.map(t => textW(t))) + 2 * Math.max(10, L * 0.35),
+        /* shorter only when its texts changed (or Length: fits its texts was just pressed): an arrow of an older drawing,
+           longer than its texts, keeps its length while other things are edited */
+        sig = texts.map(t => t.id + ':' + Math.round(textW(t))).join(','),
+        shrink = r.fitNow || (r.fitSig !== undefined && r.fitSig !== sig),
+        len = x1 - x0,
+        want = r.noFit ? len : len < need ? need : shrink ? Math.min(len, Math.max(need, 2.5 * L)) : len;
+      r.fitSig = sig;
+      delete r.fitNow;
+      if (Math.abs(len - want) > 0.5) {
+        const dx = want - (x1 - x0),
           right = x1;
         mol.atoms.forEach(q => q.x > right && (q.x += dx));
         mol.texts.forEach(t => !texts.includes(t) && t.x > right - 2 && (t.x += dx));
@@ -21588,7 +21597,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             render();
             return;
           }
-          drag = { mode: 'ahandle', r: hh.r, k: hh.k, p0: p, moved: false };
+          drag = { mode: 'ahandle', r: hh.r, k: hh.k, p0: p, moved: false, len0: Math.hypot(hh.r.x2 - hh.r.x1, hh.r.y2 - hh.r.y1) };
           svg.setPointerCapture(e.pointerId);
           return;
         }
@@ -22783,6 +22792,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (d.mode === 'ahandle') {
+      /* an arrow with its texts made longer or shorter by hand keeps that length (Length: as drawn in its menu) */
+      const r = d.r;
+      if (d.moved && r && !r.kind && !r.curve && !r.noFit && r.gl && r.gl.length && d.len0 != null && Math.abs(Math.hypot(r.x2 - r.x1, r.y2 - r.y1) - d.len0) > 1) {
+        r.noFit = 1;
+        toast('The arrow keeps this length now; Length: fits its texts in its menu (right-click) makes it follow them again');
+      }
       if (d.moved) commit();
       else render();
       return;
@@ -47362,7 +47377,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function makeArrow(s, e) {
     const t = curArrow,
-      r = { id: mol.next++, x1: s.x, y1: s.y, x2: e.x, y2: e.y };
+      /* fitNow: drawn just now, so its first texts may make it shorter as well as longer (glue) */
+      r = { id: mol.next++, x1: s.x, y1: s.y, x2: e.x, y2: e.y, fitNow: 1 };
     for (const k of ARROW_KEYS)
       if (
         t[k] !== undefined &&
@@ -50835,7 +50851,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           `<div class="aer">${lab ? `<span>${lab}</span>` : ''}<div>${btns.map(([k, v, t]) => `<button type="button" data-ae="${k}" data-v="${v}" aria-pressed="${st[k] === v}">${t}</button>`).join('')}</div></div>`
       ).join('') +
       (!r.kind && !r.curve && !r.bz && !r.pen
-        ? `<div class="aer"><span>Texts</span><div><button type="button" data-ae="glue" data-v="1" aria-pressed="${!r.noGlue}" title="Texts above and below stay with the arrow, the same gap on both sides, and the arrow grows with them">stick to the arrow</button><button type="button" data-ae="glue" data-v="0" aria-pressed="${!!r.noGlue}" title="Texts stay where they are put">free</button></div></div>`
+        ? `<div class="aer"><span>Texts</span><div><button type="button" data-ae="glue" data-v="1" aria-pressed="${!r.noGlue}" title="Texts above and below stay with the arrow, the same gap on both sides, and the arrow grows with them">stick to the arrow</button><button type="button" data-ae="glue" data-v="0" aria-pressed="${!!r.noGlue}" title="Texts stay where they are put">free</button></div></div>` +
+          (r.noGlue
+            ? ''
+            : `<div class="aer"><span>Length</span><div><button type="button" data-ae="fit" data-v="1" aria-pressed="${!r.noFit}" title="The arrow as long as its widest text: longer or shorter as the texts change">fits its texts</button><button type="button" data-ae="fit" data-v="0" aria-pressed="${!!r.noFit}" title="The texts stay with the arrow, its length stays as drawn">as drawn</button></div></div>`)
         : '');
   }
   function openArrowEd(r, p) {
@@ -50859,6 +50878,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       k = b.dataset.ae,
       v = b.dataset.v;
     snap();
+    if (k === 'fit') {
+      if (v === '1') {
+        delete r.noFit;
+        r.fitNow = 1;
+      }
+      else r.noFit = 1;
+      commit();
+      renderArrEd();
+      return;
+    }
     if (k === 'glue') {
       if (v === '1') delete r.noGlue;
       else {

@@ -1,3 +1,9 @@
+# Next version
+
+## Changed
+
+- **A reaction arrow fits its texts both ways.** It grew for a longer text over or under it and now also gets shorter when the texts get shorter (down to the length of an arrow drawn with a click): a long arrow drawn just now shortens to its Et3N. An arrow of an older drawing keeps its length until its texts change. Right-click the arrow: **Length: fits its texts / as drawn**; as drawn, the texts stay with the arrow and its length stays. Dragging an arrow with texts longer or shorter by hand sets it to as drawn.
+
 # Reactio Draw 1.11
 
 ## New
