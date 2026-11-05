@@ -151,6 +151,10 @@ func handle(s string) {
 			reply(r.ID, map[string]interface{}{"tag": t})
 			return
 		}
+		if b, ty := clipPicture(app.hwnd); b != nil {
+			reply(r.ID, map[string]interface{}{"pic": base64.StdEncoding.EncodeToString(b), "picType": ty})
+			return
+		}
 		reply(r.ID, map[string]interface{}{})
 	case "embedSave":
 		if app.embedding {

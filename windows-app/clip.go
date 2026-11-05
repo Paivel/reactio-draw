@@ -356,6 +356,60 @@ func clipOwn(hwnd uintptr) []byte {
 	return nil
 }
 
+// a picture on the clipboard with no drawing (a screenshot: Win+Shift+S, Print Screen, the Snipping Tool): its PNG when
+// there is one, otherwise the bitmap (CF_DIB) made into a .bmp file, for the page to place as a picture
+func clipPicture(hwnd uintptr) ([]byte, string) {
+	if !openClipboard(hwnd) {
+		return nil, ""
+	}
+	defer pCloseClipboard.Call()
+	if pf := clipFormat("PNG"); pf != 0 {
+		if r, _, _ := pIsClipboardFormatAvailable.Call(uintptr(pf)); r != 0 {
+			if h, _, _ := pGetClipboardData.Call(uintptr(pf)); h != 0 {
+				if b := globalBytes(h); len(b) > 8 && string(b[1:4]) == "PNG" {
+					return b, "image/png"
+				}
+			}
+		}
+	}
+	if r, _, _ := pIsClipboardFormatAvailable.Call(CF_DIB); r == 0 {
+		return nil, ""
+	}
+	h, _, _ := pGetClipboardData.Call(CF_DIB)
+	if h == 0 {
+		return nil, ""
+	}
+	dib := globalBytes(h)
+	if len(dib) < 40 {
+		return nil, ""
+	}
+	le32 := func(o int) uint32 {
+		return uint32(dib[o]) | uint32(dib[o+1])<<8 | uint32(dib[o+2])<<16 | uint32(dib[o+3])<<24
+	}
+	hdr := le32(0)
+	bits := uint32(dib[14]) | uint32(dib[15])<<8
+	comp := le32(16)
+	used := le32(32)
+	pal := uint32(0)
+	if bits <= 8 {
+		pal = used
+		if pal == 0 {
+			pal = 1 << bits
+		}
+	}
+	off := 14 + hdr + pal*4
+	if comp == 3 && hdr == 40 {
+		off += 12 // BI_BITFIELDS: the three colour masks after the header
+	}
+	size := uint32(14 + len(dib))
+	f := make([]byte, 14, size)
+	f[0], f[1] = 'B', 'M'
+	for i, v := range []uint32{size, 0, off} {
+		f[2+i*4], f[3+i*4], f[4+i*4], f[5+i*4] = byte(v), byte(v>>8), byte(v>>16), byte(v>>24)
+	}
+	return append(f, dib...), "image/bmp"
+}
+
 // the binary CDX clipboard format, put there by chemistry editors on Ctrl+C (its registered name is the format's own)
 func clipCdx(hwnd uintptr) []byte {
 	if !openClipboard(hwnd) {

@@ -4246,7 +4246,7 @@ function kdOf(st) {
     BIG_INFO = 800;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.10';
+  const RD_VERSION = '1.11';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -4654,7 +4654,7 @@ function kdOf(st) {
   const bondSel = b =>
     sel.has(b.a) && sel.has(b.b) && !(atomOnly.has(b.a) && atomOnly.has(b.b) && !selBonds.has(b.id));
   const hasSel = () => sel.size || selArr.size || selTxt.size || selDec.size;
-  const decZ = (a, k) => (a.dsz && a.dsz[k] != null ? a.dsz[k] : a.ss || 1);
+  const decZ = (a, k) => (a.dsz && a.dsz[k] != null ? a.dsz[k] : atomZ(a));
   const decHalo = (a, k, x, y, r) =>
     selDec.has(a.id + ':' + k)
       ? `<circle class="scr" cx="${x}" cy="${y}" r="${r}" fill="none" style="stroke:var(--accent)" stroke-width="1.4" stroke-dasharray="3 2"/>`
@@ -10153,6 +10153,25 @@ function kdOf(st) {
     nbs.forEach((nb, k) => (pos[base + k] = { x: nb.x, y: nb.y }));
     const obs = mol.atoms.filter(a => a !== center && !nbs.includes(a)).map(a => ({ x: a.x, y: a.y }));
     layoutG(g, pos, 0, obs);
+    /* a label opened on a structure made larger or smaller: the new atoms at its size (bond length about the label,
+       line width, label size), not the document's */
+    let k = 1,
+      bw;
+    if (!attach) {
+      const ds = nbs.map(nb => Math.hypot(nb.x - center.x, nb.y - center.y)).filter(d => d > 1);
+      if (ds.length) k = ds.reduce((x, y) => x + y, 0) / ds.length / L;
+      else if (center.ss) k = center.ss;
+      if (Math.abs(k - 1) < 0.05) k = 1;
+      const b0 = nbs.length ? bondBetween(center, nbs[0]) : null;
+      bw = b0 && b0.w;
+      if (k !== 1)
+        g.nodes.forEach((nd, i) => {
+          if (i === 0 || nd.ghost || !pos[i]) return;
+          pos[i] = { x: center.x + (pos[i].x - center.x) * k, y: center.y + (pos[i].y - center.y) * k };
+        });
+    }
+    const fs0 = center.fs,
+      ss0 = center.ss;
     if (!attach) {
       setEl(center, g.nodes[0].el);
       center.chg = g.nodes[0].chg || 0;
@@ -10164,19 +10183,25 @@ function kdOf(st) {
       const a = newAtom(pos[i].x, pos[i].y, nd.el);
       a.chg = nd.chg || 0;
       if (nd.iso) a.iso = nd.iso;
+      if (!attach && ss0) a.ss = ss0;
       map[i] = a;
       created.push(a);
     });
+    /* the label's own size stays only where a label is left (OMe opened to O–CH3 keeps its O at that size) */
+    if (!attach && fs0 && !labeled(center)) delete center.fs;
     g.edges.forEach(e => {
       if (e.ghost) return;
-      mol.bonds.push({
+      const nb = {
         id: mol.next++,
         a: map[e.a].id,
         b: map[e.b].id,
         order: e.order,
         stereo: e.stereo || null
-      });
+      };
+      if (!attach && bw) nb.w = bw;
+      mol.bonds.push(nb);
     });
+    if (!attach && fs0) for (const a of created) if (labeled(a)) a.fs = fs0;
     return created;
   }
   /* metal chelates: rings that close through a metal cannot all be regular polygons (three or four of them meet at the metal), so the plain
@@ -12342,13 +12367,28 @@ function kdOf(st) {
       bd = r;
     for (const a of mol.atoms) {
       if (a === ex || a.multi) continue;
-      const d = dist(p, a);
+      /* an atom of a structure made larger is reached as far out as it is drawn larger */
+      const z = Math.max(1, atomZ(a)),
+        d = dist(p, a) / z;
       if (d < bd) {
         bd = d;
         best = a;
       }
     }
-    /* anywhere on a label's text picks its atom (the O2Me of CO2Me, not only the C) */
+    /* anywhere on the letters of an atom (the H of a large HN, the O2Me of CO2Me) picks the atom */
+    if (!best)
+      for (const a of mol.atoms) {
+        if (a === ex || a.multi || a.lsplit || !labeled(a)) continue;
+        let P = null,
+          rr = 0;
+        try {
+          P = hlSpots(a);
+          rr = 11 * labK(a);
+        } catch (e) {
+          P = null;
+        }
+        if (P && P.some(([x, y]) => Math.hypot(p.x - x, p.y - y) <= rr)) return a;
+      }
     if (!best)
       for (const a of mol.atoms) {
         if (a === ex || !a.label || a.lsplit) continue;
@@ -13430,6 +13470,16 @@ function kdOf(st) {
   const docLW = () => (S.doc && S.doc.lw) || STY().lw;
   const labPx = a => a.fs || (a.sty ? STYo(a).label : (S.doc && S.doc.label) || STY().label);
   const labK = a => labPx(a) / 15;
+  /* how much larger an atom is drawn than the document's: its size (a.ss), or, for letters made larger on their own
+     (a.fs alone), their size against the document's */
+  const atomZ = a => {
+    if (a.ss) return a.ss;
+    if (!a.fs) return 1;
+    const base = a.sty ? STYo(a).label : (S.doc && S.doc.label) || STY().label,
+      k = base ? a.fs / base : 1;
+    /* a label size read from a file, near the document's: drawn as usual */
+    return Math.abs(k - 1) < 0.15 ? 1 : k;
+  };
   const trimOf = a => labPx(a) * 0.45 + STYo(a).margin;
   /* rich text: _{…} subscript, ^{…} superscript, \b{…} bold, \i{…} italic, \u{…} underline, \f[Font]{…} a font, for any characters
    (marks nest); new lines. plainText drops the marks, richRuns splits a line into runs with their styles */
@@ -15323,7 +15373,8 @@ function kdOf(st) {
     let best = null,
       bd = lim;
     for (const a of mol.atoms) {
-      const d = Math.hypot(a.x - x, a.y - y);
+      /* a larger atom (a structure made larger, a larger label) takes a charge put as far out as it is larger */
+      const d = Math.hypot(a.x - x, a.y - y) / Math.max(1, atomZ(a));
       if (d < bd) {
         bd = d;
         best = a;
@@ -15562,7 +15613,9 @@ function kdOf(st) {
       if (bondSel(b)) {
         const A = atomById(b.a),
           B = atomById(b.b);
-        s += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" style="stroke:var(--accent-soft)" stroke-width="12" stroke-linecap="round"/>`;
+        /* as wide as the structure is large (a structure made larger has a wider band) */
+        const z = ((A.ss || 1) + (B.ss || 1)) / 2;
+        s += `<line x1="${A.x}" y1="${A.y}" x2="${B.x}" y2="${B.y}" style="stroke:var(--accent-soft)" stroke-width="${+(12 * z).toFixed(1)}" stroke-linecap="round"/>`;
       }
     }
     for (const r of mol.arrows)
@@ -15607,13 +15660,27 @@ function kdOf(st) {
     for (const t of mol.texts)
       if (selTxt.has(t.id))
         s += `<rect x="${t.x - 3}" y="${t.y - tSize(t) - 2}" width="${textW(t) + 6}" height="${tSize(t) + 7 + tExtra(t)}" rx="3" style="fill:var(--accent-soft)"/>`;
+    /* a selected atom shown as letters (F, S, OMe, CO2Et): marked round its letters as Highlight marks them, a circle on
+       each letter with a margin, joined into one even shape; a plain atom a dot */
     for (const id of sel) {
       const a = atomById(id);
       if (!a) continue;
-      const L = labRect(a);
-      s += L
-        ? `<rect x="${L.x0.toFixed(1)}" y="${L.y0.toFixed(1)}" width="${(L.x1 - L.x0).toFixed(1)}" height="${(L.y1 - L.y0).toFixed(1)}" rx="${(L.y1 - L.y0) / 2}" style="fill:var(--accent-soft)"/>`
-        : `<circle cx="${a.x}" cy="${a.y}" r="10" style="fill:var(--accent-soft)"/>`;
+      let P = null,
+        r = 10 * (a.ss || 1);
+      if (labeled(a))
+        try {
+          P = hlSpots(a);
+          r = Math.max(r, 12 * labK(a));
+        } catch (e) {
+          P = null;
+        }
+      if (P && P.length > 1) {
+        const pts = P.slice().sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+        s += `<path d="M${pts.map(([x, y]) => x.toFixed(1) + ',' + y.toFixed(1)).join('L')}" fill="none" style="stroke:var(--accent-soft)" stroke-width="${(2 * r).toFixed(1)}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      } else {
+        const [x, y] = P && P.length ? P[0] : [a.x, a.y];
+        s += `<circle cx="${(+x).toFixed(1)}" cy="${(+y).toFixed(1)}" r="${r.toFixed(1)}" style="fill:var(--accent-soft)"/>`;
+      }
     }
     autoDepth();
     /* structures drawn in a 3D style (ball and stick, tubes, spheres) are drawn whole further on, not bond by bond here */
@@ -15640,6 +15707,12 @@ function kdOf(st) {
           bw = lwOf(b),
           ink = `style="stroke:${bc}"`;
         let st = STYo(b);
+        /* a structure made larger or smaller (both atoms carry its size): the lines of a double bond stay as far apart
+           against the bond as before, not a fixed distance */
+        if (A.ss && B.ss) {
+          const zf = (A.ss + B.ss) / 2;
+          if (Math.abs(zf - 1) > 0.01) st = { ...st, dbl: st.dbl * zf };
+        }
         const wk = bw / st.lw;
         /* a turned ring in 3D: the inner line of a double bond stays in the ring plane, so its gap shrinks as the ring turns edge-on */
         if (AUTOD && b.order === 2 && A.z !== undefined && B.z !== undefined) {
@@ -19873,8 +19946,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     commit();
     return todo.length;
   }
+  /* an atom of a structure made larger or smaller (its size a.ss) given letters: they come at the structure's size, as
+     the other labels of it were made with it, not at the document's */
+  function labelAtSize(a) {
+    if (!a || a.fs != null || !a.ss || Math.abs(a.ss - 1) < 0.01 || !labeled(a)) return;
+    a.fs = +(labPx(a) * a.ss).toFixed(3);
+  }
   function applyLabel(a, t) {
     applyLabel0(a, t);
+    labelAtSize(a);
     if (pfxMode() !== 'plain' && a.label && !a.lsty && pfxStyle(a, pfxMode())) commit();
   }
   /* a group typed back to front (MeO, BnO, MeO2C, tBuO, HO): kept the usual way round (OMe, OBn, CO2Me, OtBu, OH), so the atom
@@ -21676,7 +21756,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       placeTpl(curTpl, p);
       return;
     }
-    if (tool === 'cage' && CHAIRS[curCage]) {
+    if (tool === 'cage' && CHAIRS[curCage] && !(h && (h.atom || h.bond))) {
       /* a chair: its six carbons where the drawing has them, centred on the click */
       e.preventDefault();
       snap();
@@ -26056,6 +26136,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (r && r.tag) {
             m['text'] = m['text/plain'] = r.tag;
           }
+          /* a screenshot (Win+Shift+S, Print Screen): Windows keeps it as a bitmap the page is not handed; the app reads it */
+          if (r && r.pic && !items.some(x => /^image\//.test(x.type))) {
+            const f = new File([window.rdNative.unb64(r.pic)], 'screenshot.' + (r.picType === 'image/bmp' ? 'bmp' : 'png'), {
+              type: r.picType || 'image/png'
+            });
+            items.push({ kind: 'file', type: f.type, getAsFile: () => f });
+          }
           const ev = {
             __rd: true,
             target: tgt,
@@ -26679,6 +26766,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     cleanVariant = cyc ? doClean.cyc.n + 1 : 0;
     cleanVariantN = 0;
     const before = t.map(fragBox);
+    /* a structure made larger or smaller (its bonds well off the document's length) keeps its size: Clean Up gives the
+       layout, then the structure is brought back to its own bond length about its middle */
+    const medBond = f => {
+        const ids = new Set(f.map(a => a.id)),
+          ls = mol.bonds
+            .filter(b => ids.has(b.a) && ids.has(b.b))
+            .map(b => {
+              const p = atomById(b.a),
+                q = atomById(b.b);
+              return p && q ? Math.hypot(p.x - q.x, p.y - q.y) : 0;
+            })
+            .filter(x => x > 1)
+            .sort((x, y) => x - y);
+        return ls.length ? ls[ls.length >> 1] : null;
+      },
+      ownBond = t.map(f => {
+        const m = medBond(f);
+        return m && Math.abs(m / L - 1) > 0.15 ? { id: f[0].id, m } : null;
+      });
     cleanForce = again;
     cleanFlat = !!flat;
     const variant = cleanVariant;
@@ -26696,6 +26802,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       cleanFlat = false;
       cleanVariant = 0;
       cleanVariantN = 0;
+    }
+    for (const o of ownBond) {
+      if (!o) continue;
+      const f = fragments().find(fr => fr.some(a => a.id === o.id)),
+        m1 = f && medBond(f);
+      if (!m1 || Math.abs(o.m / m1 - 1) < 0.01) continue;
+      const k = o.m / m1,
+        bx = fragBox(f),
+        cx = (bx.x0 + bx.x1) / 2,
+        cy = (bx.y0 + bx.y1) / 2;
+      for (const a of f) {
+        a.x = cx + (a.x - cx) * k;
+        a.y = cy + (a.y - cy) * k;
+        if (a.zx !== undefined) {
+          a.zx = cx + (a.zx - cx) * k;
+          a.zy = cy + (a.zy - cy) * k;
+        }
+        if (a.z !== undefined) a.z *= k;
+      }
     }
     const skipped = cleanSkipped;
     doClean.last = skipped ? { key, at: Date.now() } : null;
@@ -29100,17 +29225,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
 
   /* ===== solvent & liquid reagent data (density at ~20–25 °C, g/mL) ===== */
   const SOLV = [
-    { n: 'THF', a: ['tetrahydrofuran'], f: 'C4H8O', d: 0.889, s: 1 },
-    { n: '2-MeTHF', a: ['2-methyltetrahydrofuran'], f: 'C5H10O', d: 0.854, s: 1 },
-    { n: 'DCM', a: ['dichloromethane', 'methylene chloride', 'ch2cl2'], f: 'CH2Cl2', d: 1.327, s: 1, u: 1 },
-    { n: 'Chloroform', a: ['chcl3'], f: 'CHCl3', d: 1.489, s: 1, u: 1 },
+    { n: 'THF', a: ['tetrahydrofuran'], f: 'C4H8O', d: 0.889, s: 1, sm: 'C1CCOC1', ks: 1 },
+    { n: '2-MeTHF', a: ['2-methyltetrahydrofuran'], f: 'C5H10O', d: 0.854, s: 1, sm: 'CC1CCCO1', ks: 1 },
+    { n: 'DCM', a: ['dichloromethane', 'methylene chloride', 'ch2cl2'], f: 'CH2Cl2', d: 1.327, s: 1, u: 1, sm: 'ClCCl', ks: 1 },
+    { n: 'Chloroform', a: ['chcl3'], f: 'CHCl3', d: 1.489, s: 1, u: 1, sm: 'ClC(Cl)Cl', ks: 1 },
     { n: 'Carbon tetrachloride', a: ['ccl4'], f: 'CCl4', d: 1.594, s: 1, u: 1 },
-    { n: 'DCE', a: ['1,2-dichloroethane', 'dichloroethane'], f: 'C2H4Cl2', d: 1.253, s: 1, u: 1 },
-    { n: 'DMF', a: ['dimethylformamide', 'n,n-dimethylformamide'], f: 'C3H7NO', d: 0.944, s: 1, u: 1 },
-    { n: 'DMAc', a: ['dimethylacetamide', 'dma'], f: 'C4H9NO', d: 0.937, s: 1 },
-    { n: 'DMSO', a: ['dimethyl sulfoxide'], f: 'C2H6OS', d: 1.1, s: 1, u: 1 },
-    { n: 'NMP', a: ['n-methyl-2-pyrrolidone', 'n-methylpyrrolidone'], f: 'C5H9NO', d: 1.028, s: 1, u: 1 },
-    { n: 'MeCN', a: ['acetonitrile', 'ch3cn'], f: 'C2H3N', d: 0.786, s: 1, u: 1 },
+    { n: 'DCE', a: ['1,2-dichloroethane', 'dichloroethane'], f: 'C2H4Cl2', d: 1.253, s: 1, u: 1, sm: 'ClCCCl', ks: 1 },
+    { n: 'DMF', a: ['dimethylformamide', 'n,n-dimethylformamide'], f: 'C3H7NO', d: 0.944, s: 1, u: 1, sm: 'CN(C)C=O', ks: 1 },
+    { n: 'DMAc', a: ['dimethylacetamide', 'dma'], f: 'C4H9NO', d: 0.937, s: 1, sm: 'CC(=O)N(C)C', ks: 1 },
+    { n: 'DMSO', a: ['dimethyl sulfoxide'], f: 'C2H6OS', d: 1.1, s: 1, u: 1, sm: 'CS(C)=O', ks: 1 },
+    { n: 'NMP', a: ['n-methyl-2-pyrrolidone', 'n-methylpyrrolidone'], f: 'C5H9NO', d: 1.028, s: 1, u: 1, sm: 'CN1CCCC1=O', ks: 1 },
+    { n: 'MeCN', a: ['acetonitrile', 'ch3cn'], f: 'C2H3N', d: 0.786, s: 1, u: 1, sm: 'CC#N', ks: 1 },
     { n: 'MeOH', a: ['methanol'], f: 'CH4O', d: 0.792, s: 1, u: 1 },
     { n: 'EtOH', a: ['ethanol'], f: 'C2H6O', d: 0.789, s: 1 },
     { n: 'i-PrOH', a: ['isopropanol', '2-propanol', 'ipa', 'iproh'], f: 'C3H8O', d: 0.786, s: 1 },
@@ -29118,18 +29243,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     { n: 't-BuOH', a: ['tert-butanol', 'tbuoh'], f: 'C4H10O', d: 0.775, s: 1 },
     { n: 'Water', a: ['h2o'], f: 'H2O', d: 0.997, s: 1, u: 1 },
     { n: 'Acetone', a: [], f: 'C3H6O', d: 0.791, s: 1 },
-    { n: 'EtOAc', a: ['ethyl acetate'], f: 'C4H8O2', d: 0.902, s: 1 },
-    { n: 'Et2O', a: ['diethyl ether', 'ether'], f: 'C4H10O', d: 0.713, s: 1 },
-    { n: 'MTBE', a: ['methyl tert-butyl ether', 'tbme'], f: 'C5H12O', d: 0.74, s: 1 },
-    { n: '1,4-Dioxane', a: ['dioxane'], f: 'C4H8O2', d: 1.033, s: 1 },
-    { n: 'DME', a: ['1,2-dimethoxyethane', 'dimethoxyethane'], f: 'C4H10O2', d: 0.868, s: 1 },
-    { n: 'Toluene', a: ['phme'], f: 'C7H8', d: 0.867, s: 1, u: 1 },
+    { n: 'EtOAc', a: ['ethyl acetate'], f: 'C4H8O2', d: 0.902, s: 1, sm: 'CCOC(C)=O', ks: 1 },
+    { n: 'Et2O', a: ['diethyl ether', 'ether'], f: 'C4H10O', d: 0.713, s: 1, sm: 'CCOCC', ks: 1 },
+    { n: 'MTBE', a: ['methyl tert-butyl ether', 'tbme'], f: 'C5H12O', d: 0.74, s: 1, sm: 'COC(C)(C)C', ks: 1 },
+    { n: '1,4-Dioxane', a: ['dioxane'], f: 'C4H8O2', d: 1.033, s: 1, sm: 'C1COCCO1', ks: 1 },
+    { n: 'DME', a: ['1,2-dimethoxyethane', 'dimethoxyethane'], f: 'C4H10O2', d: 0.868, s: 1, sm: 'COCCOC', ks: 1 },
+    { n: 'Toluene', a: ['phme'], f: 'C7H8', d: 0.867, s: 1, u: 1, sm: 'Cc1ccccc1', ks: 1 },
     { n: 'Benzene', a: [], f: 'C6H6', d: 0.877, s: 1, u: 1 },
     { n: 'Xylenes', a: ['xylene'], f: 'C8H10', d: 0.86, s: 1 },
-    { n: 'Hexane', a: ['hexanes', 'n-hexane'], f: 'C6H14', d: 0.659, s: 1 },
-    { n: 'Heptane', a: ['n-heptane'], f: 'C7H16', d: 0.684, s: 1 },
-    { n: 'Pentane', a: ['n-pentane'], f: 'C5H12', d: 0.626, s: 1 },
-    { n: 'Cyclohexane', a: [], f: 'C6H12', d: 0.779, s: 1 },
+    { n: 'Hexane', a: ['hexanes', 'n-hexane'], f: 'C6H14', d: 0.659, s: 1, sm: 'CCCCCC', ks: 1 },
+    { n: 'Heptane', a: ['n-heptane'], f: 'C7H16', d: 0.684, s: 1, sm: 'CCCCCCC', ks: 1 },
+    { n: 'Pentane', a: ['n-pentane'], f: 'C5H12', d: 0.626, s: 1, sm: 'CCCCC', ks: 1 },
+    { n: 'Cyclohexane', a: [], f: 'C6H12', d: 0.779, s: 1, sm: 'C1CCCCC1', ks: 1 },
     { n: 'Pyridine', a: [], f: 'C5H5N', d: 0.982, s: 1, u: 1 },
     { n: 'Chlorobenzene', a: ['phcl'], f: 'C6H5Cl', d: 1.106, s: 1, u: 1 },
     { n: 'Nitromethane', a: ['meno2'], f: 'CH3NO2', d: 1.137, s: 1, u: 1 },
@@ -29156,12 +29281,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     { n: 'Ethylene glycol', a: [], f: 'C2H6O2', d: 1.113, u: 1 },
     { n: 'HMPA', a: [], f: 'C6H18N3OP', d: 1.03, u: 1 }
   ];
+  /* sm: the structure as drawn (its SMILES), so a solvent whose formula other compounds share (THF, EtOAc) is known
+     from its drawing; ks: one of the usual solvents, which a new reagent table takes as a solvent from the start */
   const SOLV_IDX = {},
-    SOLV_F = {};
+    SOLV_F = {},
+    SOLV_SM = {};
   for (const e of SOLV) {
     SOLV_IDX[e.n.toLowerCase()] = e;
     e.a.forEach(x => (SOLV_IDX[x.toLowerCase()] = e));
     if (e.u) SOLV_F[e.f] = e;
+    if (e.sm) SOLV_SM[e.sm] = e;
+  }
+  /* the solvent a drawn compound is: by its structure, else by a formula only one solvent has */
+  function solvOfDrawn(fr, ft) {
+    let e = null;
+    try {
+      if (fr && fr.length) e = SOLV_SM[fragSmiles(fr)] || null;
+    } catch (err) {
+      e = null;
+    }
+    return e || SOLV_F[ft] || null;
   }
   $('solvlist').innerHTML = SOLV.map(
     e => `<option value="${esc(e.n)}">${esc(e.a[0] || e.f)} · ${e.d} g/mL</option>`
@@ -29610,18 +29749,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         delete m.autoN;
         delete m.autoD;
         delete m.autoK;
-        const e = x.role === 'r' && SOLV_F[ft];
+        const e = x.role === 'r' && solvOfDrawn(!x.extra && x.fr, ft);
         if (e) {
           m.name = e.n;
           m.rho = e.d;
           m.auto = ft;
           m.autoN = e.n;
           m.autoD = e.d;
+          if (e.ks && m.kind !== 'solvent' && !m.svol) {
+            m.kind = 'solvent';
+            m.autoK = 1;
+          }
         }
       }
       if (!m) {
         m = S.memo[id] = blankRow();
-        const e = x.role === 'r' && ((x.txt && SOLV_IDX[x.txt.text.trim().toLowerCase()]) || SOLV_F[ft]);
+        const e =
+          x.role === 'r' &&
+          (x.txt ? SOLV_IDX[x.txt.text.trim().toLowerCase()] || SOLV_F[ft] : solvOfDrawn(!x.extra && x.fr, ft));
         if (e) {
           m.name = e.n;
           m.rho = e.d;
@@ -29629,6 +29774,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             m.auto = ft;
             m.autoN = e.n;
             m.autoD = e.d;
+          }
+          /* the usual solvents start as solvents: their volume then gives the concentration */
+          if (e.ks && !(x.txt && x.txt.kindHint)) {
+            m.kind = 'solvent';
+            m.meas = 'vol';
+            if (!x.txt) m.autoK = 1;
           }
         }
         if (x.txt && !m.name) m.name = x.txt.text;
@@ -38826,8 +38977,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* the settings written in a Word file ([[#format …]], [[#start …]]) */
   function cmpdSettings(docXml, setXml) {
-    const plain = docXml.replace(/<[^>]+>/g, ''),
-      o = {};
+    /* the document's own style and first number: the lines before its first drawing and its first compound; a line further
+       on starts a chapter of its own (wordNumber), it does not set the whole document */
+    const di = docXml.search(/<w:(?:object|drawing|pict)\b/),
+      head = di < 0 ? docXml : docXml.slice(0, di);
+    let plain = head.replace(/<[^>]+>/g, '');
+    const mk = plain.search(CMPD_RX);
+    CMPD_RX.lastIndex = 0;
+    if (mk >= 0) plain = plain.slice(0, mk);
+    const o = {};
     for (const m of plain.matchAll(CMPD_SET)) if (!(m[1] in o)) o[m[1]] = m[2];
     /* the style and first number set on the Word tab (kept in the document as its variables rdFormat, rdStart) come before
        the [[#format …]] and [[#start …]] lines */
@@ -38897,7 +39055,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       `<li>${c('[[A:catalyst]]')} → A, B, C…, a series of its own (catalysts, intermediates); ${c('[[a:…]]')} → a, b, c…; ${c('[[I:…]]')} → I, II, III…; ${c('[[i:…]]')} → i, ii, iii…</li>` +
       '<li>Keys: letters, digits, _ and -.</li></ul>' +
       'Order: the drawings first, in their order in the document, each read line by line; compounds only in the text come after. Set the order on a drawing by hand with the button at the end of the Text group (Ctrl+Shift+O).<br>' +
-      `Style and first number: the boxes on the Word tab, or a line ${c('[[#format S{n}]]')} or ${c('[[#start 5]]')} in the document. Chapters: put ${c('[[#format 2-{n}]]')} at the start of chapter 2 (and ${c('[[#format 3-{n}]]')} at chapter 3…); from there new compounds are 2-1, 2-2…, each chapter counted on its own and its own drawings first, while a compound met in an earlier chapter keeps its number.<br>` +
+      `Style and first number: the boxes on the Word tab, or a line ${c('[[#format S{n}]]')} or ${c('[[#start 5]]')} in the document. Chapters: put ${c('[[#format 2-{n}]]')} at the start of chapter 2 (and ${c('[[#format 3-{n}]]')} at chapter 3…); from there new compounds are 2-1, 2-2…, each chapter counted on its own and its own drawings first, while a compound met in an earlier chapter keeps its number. After numbering such a line is hidden text (not printed, no empty line); Show marks shows it again to read or change it (as does ¶, Ctrl+Shift+8, in Word).<br>` +
       'On the sheet, marks that run into each other are shown as grey numbers (this drawing alone); point at one to see its mark, open it to edit the mark.' +
       '</div><div class="row"><button class="pri" data-k="ok">OK</button></div></div>';
     document.body.appendChild(b);
@@ -39007,11 +39165,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!CORD && !mol.texts.concat(gridMarkTexts()).some(t => t.cord)) return '';
     let s = '',
       i = 0;
+    /* marks shown as grey numbers: the index goes after the number, where the text now ends */
+    const MS = markShort(),
+      endX = t => {
+        if (!MS || !MS.has(t.id)) return t.x + textW(t);
+        const w = textW(t);
+        return t.x + (w + textW({ ...t, text: MS.get(t.id) })) / 2;
+      };
     for (const t of cmpdTexts()) {
       i++;
       if (!CORD && !t.cord) continue;
       const fz = tSize(t) * 0.7,
-        x = t.x + textW(t) + 1.5,
+        x = endX(t) + 1.5,
         y = t.y + tSize(t) * 0.3;
       s += `<text x="${x.toFixed(1)}" y="${y.toFixed(1)}" font-size="${fz.toFixed(1)}" font-family="Arial, Helvetica, sans-serif" pointer-events="none" style="fill:${t.cord ? 'var(--accent)' : '#9aa3ad'}">${i}</text>`;
     }
@@ -39024,14 +39189,52 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
        first, the other texts after it in reading order */
     const set = all.filter(t => t.cord).sort((a, b) => a.cord - b.cord),
       T = all.filter(t => !t.cord);
-    T.sort((a, b) => a.y - b.y);
+    /* a mark under a structure stands where its structure stands: marks under structures of a row are one row, however
+       tall each structure is (a mark under a taller structure is lower, not on the next row) */
+    let boxes = null;
+    const ext = t => {
+      let y0, y1;
+      try {
+        const w = textW(t),
+          cx = t.x + w / 2,
+          top = t.y - tSize(t);
+        y0 = top;
+        y1 = t.y;
+        if (t.cell) return { t, x: cx, y0, y1 };
+        if (!boxes) boxes = fragments().filter(f => f.length).map(f => ({ f, b: fragBox(f) }));
+        let own = null;
+        if (t.cnum && t.cnum.atoms && t.cnum.atoms.length) {
+          const ids = new Set(t.cnum.atoms);
+          own = boxes.find(q => q.f.some(a => ids.has(a.id))) || null;
+        }
+        if (!own) {
+          let bd = 2.5 * L;
+          for (const q of boxes) {
+            const g = top - q.b.y1;
+            if (cx >= q.b.x0 - 4 && cx <= q.b.x1 + 4 && g > -tSize(t) && g < bd) {
+              bd = g;
+              own = q;
+            }
+          }
+        }
+        if (own) y0 = Math.min(y0, own.b.y0);
+        return { t, x: cx, y0, y1 };
+      } catch (e) {
+        return { t, x: t.x, y0: t.y - 14, y1: t.y };
+      }
+    };
+    const E = T.map(ext).sort((a, b) => a.y0 + a.y1 - (b.y0 + b.y1));
     const rows = [];
-    for (const t of T) {
-      const r = rows.find(r => Math.abs(r.y - t.y) < 20);
-      if (r) r.t.push(t);
-      else rows.push({ y: t.y, t: [t] });
+    for (const e of E) {
+      const r = rows.find(r => e.y0 <= r.y1 && e.y1 >= r.y0);
+      if (r) {
+        r.e.push(e);
+        r.y0 = Math.min(r.y0, e.y0);
+        r.y1 = Math.max(r.y1, e.y1);
+      } else rows.push({ y0: e.y0, y1: e.y1, e: [e] });
     }
-    return set.concat(rows.flatMap(r => r.t.sort((a, b) => a.x - b.x)));
+    rows.sort((a, b) => a.y0 - b.y0);
+    return set.concat(rows.flatMap(r => r.e.sort((a, b) => a.x - b.x).map(e => e.t)));
   }
   /* the text runs of Word XML between two places: each run with its properties and text (raw XML), or null when it is no
      plain text run */
@@ -39150,9 +39353,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (mk.set) setting(full.slice(mk.s, mk.e));
         else secUsed[sect] = true;
         if (mk.set) {
-          /* a setting stays, as hidden text (and goes when the marks are taken out) */
-          const hp = rp ? rp.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>';
-          xml += mode === 'strip' ? '\u0000S\u0000' : wT(hp, full.slice(mk.s, mk.e));
+          /* a setting stays, as hidden text (and goes when the marks are taken out); Show marks shows it, as the marks
+             are shown, so it can be read and changed; hidden once only, however often the file is numbered */
+          const r0 = rp ? rp.replace(/<w:vanish\/>/g, '') : '',
+            hp = r0 ? r0.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>';
+          xml += mode === 'strip' ? '\u0000S\u0000' : wT(mode === true ? (r0 === '<w:rPr></w:rPr>' ? '' : r0) : hp, full.slice(mk.s, mk.e));
         } else {
           const sp = spec(mk.key, mk.sub, mk.sub ? mk.fmt : '');
           xml += '\u0000M' + textMarks.length + '\u0000';
@@ -39282,6 +39487,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* a paragraph that holds only a setting line ([[#format 2-{n}]] on its own) leaves no empty line: its paragraph mark is
        hidden too, and in a copy without marks the paragraph goes */
     body = body.replace(/<w:p\b[^>]*?(?:\/>|>(?:(?!<w:p[\s>])[\s\S])*?<\/w:p>)/g, P => {
+      /* its paragraph mark as it was before (shown), so it is hidden once below, or shown with the marks */
+      if (/\[\[#(?:format|start)\b/.test(P.replace(/<[^>]+>/g, '')))
+        P = P.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/, x => x.replace(/<w:vanish\/>/g, '').replace('<w:rPr></w:rPr>', '')).replace(
+          /<w:r>(<w:rPr>(?:(?!<\/w:rPr>)[\s\S])*<\/w:rPr>)(<w:t(?:\s[^>]*)?>\s*<\/w:t>)<\/w:r>/g,
+          (x, rp, t) => '<w:r>' + rp.replace(/<w:vanish\/>/g, '').replace('<w:rPr></w:rPr>', '') + t + '</w:r>'
+        );
       const setHid = /<w:vanish\/><\/w:rPr><w:t[^>]*>\[\[#/.test(P),
         setGone = P.includes('\u0000S\u0000');
       if (!setHid && !setGone) return P;
@@ -39290,6 +39501,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const empty = !vis.trim() && !/<w:(drawing|pict|object|sdt|tab|br)\b/.test(rest) && !/\u0000/.test(rest);
       if (setGone) return empty ? '' : P.replace(/\u0000S\u0000/g, '');
       if (!empty) return P;
+      /* spaces between two settings on one line ([[#format S{n}]] [[#start 5]]) hidden with them, or the space would
+         start the next paragraph */
+      P = P.replace(/<w:r>(<w:rPr>(?:(?!<\/w:rPr>)[\s\S])*<\/w:rPr>)?(<w:t(?:\s[^>]*)?>\s*<\/w:t>)<\/w:r>/g, (x, rp, t) =>
+        rp && /<w:vanish\/>/.test(rp) ? x : `<w:r>${rp ? rp.replace('</w:rPr>', '<w:vanish/></w:rPr>') : '<w:rPr><w:vanish/></w:rPr>'}${t}</w:r>`
+      );
       if (/<w:pPr>/.test(P)) {
         if (/<w:pPr>(?:(?!<\/w:pPr>)[\s\S])*<w:rPr>/.test(P)) return P.replace(/(<w:pPr>(?:(?!<\/w:pPr>)[\s\S])*?<w:rPr>)/, '$1<w:vanish/>');
         return P.replace('</w:pPr>', '<w:rPr><w:vanish/></w:rPr></w:pPr>');
@@ -44295,9 +44511,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   try {
     CAGE_ANCH = JSON.parse(localStorage.getItem('rd-cage-anchor') || '{}') || {};
   } catch (e) {}
-  const isCageBtn = smi => CAGE_BTNS.some(c => c[1] === smi);
+  /* the chairs are templates as the bridged systems are: fused by a bond of the sheet, and which of their bonds that is
+     set with Tab or a right-click on the button */
+  const isCageBtn = smi => CAGE_BTNS.some(c => c[1] === smi) || !!CHAIRS[smi];
   function cageTpl(smi) {
     if (CAGE_TPL.has(smi)) return CAGE_TPL.get(smi);
+    if (CHAIRS[smi]) {
+      const P = CHAIRS[smi],
+        t = {
+          n: 'Cyclohexane chair' + (smi === 'chair:2' ? ' (mirror image)' : ''),
+          cage: true,
+          smi,
+          a: P.map(([x, y]) => ['C', x - 0.18, y, {}]),
+          b: P.map((q, i) => [i, (i + 1) % 6, 1, 0])
+        };
+      Object.assign(t, CAGE_ANCH[smi] || {});
+      CAGE_TPL.set(smi, t);
+      return t;
+    }
     const g = parseSmiles(smi);
     if (!g) return null;
     const n0 = mol.atoms.length,
@@ -68893,6 +69124,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     switchStep,
     wordNumber,
+    cmpdSettingsZ,
     rdCliRun,
     unzipAll,
     rdUntag,

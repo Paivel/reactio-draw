@@ -1,7 +1,9 @@
-# Next version
+# Reactio Draw 1.11
 
 ## New
 
+- **Compound numbers in a Word file.** Marks in the text and in Reactio Draw drawings, [[aldehyde]] for 7, [[aldehyde.OMe.letter]] for 7a, [[aldehyde.OMe.num]] for 7.1, get their numbers in the drawings first, in their order in the document, each read line by line (a label with several marks, "Eu ([[eu]], 78%), Sm ([[sm]], 82%)", in its order); the text takes them from there, and compounds only in the text come after. The same key is the same number everywhere. The order on a drawing can be set by hand (a catalytic cycle read round): the button at the end of the Text group (Ctrl+Shift+O), then a click on each mark text in turn; the order shows as a small index after each ([[ald]]₁). On the Word tab: Number compounds and Show marks work in the open document (one Undo step); Style ({n}, S{n}, ({n}) or any text with {n}) and From set how the numbers look, kept in the document ([[#format S{n}]] and [[#start 5]] in the text do the same); Remove marks and Final copy write a copy with the numbers as plain text (Final copy with plain pictures too). In Reactio Draw: File → Word files → Number the compounds; on the command line: reactio word-number paper.docx [--number S{n}] [--start 1] [--marks | --strip].
+- **Compound numbers: more kinds of marks.** [[A:catalyst]] numbers a series of its own, A, B, C… ([[a:…]] a, b, c; [[I:…]] I, II, III; [[i:…]] i, ii, iii), apart from 1, 2, 3; [[key.sub.dash]] gives 1-1, 1-2. Chapters in one file: a [[#format 2-{n}]] line at the start of chapter 2 numbers its new compounds 2-1, 2-2…, on their own; after numbering a setting line is hidden text (not printed, no empty line), and Show marks shows it again. On the sheet, long marks that run into each other show as grey numbers, the mark on hover. File → Word files → How to write the [[key]] marks explains them all.
 - **Metal complexes written as pieces.** A SMILES that gives a complex piece by piece (Cl[Ru]Cl.Cl[Ru]Cl with two p-cymenes, [Fe+2] with two Cp−, Cl[Ir].Cl[Ir] with two cod) is drawn as one structure: an arene on its metal through the ring centre (η6), a Cp or Cp* (η5), a cod by its two double bonds, seen from the side as a tub; two like metals with their halides joined by two bridging halides as a rhombus, M(μ-Cl)2M, the rings on opposite sides; a metal with one ring as a piano stool, two rings as a sandwich (ferrocene, Cp2ZrCl2, Ni(cod)2). Charges that only came of writing the pieces apart (Fe2+ and two Cp−) are taken off; the formula stays. Pieces that make no complex (Pd(OAc)2 beside toluene) stay apart. In a reaction SMILES such a complex is one compound, and over the arrow it is written by its name ([RuCl2(p-cymene)]2, [Rh(cod)Cl]2, [Cp*RhCl2]2…), however its pieces are written. Paste name draws them too.
 - **PDF for LaTeX.** File → Export as → Vector image for LaTeX and journals (.pdf): the same vector drawing as the EPS, as a PDF that pdflatex takes as it is (\includegraphics); its letters stay text, in the standard PDF fonts. On the command line: reactio render scheme.cdxml -o scheme.pdf.
 - **3D shape as an SDF.** Besides the .xyz for quantum chemistry, the 3D shape (the lowest MMFF94s+ conformer, or the 3D shape on the sheet) is saved or copied as an SDF with its bonds, charges and configuration, so Avogadro and other 3D programs read it without guessing the bonds (File → Export as, Copy to clipboard; Local API export sdf3d; reactio convert --format sdf3d).
@@ -16,6 +18,9 @@
 - **A carbon with two like large branches is drawn symmetric**: a bis(oxazoline) or two pyridines on CMe2 or CEt2 come out as the mirror of themselves across the upright line through that carbon, the two small branches alike below, on paste and after Clean Up (it turned one ring over and laid the ethyls unlike); a Bn-box, whose benzyls ran into each other, has its benzyls swung clear and is fanned too.
 - The bonds of a cod to its metal are dashed.
 - **Arrows into and out of a catalytic cycle** are one round bend: they leave the cycle along it and end aimed at the middle of their structure, the tail of one going in and the head of one coming out looking at the molecule.
+- **The usual solvents start as solvents** in a new reagent table (THF, DCM, MeCN, DMF, DMSO, toluene, EtOAc, Et2O, dioxane, hexane and others), drawn or written by name, so a volume of solvent gives the concentration; THF and EtOAc are known by their drawing, not only their formula. Methanol, water, acids and amines still start as reactants.
+- **A selected label is marked round its letters**, as Highlight marks it (F, S, OMe, CO2Et in one even shape), not by the band of its bond running under the letters; the band along selected bonds is as wide as the structure is large.
+- **Chairs fuse by a bond.** The cyclohexane chairs are templates as the bridged systems are: a click on a bond fuses the chair by it, Tab (or a right-click on the button) picks which bond of the chair; a click in the air places it alone as before.
 
 ## Fixed
 
@@ -27,6 +32,10 @@
 - Zoom and dragging on large sheets are faster.
 - Compound numbers from the panel go below a label under the structure (OMe, CO2Me), not over it.
 - A reaction copied together with its reagent table pastes with the table and its data (roles, amounts, limiting reagent, conditions); before, only the reaction was pasted.
+- **A structure made larger or smaller keeps its size** (issues #4, #5): Clean Up lays it out at its own bond length, not the document's, and Expand Label opens its labels at that size (bonds, line width, atoms), without the oversized selection shadow on the opened atom.
+- A structure made larger or smaller: its double bonds keep their lines as far apart against the bond (they drew closer as it grew); a label typed on one of its atoms comes at its size; a charge clicked anywhere on its letters goes to that atom, drawn at its size.
+- Screenshots paste on Windows (Win+Shift+S, Print Screen): the picture the clipboard holds as a bitmap is placed on the sheet.
+- Compound marks under the structures of a row are read as one row for numbering in Word, however tall each structure is (a mark under a taller structure was taken for the next row).
 
 # Reactio Draw 1.10
 
