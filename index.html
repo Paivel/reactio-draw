@@ -10927,14 +10927,14 @@ function kdOf(st) {
       h.x = q.x + Math.cos(t) * L;
       h.y = q.y + Math.sin(t) * L;
       /* that place crowded by atoms or bonds that are not its own (a congested ring system): the freest place near it, but
-         never inside one of its rings (an H points out of the ring system), shorter if that makes room */
+         never inside one of its rings (an H points out of the ring system), a whole bond long as the others */
       if (hCrowd(h, q) < L * 0.45) {
         const t0 = t,
           inAny = (x, y) => R.some(r => inPoly({ x, y }, r));
         let best = null;
         for (let i = 0; i < 72; i++) {
           const a = t0 + ((i % 2 ? -1 : 1) * Math.ceil(i / 2) * Math.PI) / 36;
-          for (const len of [L, L * 0.8]) {
+          for (const len of [L]) {
             const x = q.x + Math.cos(a) * len,
               y = q.y + Math.sin(a) * len;
             if (inAny(q.x + Math.cos(a) * L * 0.4, q.y + Math.sin(a) * L * 0.4) || inAny(x, y)) continue;
@@ -11272,7 +11272,30 @@ function kdOf(st) {
     }
     return changed;
   }
+  /* Clean Up of structures: laid out (cleanFragmentsWithH), then the wedges on ring bonds moved out of the rings where a group
+     or an H outside can show the centre */
+  let CLEAN_DEPTH = 0;
   function cleanFragments(frs) {
+    let r;
+    CLEAN_DEPTH++;
+    try {
+      r = cleanFragmentsWithH(frs);
+    } finally {
+      CLEAN_DEPTH--;
+    }
+    /* only once the whole Clean Up is done (cleanFragments calls itself on the way) */
+    if (!CLEAN_DEPTH && !cleanFragments.inH && !cleanFlat)
+      for (const f of frs || []) {
+        const live = f && f.find(a => mol.atoms.includes(a)),
+          g = live && fragments().find(x => x.includes(live));
+        if (g && g.length >= 3)
+          try {
+            wedgeTidy(g, true);
+          } catch (e) {}
+      }
+    return r;
+  }
+  function cleanFragmentsWithH(frs) {
     /* where each metal's ligands pointed before (metalStar keeps them on those sides, so a second Clean Up moves nothing) */
     if (!cleanFragments.inH) {
       METAL_PREV = new Map();
@@ -25968,6 +25991,63 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return m;
   }
+  /* a new H on a ring atom: straight out from its other bonds, outside its rings (the nearest free direction with most
+     room), a whole bond long */
+  function hOutPlace(A) {
+    const nb = neighbors(A),
+      R = molRings(fragmentOf(A)).filter(r => r.includes(A)),
+      inPoly = (p, P) => {
+        let c = false;
+        for (let i = 0, j = P.length - 1; i < P.length; j = i++)
+          if (P[i].y > p.y !== P[j].y > p.y && p.x < ((P[j].x - P[i].x) * (p.y - P[i].y)) / (P[j].y - P[i].y) + P[i].x) c = !c;
+        return c;
+      };
+    let vx = 0,
+      vy = 0;
+    for (const o of nb) {
+      const d = Math.hypot(o.x - A.x, o.y - A.y) || 1;
+      vx -= (o.x - A.x) / d;
+      vy -= (o.y - A.y) / d;
+    }
+    const t0 = Math.hypot(vx, vy) > 0.2 ? Math.atan2(vy, vx) : -Math.PI / 2,
+      near = mol.atoms.filter(o => o !== A && Math.hypot(o.x - A.x, o.y - A.y) < L * 2.5);
+    /* among the free directions outside the rings: the one with most room from the atoms near (other H drawn just
+       before included), not far from straight out */
+    let best = null;
+    for (let i = 0; i < 72; i++) {
+      const a = t0 + ((i % 2 ? -1 : 1) * Math.ceil(i / 2) * Math.PI) / 36;
+      const p = { x: A.x + Math.cos(a) * L * 0.5, y: A.y + Math.sin(a) * L * 0.5 };
+      if (R.some(r => inPoly(p, r))) continue;
+      if (nb.some(o => Math.abs(Math.atan2(Math.sin(a - Math.atan2(o.y - A.y, o.x - A.x)), Math.cos(a - Math.atan2(o.y - A.y, o.x - A.x)))) < 0.5)) continue;
+      /* every H drawn a whole bond long, as the other bonds (one length for all the wedges) */
+      for (const len of [1]) {
+        const x = A.x + Math.cos(a) * L * len,
+          y = A.y + Math.sin(a) * L * len;
+        let room = L * 1.2;
+        for (const o of near) room = Math.min(room, Math.hypot(o.x - x, o.y - y) * (o.el === 'H' ? 0.8 : 1));
+        const dev = Math.abs(Math.atan2(Math.sin(a - t0), Math.cos(a - t0))),
+          sc = Math.min(room, L * 0.9) - dev * L * 0.15 - (len < 0.8 ? L * 0.08 : 0);
+        if (!best || sc > best.sc) best = { sc, x, y };
+      }
+    }
+    if (best) return { x: best.x, y: best.y };
+    /* no way out (an atom shared by three rings): into its largest ring, between that ring's two bonds, short */
+    const big = R.slice().sort((p, q) => q.length - p.length)[0];
+    if (big) {
+      const k = big.indexOf(A),
+        p1 = big[(k + 1) % big.length],
+        p2 = big[(k + big.length - 1) % big.length],
+        a1 = Math.atan2(p1.y - A.y, p1.x - A.x),
+        a2 = Math.atan2(p2.y - A.y, p2.x - A.x);
+      let mid = (a1 + a2) / 2;
+      if (Math.abs(a1 - a2) > Math.PI) mid += Math.PI;
+      const tx = A.x + Math.cos(mid) * L * 0.5,
+        ty = A.y + Math.sin(mid) * L * 0.5;
+      if (!inPoly({ x: tx, y: ty }, big)) mid += Math.PI;
+      return { x: A.x + Math.cos(mid) * L, y: A.y + Math.sin(mid) * L };
+    }
+    return hPlace(A);
+  }
   function hPlace(A, skip) {
     const ang = neighbors(A)
       .filter(o => o !== skip)
@@ -26008,7 +26088,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return best || { x: A.x + Math.cos(mid) * r, y: A.y + Math.sin(mid) * r };
   }
-  function wedgeTidy(fr) {
+  /* ringToo (Clean Up): a wedge or hash on a ring bond goes out of the ring too, onto a group outside the ring or onto a
+     drawn H, wherever that keeps the molecule; a ring bond is left only where nothing outside can show the centre */
+  function wedgeTidy(fr, ringToo) {
     try {
       if (!fr || fr.length < 3 || fr.some(a => a.label || a.multi || a.z !== undefined)) return 0;
       const ids = new Set(fr.map(a => a.id)),
@@ -26049,12 +26131,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return false;
       };
       let moved = 0;
+      const addedH = [];
       const bad = bondsNow().filter(
-        b => (b.stereo === 'wedge' || b.stereo === 'hash') && centre.has(b.a) && centre.has(b.b) && b.order === 1
+        b =>
+          (b.stereo === 'wedge' || b.stereo === 'hash') &&
+          b.order === 1 &&
+          ((centre.has(b.a) && centre.has(b.b)) || (ringToo && centre.has(b.a) && ringBond(b)))
       );
       for (const b of bad) {
         const A = atomById(b.a),
-          was = b.stereo;
+          was = b.stereo,
+          inRing = ringToo && ringBond(b);
         if (!A) continue;
         /* the other stereo bonds that start at this centre stay as they are */
         const tryOn = bd => {
@@ -26067,9 +26154,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         };
         b.stereo = null;
         let ok = false;
+        /* a ring bond's wedge: first onto a group outside the ring (no stereocentre, no wedge of its own) */
+        if (inRing) {
+          const outs = bondsNow().filter(c => c !== b && (c.a === A.id || c.b === A.id) && c.order === 1 && !c.stereo && !isDative(c) && !ringBond(c));
+          for (const c of outs) {
+            const o = c.a === A.id ? c.b : c.a;
+            if (centre.has(o) || bondsNow().some(x => x.a === o && (x.stereo === 'wedge' || x.stereo === 'hash'))) continue;
+            c.a = A.id;
+            c.b = o;
+            if (tryOn(c)) {
+              ok = true;
+              break;
+            }
+          }
+        }
         /* 1. a centre with a hydrogen: draw the H and put the wedge on it */
-        if (implicitH(A) >= 1 && A.el === 'C') {
-          const hp = hPlace(A),
+        if (!ok && implicitH(A) >= 1 && A.el === 'C') {
+          const hp = inRing ? hOutPlace(A) : hPlace(A),
             H = { id: mol.next++, x: hp.x, y: hp.y, el: 'H', chg: 0 },
             hb = { id: mol.next++, a: A.id, b: H.id, order: 1, stereo: null };
           mol.atoms.push(H);
@@ -26077,6 +26178,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           ids.add(H.id);
           fr.push(H);
           ok = tryOn(hb);
+          if (ok && inRing) addedH.push([H, A]);
           if (!ok) {
             mol.bonds.splice(mol.bonds.indexOf(hb), 1);
             mol.atoms.splice(mol.atoms.indexOf(H), 1);
@@ -26092,6 +26194,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               const o = c.a === A.id ? c.b : c.a;
               return !centre.has(o) && !bondsNow().some(x => x.a === o && (x.stereo === 'wedge' || x.stereo === 'hash'));
             })
+            .filter(c => !inRing || !ringBond(c))
             .sort((p, q) => ringBond(p) - ringBond(q));
           for (const c of cands) {
             const o = c.a === A.id ? c.b : c.a;
@@ -26106,6 +26209,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (ok) moved++;
         else b.stereo = was;
       }
+      /* the H drawn for ring centres placed again, each with all the others there, so two do not crowd one place */
+      for (let it = 0; it < 2 && addedH.length > 1; it++)
+        for (const [H, A] of addedH) {
+          const x0 = H.x,
+            y0 = H.y;
+          H.x = 1e9;
+          H.y = 1e9;
+          const p = hOutPlace(A);
+          H.x = p.x;
+          H.y = p.y;
+          if (idOf() !== want) {
+            H.x = x0;
+            H.y = y0;
+          }
+        }
       /* 3. a wedge InChI still finds ambiguous (a centre whose drawn bonds leave its configuration open to two readings):
          a CH centre shows it on its H instead, kept only where that clears the ambiguity (InChI, when it has started) */
       if (INCHI) {
@@ -28277,6 +28395,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       frontLater = [];
       cleanFragments(t);
       nVar = cleanVariantN;
+
     } finally {
       later = frontLater;
       frontLater = null;
