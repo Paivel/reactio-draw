@@ -12,6 +12,7 @@
 - **Wavy arrow** in the arrow menu, drawn with the wave of the Jablonski diagram's arrows, for hν and emission; it goes to CDXML as a wavy arrow and comes back.
 - **The head of an arrow shaped by hand.** A selected straight arrow has points on its head: the back corners (longer or shorter, wider or narrower), the middle of the notch (how deep) and the middle of a side (hollowed or straight). The shape goes to CDXML and comes back. The Long head group of the arrow menu has a long narrow head (10 line widths long and 2.5 half wide, the size CDXML gives a head) in three sizes.
 - **Jablonski diagrams arranged by hand.** While the diagram's window is open, drag its parts on the sheet: a level up or down and sideways (an end stretches it), a level's name, an arrow sideways, an arrow's label; the arrows stay on their levels. Reset positions puts everything back.
+- **Animation of a scheme.** File → Export as → Animation: each structure of a scheme turns into the next, the atoms paired across the arrow by place, label and bonds (after cdxmorph, Ryan Shenvi, MIT); the bonds that stay keep their length on the way, pieces that leave or join move as pieces, a structure drawn turned turns, and bonds that break or form fade. Saved as a GIF, a video (MP4 or WebM, where the browser can) or the frames (PNG, in a zip); size, speed and pauses set in the window. With no arrows, the drawn structures in reading order; with a selection, only those.
 
 ## Changed
 

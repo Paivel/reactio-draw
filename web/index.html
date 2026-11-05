@@ -1196,6 +1196,32 @@ input.tgl:focus-visible {
   color: var(--ink);
   cursor: pointer;
 }
+.animbox .card {
+  max-width: min(760px, calc(100vw - 32px));
+}
+.animbox .grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 12px;
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+.animbox .grid input {
+  width: 70px;
+  margin-left: 4px;
+}
+.animbox .prev {
+  display: block;
+  max-width: 100%;
+  max-height: 50vh;
+  margin-top: 10px;
+  border: 1px solid var(--line);
+}
+.animbox .warn {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+}
 .askbox.xyzbox {
   inset: auto 16px 16px auto;
   background: none;
@@ -40463,6 +40489,928 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const p = rows.find(r => kindOf(r) === 'product');
     return ((p && (p.name || p.formula)) || 'reactio').replace(/[^\w.-]+/g, '_').slice(0, 40) || 'reactio';
   }
+  /* ===== Animation: one structure turning into the next (File → Export as → Animation). A port of the idea and the
+     matching of cdxmorph (Ryan Shenvi, MIT, https://github.com/rshenvi/cdxmorph): the drawings are paired atom by atom
+     — by place after a rigid fit (tried mirrored too), by label and by how many bonds an atom has, neighbours that pair
+     making a pair cheaper; or by connectivity grown out along the bonds — the better of the two by the bonds it keeps.
+     Paired atoms move from one place to the other, the rest ride with their paired neighbours, and what differs
+     dissolves: each frame is the first drawing and the second, both at the moving places, the second laid over the
+     first more and more (so what both have stays solid all the way) ===== */
+  /* Hungarian assignment on a cost matrix (rows ≤ columns padded square): row → column, or −1 */
+  function animAssign(C) {
+    const n = C.length,
+      m = n ? C[0].length : 0,
+      N = Math.max(n, m),
+      BIG = 1e12,
+      a = (i, j) => (i < n && j < m ? C[i][j] : 0),
+      u = new Float64Array(N + 1),
+      v = new Float64Array(N + 1),
+      p = new Int32Array(N + 1),
+      way = new Int32Array(N + 1);
+    for (let i = 1; i <= N; i++) {
+      p[0] = i;
+      let j0 = 0;
+      const minv = new Float64Array(N + 1).fill(BIG),
+        used = new Uint8Array(N + 1);
+      do {
+        used[j0] = 1;
+        const i0 = p[j0];
+        let delta = BIG,
+          j1 = 0;
+        for (let j = 1; j <= N; j++) {
+          if (used[j]) continue;
+          const cur = a(i0 - 1, j - 1) - u[i0] - v[j];
+          if (cur < minv[j]) {
+            minv[j] = cur;
+            way[j] = j0;
+          }
+          if (minv[j] < delta) {
+            delta = minv[j];
+            j1 = j;
+          }
+        }
+        for (let j = 0; j <= N; j++) {
+          if (used[j]) {
+            u[p[j]] += delta;
+            v[j] -= delta;
+          } else minv[j] -= delta;
+        }
+        j0 = j1;
+      } while (p[j0] !== 0);
+      do {
+        const j1 = way[j0];
+        p[j0] = p[j1];
+        j0 = j1;
+      } while (j0);
+    }
+    const out = new Array(n).fill(-1);
+    for (let j = 1; j <= N; j++) if (p[j] && p[j] <= n && j <= m) out[p[j] - 1] = j - 1;
+    return out;
+  }
+  /* a drawing for the animation: its atoms (copies), bonds, neighbours */
+  function animScene(atoms) {
+    const ids = new Set(atoms.map(a => a.id)),
+      A = atoms.map(a => JSON.parse(JSON.stringify(a))),
+      B = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)).map(b => JSON.parse(JSON.stringify(b))),
+      ix = new Map(A.map((a, i) => [a.id, i])),
+      nb = A.map(() => []);
+    for (const b of B) {
+      nb[ix.get(b.a)].push(ix.get(b.b));
+      nb[ix.get(b.b)].push(ix.get(b.a));
+    }
+    /* which drawn structure each atom is in (a stage may hold several) */
+    const frag = A.map(() => -1);
+    let f = 0;
+    for (let i = 0; i < A.length; i++) {
+      if (frag[i] >= 0) continue;
+      const st = [i];
+      frag[i] = f;
+      while (st.length) {
+        const x = st.pop();
+        for (const y of nb[x]) if (frag[y] < 0) ((frag[y] = f), st.push(y));
+      }
+      f++;
+    }
+    return { A, B, ix, nb, frag };
+  }
+  /* what an atom shows: its label, or the element of a hetero atom; and the atom its bonds meet */
+  const animLab = a => (a.label ? a.label : a.el === 'C' ? '' : a.el) + (a.chg ? (a.chg > 0 ? '+' : '-') + Math.abs(a.chg) : '');
+  const animAttach = a => (a.label || a.el !== 'C' ? a.el : '');
+  const ANIM_K = L / 14.4; /* cdxmorph's costs are in points of a 14.4 pt bond */
+  function animMatchNodes(SA, SB, forced, idxA) {
+    const ka = idxA || SA.A.map((a, i) => i),
+      kb = SB.A.map((a, i) => i),
+      maxCost = 22 * ANIM_K,
+      iters = 6,
+      cons = 3 * ANIM_K;
+    if (!ka.length || !kb.length) return new Map();
+    const pen = ka.map(i =>
+      kb.map(j => {
+        const x = SA.A[i],
+          y = SB.A[j];
+        let c = 0;
+        const la = animLab(x),
+          lb = animLab(y);
+        if (la !== lb) {
+          const ea = animAttach(x),
+            eb = animAttach(y);
+          if ((ea || eb) && ea === eb) c += (6 + 1.5 * Math.abs(la.length - lb.length)) * ANIM_K;
+          else c += la && lb ? 1e3 * ANIM_K : 16 * ANIM_K;
+        }
+        c += 2.5 * ANIM_K * Math.abs(SA.nb[i].length - SB.nb[j].length);
+        return c;
+      })
+    );
+    const PB = SB.A.map(a => [a.x, a.y]);
+    const fit = flip => {
+      const P = ka.map(i => [SA.A[i].x * flip, SA.A[i].y]);
+      const mean = Q => [Q.reduce((t, p) => t + p[0], 0) / Q.length, Q.reduce((t, p) => t + p[1], 0) / Q.length];
+      let ca = mean(P),
+        cb = mean(PB),
+        R = [1, 0, 0, 1],
+        t = [cb[0] - ca[0], cb[1] - ca[1]],
+        m = new Map(),
+        bonus = ka.map(() => kb.map(() => 0));
+      for (let it = 0; it < iters; it++) {
+        const Q = P.map(p => [R[0] * p[0] + R[1] * p[1] + t[0], R[2] * p[0] + R[3] * p[1] + t[1]]);
+        const C = ka.map((i, r) => kb.map((j, c) => Math.hypot(Q[r][0] - PB[j][0], Q[r][1] - PB[j][1]) + pen[r][c] - bonus[r][c]));
+        if (forced)
+          for (const [a, b] of forced) {
+            const r = ka.indexOf(a),
+              c = kb.indexOf(b);
+            if (r < 0 || c < 0) continue;
+            for (let q = 0; q < kb.length; q++) C[r][q] += 1e6;
+            for (let q = 0; q < ka.length; q++) C[q][c] += 1e6;
+            C[r][c] = -1e6;
+          }
+        const as = animAssign(C);
+        m = new Map();
+        as.forEach((c, r) => {
+          if (c >= 0 && (C[r][c] <= maxCost || (forced && forced.has(ka[r])))) m.set(ka[r], kb[c]);
+        });
+        if (m.size < 3) break;
+        /* the rigid fit of the pairs (a proper rotation) */
+        const X = [],
+          Y = [];
+        for (const [a, b] of m) {
+          X.push(P[ka.indexOf(a)]);
+          Y.push(PB[b]);
+        }
+        const xc = mean(X),
+          yc = mean(Y);
+        let sxx = 0,
+          sxy = 0;
+        X.forEach((p, k) => {
+          const px = p[0] - xc[0],
+            py = p[1] - xc[1],
+            qx = Y[k][0] - yc[0],
+            qy = Y[k][1] - yc[1];
+          sxx += px * qx + py * qy;
+          sxy += px * qy - py * qx;
+        });
+        const th = Math.atan2(sxy, sxx),
+          c = Math.cos(th),
+          s = Math.sin(th);
+        R = [c, -s, s, c];
+        t = [yc[0] - (c * xc[0] - s * xc[1]), yc[1] - (s * xc[0] + c * xc[1])];
+        bonus = ka.map(() => kb.map(() => 0));
+        const kaIx = new Map(ka.map((a, r) => [a, r]));
+        for (const [a, b] of m)
+          for (const x of SA.nb[a])
+            for (const y of SB.nb[b]) {
+              const r = kaIx.get(x);
+              if (r != null) bonus[r][y] += cons;
+            }
+      }
+      let resid = 0;
+      for (const [a, b] of m) {
+        const p = P[ka.indexOf(a)];
+        resid += Math.hypot(R[0] * p[0] + R[1] * p[1] + t[0] - PB[b][0], R[2] * p[0] + R[3] * p[1] + t[1] - PB[b][1]);
+      }
+      return { m, resid };
+    };
+    let best = null;
+    for (const flip of [1, -1]) {
+      const r = fit(flip);
+      if (!best || r.m.size > best.m.size || (r.m.size === best.m.size && r.resid < best.resid)) best = r;
+    }
+    return best.m;
+  }
+  /* bonds kept: A bond index → B bond index, for a pairing */
+  function animMatchBonds(SA, SB, m) {
+    const key = (x, y) => (x < y ? x + ',' + y : y + ',' + x),
+      inv = new Map([...m].map(([a, b]) => [b, a])),
+      bk = new Map();
+    SB.B.forEach((b, k) => {
+      const x = inv.get(SB.ix.get(b.a)),
+        y = inv.get(SB.ix.get(b.b));
+      if (x != null && y != null) bk.set(key(x, y), k);
+    });
+    const out = new Map();
+    SA.B.forEach((b, k) => {
+      const v = bk.get(key(SA.ix.get(b.a), SA.ix.get(b.b)));
+      if (v != null) out.set(k, v);
+    });
+    return out;
+  }
+  /* how far the paired atoms travel once the second drawing is moved over the first (only moved, as the film does) */
+  function animResid(SA, SB, m) {
+    if (!m.size) return 0;
+    /* what is left after the best move and turn (the film turns the scene) */
+    const pr = [...m],
+      P = pr.map(([a, b]) => [SB.A[b].x, SB.A[b].y]),
+      Q = pr.map(([a]) => [SA.A[a].x, SA.A[a].y]),
+      T = animTurn(P, Q);
+    let r = 0;
+    for (let i = 0; i < pr.length; i++) {
+      const p = animRot(P[i], T.pc, T.th);
+      r += Math.hypot(p[0] - T.pc[0] + T.qc[0] - Q[i][0], p[1] - T.pc[1] + T.qc[1] - Q[i][1]);
+    }
+    return r / pr.length;
+  }
+  /* the neighbours of an atom in the order they are drawn around it */
+  function animRingOrder(S, k) {
+    const p = S.A[k];
+    return S.nb[k].map(q => [Math.atan2(S.A[q].y - p.y, S.A[q].x - p.x), q]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+  }
+  function animCompat(SA, SB) {
+    return (x, y) => {
+      const a = SA.A[x],
+        b = SB.A[y],
+        same = animLab(a) === animLab(b) || (animAttach(a) && animAttach(a) === animAttach(b));
+      return same && Math.abs(SA.nb[x].length - SB.nb[y].length) <= 1;
+    };
+  }
+  /* a pairing grown out from one pair along the bonds, keeping the order the bonds come off each atom (reversed if mirrored) */
+  function animGrow(SA, SB, a0, b0, flip, compat) {
+    const m = new Map([[a0, b0]]),
+      inv = new Map([[b0, a0]]),
+      dq = [[a0, b0]];
+    while (dq.length) {
+      const [a, b] = dq.shift();
+      const oa = animRingOrder(SA, a);
+      let ob = animRingOrder(SB, b);
+      if (flip) ob = ob.slice().reverse();
+      if (!oa.length || !ob.length) continue;
+      let best = -1,
+        off0 = 0;
+      for (let off = 0; off < ob.length; off++) {
+        let sc = 0;
+        oa.forEach((x, i) => {
+          const y = ob[(i + off) % ob.length];
+          if (m.has(x)) sc += m.get(x) === y ? 3 : -3;
+          else if (inv.has(y)) sc -= 1;
+          else if (compat(x, y)) sc += 1;
+        });
+        if (sc > best) ((best = sc), (off0 = off));
+      }
+      oa.forEach((x, i) => {
+        const y = ob[(i + off0) % ob.length];
+        if (m.has(x) || inv.has(y) || !compat(x, y)) return;
+        m.set(x, y);
+        inv.set(y, x);
+        dq.push([x, y]);
+      });
+    }
+    return m;
+  }
+  function animMatchConnectivity(SA, SB, forced, onlyA, takenB) {
+    const compat0 = animCompat(SA, SB),
+      compat = (x, y) => (!onlyA || onlyA.has(x)) && !(takenB && takenB.has(y)) && compat0(x, y);
+    let best = new Map(),
+      bestN = -Infinity;
+    const seeds = [];
+    if (forced) for (const [a, b] of forced) seeds.push([a, b]);
+    for (let a = 0; a < SA.A.length; a++) for (let b = 0; b < SB.A.length; b++) if (compat(a, b)) seeds.push([a, b]);
+    /* a big pair of drawings: seeds from the rarer kinds of atom first, and not more than a few hundred */
+    const tried = seeds.slice(0, 400);
+    for (const [a0, b0] of tried) {
+      if (!compat(a0, b0)) continue;
+      for (const flip of [false, true]) {
+        let m = animGrow(SA, SB, a0, b0, flip, compat);
+        if (forced && [...forced].some(([k, v]) => m.has(k) && m.get(k) !== v)) {
+          m = new Map([...m].filter(([k, v]) => !forced.has(k) && ![...forced.values()].includes(v)));
+          for (const [k, v] of forced) m.set(k, v);
+        }
+        /* most bonds kept; of equal ones the pairing that moves least (a ring not turned over, a benzene not spun) */
+        const n = animMatchBonds(SA, SB, m).size * 1e6 - animResid(SA, SB, m);
+        if (n > bestN) ((best = m), (bestN = n));
+      }
+    }
+    return best;
+  }
+  /* the pairing of two stages: by place (the whole, then each structure on its own) and by connectivity, the one that keeps
+     most bonds; forced pairs (from the editor) always kept */
+  function animMatch(SA, SB, forced) {
+    const cands = [animMatchNodes(SA, SB, forced)];
+    const nf = Math.max(...SA.frag) + 1;
+    if (nf > 1) {
+      const out = new Map(forced || []),
+        taken = new Set(out.values());
+      const fr = [...Array(nf).keys()].sort((x, y) => SA.frag.filter(f => f === y).length - SA.frag.filter(f => f === x).length);
+      for (const f of fr) {
+        const idx = SA.A.map((a, i) => i).filter(i => SA.frag[i] === f);
+        if (idx.length < 2) continue;
+        const m = animMatchNodes(SA, SB, forced, idx);
+        for (const [k, v] of m) if (!out.has(k) && !taken.has(v)) (out.set(k, v), taken.add(v));
+      }
+      cands.push(out);
+    }
+    if (SA.A.length * SB.A.length <= 40000) {
+      cands.push(animMatchConnectivity(SA, SB, forced));
+      /* several structures on the first side (a reagent joining): each grown on its own, the larger first, into what is
+         left of the second side */
+      if (nf > 1) {
+        const out = new Map(forced || []),
+          taken = new Set(out.values());
+        const fr = [...Array(nf).keys()].sort((x, y) => SA.frag.filter(f => f === y).length - SA.frag.filter(f => f === x).length);
+        for (const f of fr) {
+          const only = new Set(SA.A.map((a, i) => i).filter(i => SA.frag[i] === f));
+          const m = animMatchConnectivity(SA, SB, null, only, taken);
+          for (const [k, v] of m) if (only.has(k) && !out.has(k) && !taken.has(v)) (out.set(k, v), taken.add(v));
+        }
+        cands.push(out);
+      }
+      /* several structures on the second side (a piece leaving): each grown back into what is left of the first */
+      const nfb = Math.max(...SB.frag) + 1;
+      if (nfb > 1) {
+        const out = new Map(forced || []),
+          takenA = new Set(out.keys()),
+          takenB = new Set(out.values());
+        const fr = [...Array(nfb).keys()].sort((x, y) => SB.frag.filter(f => f === y).length - SB.frag.filter(f => f === x).length);
+        for (const f of fr) {
+          const only = new Set(SB.A.map((a, i) => i).filter(i => SB.frag[i] === f && !takenB.has(i)));
+          const m = animMatchConnectivity(SB, SA, null, only, takenA);
+          for (const [b, a] of m) if (only.has(b) && !takenA.has(a) && !takenB.has(b)) (out.set(a, b), takenA.add(a), takenB.add(b));
+        }
+        cands.push(out);
+      }
+    }
+    let best = null,
+      bn = -Infinity;
+    for (const m of cands) {
+      const n = animMatchBonds(SA, SB, m).size * 1e6 + m.size * 1e3 - animResid(SA, SB, m);
+      if (n > bn) ((best = m), (bn = n));
+    }
+    return best || new Map();
+  }
+  /* the stages of the sheet (or of the selection): the structures between one reaction arrow and the next, in reading
+     order; a structure over or under an arrow is its reagent and stays out; with no arrows each structure is a stage */
+  function animStages() {
+    let frs = fragments().filter(f => f.length >= 1 && !f.every(a => a.multi));
+    if (sel.size) {
+      const s = frs.filter(f => f.some(a => sel.has(a.id)));
+      if (s.length >= 2) frs = s;
+    }
+    const rows = y => Math.round(y / 160);
+    const box = f => {
+      let x0 = 1e9,
+        y0 = 1e9,
+        x1 = -1e9,
+        y1 = -1e9;
+      for (const a of f) ((x0 = Math.min(x0, a.x)), (y0 = Math.min(y0, a.y)), (x1 = Math.max(x1, a.x)), (y1 = Math.max(y1, a.y)));
+      return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+    };
+    const ars = mol.arrows.filter(r => isRxnArrow(r) && !r.kind);
+    const items = [];
+    for (const f of frs) {
+      const b = box(f);
+      /* a reagent: its middle over or under an arrow, within the arrow's length */
+      const reag = ars.some(r => {
+        const dx = r.x2 - r.x1,
+          dy = r.y2 - r.y1,
+          l = Math.hypot(dx, dy) || 1,
+          t = ((b.cx - r.x1) * dx + (b.cy - r.y1) * dy) / l,
+          d = Math.abs((b.cx - r.x1) * dy - (b.cy - r.y1) * dx) / l;
+        return t > 0 && t < l && d < L * 6 && d > L * 0.3;
+      });
+      if (!reag) items.push({ f, k: [rows(b.cy), b.cx] });
+    }
+    for (const r of ars) items.push({ r, k: [rows((r.y1 + r.y2) / 2), (r.x1 + r.x2) / 2] });
+    items.sort((p, q) => p.k[0] - q.k[0] || p.k[1] - q.k[1]);
+    const stages = [];
+    let cur = [];
+    const hasArrows = ars.length > 0;
+    for (const it of items) {
+      if (it.r) {
+        if (cur.length) stages.push(cur);
+        cur = [];
+      } else if (hasArrows) cur.push(...it.f);
+      else stages.push([...it.f]);
+    }
+    if (hasArrows && cur.length) stages.push(cur);
+    return stages.filter(s => s.length);
+  }
+  /* the plan: scenes of every stage, each placed over the one before it (only moved, not turned), the pairings */
+  function animPlan(forcedList) {
+    const stages = animStages();
+    if (stages.length < 2) return { err: 'Draw at least two structures, joined by a reaction arrow (or select two)' };
+    const scenes = stages.map(animScene),
+      steps = [];
+    for (let i = 0; i + 1 < scenes.length; i++) {
+      const SA = scenes[i],
+        SB = scenes[i + 1],
+        forced = forcedList && forcedList[i] ? new Map(forcedList[i]) : null,
+        m = animMatch(SA, SB, forced);
+      /* B moved over A: by the mean offset of the pairs (or of the centres when nothing pairs) */
+      let dx = 0,
+        dy = 0;
+      if (m.size) {
+        for (const [a, b] of m) ((dx += SB.A[b].x - SA.A[a].x), (dy += SB.A[b].y - SA.A[a].y));
+        dx /= m.size;
+        dy /= m.size;
+      } else {
+        const c = S => [S.A.reduce((t, a) => t + a.x, 0) / S.A.length, S.A.reduce((t, a) => t + a.y, 0) / S.A.length],
+          ca = c(SA),
+          cb = c(SB);
+        dx = cb[0] - ca[0];
+        dy = cb[1] - ca[1];
+      }
+      for (const a of SB.A) ((a.x -= dx), (a.y -= dy));
+      const bm = animMatchBonds(SA, SB, m);
+      steps.push({ m, bm, mo: animMotion(SA, SB, m), kept: bm.size, broken: SA.B.length - bm.size, formed: SB.B.length - bm.size, paired: m.size, ofA: SA.A.length, ofB: SB.A.length });
+    }
+    return { scenes, steps };
+  }
+  /* the best turn (about the centres) that lays the points P over the points Q */
+  function animTurn(P, Q) {
+    const n = P.length,
+      pc = [0, 0],
+      qc = [0, 0];
+    for (let i = 0; i < n; i++) ((pc[0] += P[i][0] / n), (pc[1] += P[i][1] / n), (qc[0] += Q[i][0] / n), (qc[1] += Q[i][1] / n));
+    let sx = 0,
+      sd = 0;
+    for (let i = 0; i < n; i++) {
+      const ax = P[i][0] - pc[0],
+        ay = P[i][1] - pc[1],
+        bx = Q[i][0] - qc[0],
+        by = Q[i][1] - qc[1];
+      sd += ax * bx + ay * by;
+      sx += ax * by - ay * bx;
+    }
+    return { th: n > 1 && (sx || sd) ? Math.atan2(sx, sd) : 0, pc, qc };
+  }
+  const animRot = (p, c, th) => {
+    const co = Math.cos(th),
+      si = Math.sin(th),
+      x = p[0] - c[0],
+      y = p[1] - c[1];
+    return [c[0] + x * co - y * si, c[1] + x * si + y * co];
+  };
+  /* how a step moves: the whole scene turned (so the second structure ends as drawn), and each structure of the first
+     side carried as one piece (turned and moved) towards its place, the rest of the way bent */
+  function animMotion(SA, SB, m) {
+    const pr = [...m];
+    if (!pr.length) return null;
+    const g = animTurn(pr.map(([a, b]) => [SB.A[b].x, SB.A[b].y]), pr.map(([a, b]) => [SA.A[a].x, SA.A[a].y]));
+    const c = g.qc,
+      Bp = SB.A.map(q => animRot([q.x - g.pc[0] + c[0], q.y - g.pc[1] + c[1]], c, g.th));
+    /* the pieces: pairs in the same structure on both sides move as one; an unpaired atom goes with the nearest piece
+       along the bonds */
+    const key = new Map(),
+      grp = SA.A.map(() => -1);
+    for (const [a, b] of pr) {
+      const k = SA.frag[a] + ':' + SB.frag[b];
+      if (!key.has(k)) key.set(k, key.size);
+      grp[a] = key.get(k);
+    }
+    for (let it = 0, ch = true; ch && it < SA.A.length; it++) {
+      ch = false;
+      const g2 = grp.slice();
+      for (let i = 0; i < SA.A.length; i++)
+        if (grp[i] < 0) {
+          const n = SA.nb[i].find(j => grp[j] >= 0);
+          if (n != null) ((g2[i] = grp[n]), (ch = true));
+        }
+      grp.splice(0, grp.length, ...g2);
+    }
+    const fr = [];
+    for (let k = 0; k < key.size; k++) {
+      const pf = pr.filter(([a]) => grp[a] === k && m.get(a) != null);
+      fr.push(animTurn(pf.map(([a]) => [SA.A[a].x, SA.A[a].y]), pf.map(([, b]) => Bp[b])));
+    }
+    fr.grp = grp;
+    /* what keeps its shape on the way: bonds kept, and the span over two kept bonds at one atom */
+    const ties = [],
+      kept = SA.A.map(() => []);
+    const len = (S, P, i, j) => Math.hypot(P[i][0] - P[j][0], P[i][1] - P[j][1]);
+    const PA0 = SA.A.map(p => [p.x, p.y]);
+    for (const bd of SA.B) {
+      const a = SA.ix.get(bd.a),
+        c = SA.ix.get(bd.b);
+      if (m.has(a) && m.has(c) && SB.nb[m.get(a)].includes(m.get(c))) {
+        ties.push([a, c, len(SA, PA0, a, c), len(SB, Bp, m.get(a), m.get(c))]);
+        kept[a].push(c);
+        kept[c].push(a);
+      }
+    }
+    for (let a = 0; a < SA.A.length; a++)
+      for (let i = 0; i < kept[a].length; i++)
+        for (let j = i + 1; j < kept[a].length; j++) {
+          const x = kept[a][i],
+            y = kept[a][j];
+          ties.push([x, y, len(SA, PA0, x, y), len(SB, Bp, m.get(x), m.get(y))]);
+        }
+    return { th: g.th, c, Bp, fr, ties };
+  }
+  /* where every atom of both scenes is at time t (0…1): paired ones on their way, the others carried with their paired
+     neighbours (cdxmorph's flow) */
+  function animPlaces(SA, SB, m, mo, t) {
+    const PA = SA.A.map(p => [p.x, p.y]),
+      PB = SB.A.map(q => [q.x, q.y]);
+    if (!mo) return [PA, PB];
+    const rig = (a, tt) => {
+      const T = mo.fr[mo.fr.grp[a]],
+        p = [SA.A[a].x, SA.A[a].y];
+      if (!T) return p;
+      const r = animRot(p, T.pc, T.th * tt);
+      return [r[0] + tt * (T.qc[0] - T.pc[0]), r[1] + tt * (T.qc[1] - T.pc[1])];
+    };
+    const res = SA.A.map(() => null);
+    for (const [a, b] of m) {
+      const e = rig(a, 1);
+      res[a] = [mo.Bp[b][0] - e[0], mo.Bp[b][1] - e[1]];
+    }
+    const carry = (S, d) => {
+      for (let it = 0; it < 8; it++)
+        for (let i = 0; i < S.A.length; i++) {
+          if (d[i]) continue;
+          const v = S.nb[i].map(n => d[n]).filter(Boolean);
+          if (v.length) d[i] = [v.reduce((s, w) => s + w[0], 0) / v.length, v.reduce((s, w) => s + w[1], 0) / v.length];
+        }
+    };
+    carry(SA, res);
+    for (let a = 0; a < SA.A.length; a++) {
+      const r = rig(a, t),
+        d = res[a] || [0, 0];
+      PA[a] = [r[0] + t * d[0], r[1] + t * d[1]];
+    }
+    /* on the way, bonds that stay (and the spans across two of them) keep a length between the two drawings: a straight
+       blend can fold a chain flat */
+    const w = 4 * t * (1 - t);
+    if (w > 0.001 && mo.ties.length) {
+      const P0 = PA.map(p => p.slice());
+      for (let it = 0; it < 30; it++) {
+        for (const [a, c, l0, l1] of mo.ties) {
+          const l = l0 + (l1 - l0) * t,
+            dx = PA[c][0] - PA[a][0],
+            dy = PA[c][1] - PA[a][1],
+            d = Math.hypot(dx, dy) || 1e-6,
+            k = ((d - l) / d) * 0.5 * Math.min(1, w * 2);
+          PA[a][0] += dx * k;
+          PA[a][1] += dy * k;
+          PA[c][0] -= dx * k;
+          PA[c][1] -= dy * k;
+        }
+        for (let a = 0; a < PA.length; a++) ((PA[a][0] += (P0[a][0] - PA[a][0]) * 0.05), (PA[a][1] += (P0[a][1] - PA[a][1]) * 0.05));
+      }
+      /* atoms held by nothing go along with their neighbours */
+      const tied = new Set(mo.ties.flatMap(q => [q[0], q[1]])),
+        dd = PA.map((p, a) => (tied.has(a) ? [p[0] - P0[a][0], p[1] - P0[a][1]] : null));
+      carry(SA, dd);
+      for (let a = 0; a < PA.length; a++) if (!tied.has(a) && dd[a]) PA[a] = [P0[a][0] + dd[a][0], P0[a][1] + dd[a][1]];
+    }
+    const dB = SB.A.map(() => null);
+    for (const [a, b] of m) dB[b] = [PA[a][0] - mo.Bp[b][0], PA[a][1] - mo.Bp[b][1]];
+    carry(SB, dB);
+    for (let b = 0; b < SB.A.length; b++) PB[b] = [mo.Bp[b][0] + (dB[b] ? dB[b][0] : 0), mo.Bp[b][1] + (dB[b] ? dB[b][1] : 0)];
+    for (const P of [PA, PB]) for (let i = 0; i < P.length; i++) P[i] = animRot(P[i], mo.c, -mo.th * t);
+    return [PA, PB];
+  }
+  const animEase = t => t * t * (3 - 2 * t);
+  /* an SVG of a scene at given places, in a fixed box, on white */
+  function animSVG(S, P, box) {
+    const full = mol,
+      ks = [new Set(sel), new Set(selArr), new Set(selTxt)];
+    const atoms = S.A.map((a, i) => ({ ...a, x: P[i][0], y: P[i][1] }));
+    try {
+      mol = { ...full, atoms, bonds: S.B, arrows: [], texts: [], fills: [], rings: [] };
+      sel.clear();
+      selArr.clear();
+      selTxt.clear();
+      let s = svgOf(true);
+      const vb = `${box.x0} ${box.y0} ${box.x1 - box.x0} ${box.y1 - box.y0}`;
+      s = s.replace(/viewBox="[^"]*" width="[^"]*" height="[^"]*"/, `viewBox="${vb}" width="${box.W}" height="${box.H}"`);
+      return s.replace(/(<svg[^>]*>)/, `$1<rect x="${box.x0}" y="${box.y0}" width="${box.x1 - box.x0}" height="${box.y1 - box.y0}" fill="#ffffff"/>`);
+    } finally {
+      mol = full;
+      ks[0].forEach(i => sel.add(i));
+      ks[1].forEach(i => selArr.add(i));
+      ks[2].forEach(i => selTxt.add(i));
+    }
+  }
+  function animImg(svg) {
+    return new Promise((res, rej) => {
+      const im = new Image();
+      im.onload = () => res(im);
+      im.onerror = () => rej(new Error('a frame could not be drawn'));
+      im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    });
+  }
+  /* the frames: [{canvas or pixels, delay in s}] by settings {width, fps, duration (moving part of each step), hold, pause} */
+  async function animFrames(plan, o, onStep) {
+    const { scenes, steps } = plan,
+      fps = Math.max(5, Math.min(60, +o.fps || 24)),
+      dur = Math.max(0.3, +o.duration || 2),
+      hold = Math.max(0, o.hold != null ? +o.hold : 0.5),
+      pause = Math.max(0, o.pause != null ? +o.pause : 0.3);
+    /* one box for the whole film */
+    let x0 = 1e9,
+      y0 = 1e9,
+      x1 = -1e9,
+      y1 = -1e9;
+    for (const S of scenes) for (const a of S.A) ((x0 = Math.min(x0, a.x)), (y0 = Math.min(y0, a.y)), (x1 = Math.max(x1, a.x)), (y1 = Math.max(y1, a.y)));
+    /* and every place on the way (a turning structure swings out) */
+    steps.forEach((st, i) => {
+      for (let k = 1; k < 8; k++)
+        for (const P of animPlaces(scenes[i], scenes[i + 1], st.m, st.mo, animEase(k / 8)))
+          for (const [x, y] of P) ((x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y)));
+    });
+    const pad = L * 1.2;
+    x0 -= pad;
+    y0 -= pad;
+    x1 += pad;
+    y1 += pad;
+    const W = Math.round(Math.max(120, Math.min(2000, +o.width || 800))),
+      H = Math.round((W * (y1 - y0)) / (x1 - x0)),
+      box = { x0, y0, x1, y1, W, H };
+    const frames = [],
+      cv = () => {
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        return c;
+      };
+    const still = async (S, delay) => {
+      const c = cv(),
+        g = c.getContext('2d');
+      g.drawImage(await animImg(animSVG(S, S.A.map(a => [a.x, a.y]), box)), 0, 0, W, H);
+      frames.push({ c, delay });
+    };
+    await still(scenes[0], hold);
+    const n = Math.max(2, Math.round(dur * fps));
+    for (let i = 0; i < steps.length; i++) {
+      const SA = scenes[i],
+        SB = scenes[i + 1],
+        st = steps[i];
+      for (let f = 1; f < n; f++) {
+        const t = animEase(f / n),
+          [PA, PB] = animPlaces(SA, SB, st.m, st.mo, t);
+        const [ia, ib] = await Promise.all([animImg(animSVG(SA, PA, box)), animImg(animSVG(SB, PB, box))]);
+        const c = cv(),
+          g = c.getContext('2d');
+        g.drawImage(ia, 0, 0, W, H);
+        g.globalAlpha = t;
+        g.drawImage(ib, 0, 0, W, H);
+        frames.push({ c, delay: 1 / fps });
+        if (onStep) await onStep(i, f / n);
+      }
+      await still(SB, i + 1 < steps.length ? Math.max(1 / fps, pause) : hold);
+    }
+    return { frames, W, H, fps };
+  }
+  /* a GIF of the frames: one palette for the whole film (the commonest colours), LZW, looping */
+  function animGif(film) {
+    const { frames, W, H } = film;
+    /* the palette: colours counted on every few pixels of every frame, 5 bits a channel */
+    const count = new Map();
+    const datas = frames.map(fr => fr.c.getContext('2d').getImageData(0, 0, W, H).data);
+    for (const d of datas)
+      for (let i = 0; i < d.length; i += 4 * 3) {
+        const k = ((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3);
+        count.set(k, (count.get(k) || 0) + 1);
+      }
+    const top = [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 256).map(([k]) => [((k >> 10) & 31) * 8 + 4, ((k >> 5) & 31) * 8 + 4, (k & 31) * 8 + 4]);
+    /* white and the ink kept exact */
+    top[0] = [255, 255, 255];
+    while (top.length < 256) top.push([0, 0, 0]);
+    const near = new Map(),
+      idx = k => {
+        let v = near.get(k);
+        if (v != null) return v;
+        const r = ((k >> 10) & 31) * 8 + 4,
+          g = ((k >> 5) & 31) * 8 + 4,
+          b = (k & 31) * 8 + 4;
+        let bd = 1e9;
+        top.forEach((p, i) => {
+          const d = (p[0] - r) ** 2 + (p[1] - g) ** 2 + (p[2] - b) ** 2;
+          if (d < bd) ((bd = d), (v = i));
+        });
+        near.set(k, v);
+        return v;
+      };
+    const out = [];
+    const b8 = x => out.push(x & 255),
+      b16 = x => (b8(x), b8(x >> 8)),
+      str = s => [...s].forEach(c => b8(c.charCodeAt(0)));
+    str('GIF89a');
+    b16(W);
+    b16(H);
+    b8(0xf7);
+    b8(0);
+    b8(0);
+    for (const p of top) (b8(p[0]), b8(p[1]), b8(p[2]));
+    /* loop for ever */
+    b8(0x21);
+    b8(0xff);
+    b8(11);
+    str('NETSCAPE2.0');
+    b8(3);
+    b8(1);
+    b16(0);
+    b8(0);
+    frames.forEach((fr, n) => {
+      const d = datas[n],
+        px = new Uint8Array(W * H);
+      for (let i = 0, j = 0; i < d.length; i += 4, j++) px[j] = idx(((d[i] >> 3) << 10) | ((d[i + 1] >> 3) << 5) | (d[i + 2] >> 3));
+      b8(0x21);
+      b8(0xf9);
+      b8(4);
+      b8(0);
+      b16(Math.max(2, Math.round(fr.delay * 100)));
+      b8(0);
+      b8(0);
+      b8(0x2c);
+      b16(0);
+      b16(0);
+      b16(W);
+      b16(H);
+      b8(0);
+      /* LZW, 8-bit codes */
+      const minCode = 8,
+        clear = 256,
+        eoi = 257;
+      b8(minCode);
+      let dict = new Map(),
+        next = 258,
+        size = 9,
+        cur = 0,
+        nbits = 0;
+      const block = [];
+      const emit = code => {
+        cur |= code << nbits;
+        nbits += size;
+        while (nbits >= 8) {
+          block.push(cur & 255);
+          cur >>= 8;
+          nbits -= 8;
+        }
+      };
+      emit(clear);
+      let w = px[0];
+      for (let i = 1; i < px.length; i++) {
+        const k = px[i],
+          key = w * 4096 + k,
+          hit = dict.get(key);
+        if (hit != null) {
+          w = hit;
+          continue;
+        }
+        emit(w);
+        /* as GIF readers count: the code size grows when the next code needs it, a full table starts again */
+        if (next === 4096) {
+          emit(clear);
+          dict = new Map();
+          next = 258;
+          size = 9;
+        } else {
+          if (next >= 1 << size) size++;
+          dict.set(key, next++);
+        }
+        w = k;
+      }
+      emit(w);
+      emit(eoi);
+      if (nbits > 0) block.push(cur & 255);
+      for (let i = 0; i < block.length; i += 255) {
+        const part = block.slice(i, i + 255);
+        b8(part.length);
+        for (const x of part) b8(x);
+      }
+      b8(0);
+    });
+    b8(0x3b);
+    return new Uint8Array(out);
+  }
+  /* a video (WebM, or MP4 where the browser records it) of the frames, played into a recorder at their own pace */
+  async function animVideo(film) {
+    const { frames, W, H, fps } = film;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const g = c.getContext('2d'),
+      types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'],
+      type = types.find(t => window.MediaRecorder && MediaRecorder.isTypeSupported(t));
+    if (!type) throw new Error('this browser cannot record video; save a GIF instead');
+    const stream = c.captureStream(fps),
+      rec = new MediaRecorder(stream, { mimeType: type, videoBitsPerSecond: 6e6 }),
+      parts = [];
+    rec.ondataavailable = e => e.data.size && parts.push(e.data);
+    const done = new Promise(r => (rec.onstop = r));
+    g.drawImage(frames[0].c, 0, 0);
+    rec.start();
+    for (const fr of frames) {
+      g.drawImage(fr.c, 0, 0);
+      await new Promise(r => setTimeout(r, fr.delay * 1000));
+    }
+    rec.stop();
+    await done;
+    return { blob: new Blob(parts, { type: type.split(';')[0] }), ext: type.includes('mp4') ? 'mp4' : 'webm' };
+  }
+  /* the window: what pairs with what, the settings, a preview, and the GIF, video or frames saved */
+  let ANIMBOX = null;
+  function animBox() {
+    if (ANIMBOX) return;
+    const plan = animPlan();
+    if (plan.err) {
+      toast(plan.err, true);
+      return;
+    }
+    const box = document.createElement('div');
+    box.className = 'askbox animbox';
+    const st = plan.steps
+      .map(
+        (s, i) =>
+          `<li>Step ${i + 1}: ${s.paired} of ${s.ofA} atoms paired with ${s.ofB}; ${s.kept} bond${s.kept === 1 ? '' : 's'} kept, ${s.broken} broken, ${s.formed} formed</li>`
+      )
+      .join('');
+    box.innerHTML = `<div class="card"><b>Animation</b><div class="note">Each structure turns into the next: atoms move, bonds that break or form dissolve. ${plan.scenes.length} structures, ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}.</div><ul class="warn">${st}</ul>
+      <div class="grid"><label>Width, px <input type="number" data-o="width" value="800" min="200" max="2000" step="50"></label><label>Each step, s <input type="number" data-o="duration" value="2" min="0.3" max="20" step="0.1"></label><label>Frames a second <input type="number" data-o="fps" value="24" min="5" max="60" step="1"></label><label>Hold at the ends, s <input type="number" data-o="hold" value="0.6" min="0" max="10" step="0.1"></label><label>Pause between steps, s <input type="number" data-o="pause" value="0.3" min="0" max="10" step="0.1"></label></div>
+      <canvas class="prev" hidden></canvas><div class="tx note"></div><div class="row"></div></div>`;
+    document.body.appendChild(box);
+    ANIMBOX = box;
+    const row = box.querySelector('.row'),
+      tx = box.querySelector('.tx'),
+      prev = box.querySelector('.prev');
+    let film = null,
+      key = '',
+      playing = 0;
+    const opts = () => {
+      const o = {};
+      box.querySelectorAll('[data-o]').forEach(i => (o[i.dataset.o] = +i.value));
+      return o;
+    };
+    const make = async () => {
+      const o = opts(),
+        k = JSON.stringify(o);
+      if (film && k === key) return film;
+      busy(true);
+      try {
+        film = await animFrames(animPlan(), o, async (i, f) => {
+          tx.textContent = 'Drawing step ' + (i + 1) + ': ' + Math.round(f * 100) + ' %';
+          await new Promise(r => setTimeout(r, 0));
+        });
+        key = k;
+        tx.textContent = film.frames.length + ' frames, ' + film.W + ' × ' + film.H + ' px, ' + film.frames.reduce((t, f) => t + f.delay, 0).toFixed(1) + ' s';
+        return film;
+      } finally {
+        busy(false);
+      }
+    };
+    const buttons = [];
+    const btn = (l, pri, f) => {
+      const b = document.createElement('button');
+      b.textContent = l;
+      if (pri) b.className = 'pri';
+      b.onclick = async () => {
+        try {
+          await f();
+        } catch (e) {
+          toast((e && e.message) || String(e), true);
+          busy(false);
+        }
+      };
+      row.appendChild(b);
+      buttons.push(b);
+      return b;
+    };
+    const busy = on => buttons.forEach(b => (b.disabled = on && b.textContent !== 'Close'));
+    const play = async () => {
+      const f = await make(),
+        my = ++playing;
+      prev.width = f.W;
+      prev.height = f.H;
+      prev.hidden = false;
+      const g = prev.getContext('2d');
+      for (const fr of f.frames) {
+        if (my !== playing || !ANIMBOX) return;
+        g.drawImage(fr.c, 0, 0);
+        await new Promise(r => setTimeout(r, fr.delay * 1000));
+      }
+    };
+    btn('Preview', false, play);
+    btn('Save GIF', true, async () => {
+      const f = await make();
+      tx.textContent = 'Writing the GIF…';
+      await new Promise(r => setTimeout(r, 0));
+      const g = animGif(f);
+      await offerFile(docName() + '.gif', new Blob([g], { type: 'image/gif' }));
+      tx.textContent = 'GIF: ' + (g.length / 1024).toFixed(0) + ' kB';
+    });
+    btn('Save video', false, async () => {
+      const f = await make();
+      tx.textContent = 'Recording the video (as long as the film)…';
+      busy(true);
+      const v = await animVideo(f);
+      busy(false);
+      await offerFile(docName() + '.' + v.ext, v.blob);
+      tx.textContent = 'Video: ' + v.ext.toUpperCase() + ', ' + (v.blob.size / 1024).toFixed(0) + ' kB';
+    });
+    btn('Save frames', false, async () => {
+      const f = await make(),
+        files = [];
+      for (let i = 0; i < f.frames.length; i++) {
+        const b = await new Promise(r => f.frames[i].c.toBlob(r, 'image/png'));
+        files.push(['frame_' + String(i + 1).padStart(4, '0') + '.png', new Uint8Array(await b.arrayBuffer())]);
+      }
+      await offerFile(docName() + '_frames.zip', zipOf(files));
+    });
+    btn('Close', false, () => {
+      playing++;
+      box.remove();
+      ANIMBOX = null;
+    });
+  }
   const FILEMENU = [
     ['h', 'File'],
     ['save', 'Save (Ctrl+S)'],
@@ -40484,6 +41432,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['tif', 'Image for journals (.tiff, 600 dpi)'],
     ['f-xyz', 'XYZ, 3D coordinates for quantum chemistry (.xyz): conformer search, charge and multiplicity'],
     ['f-sdf3', 'SDF with the 3D shape and its bonds (.sdf): for Avogadro and other 3D programs'],
+    ['anim', 'Animation, each structure turning into the next (.gif, video, frames)…'],
     ['h', 'Copy to clipboard'],
     ['c-cdxml', 'CDXML'],
     ['c-mol', 'Molfile'],
@@ -41443,6 +42392,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (k === 'f-xyz' || k === 'c-xyz' || k === 'f-sdf3' || k === 'c-sdf3') {
       xyzBox(k);
+      return;
+    }
+    if (k === 'anim') {
+      animBox();
       return;
     }
     if (k === 'ord') {
@@ -71425,6 +72378,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    animPlan,
+    animPlaces,
+    animFrames,
+    animGif,
+    animStages,
     smartsTarget,
     jabParts,
     pkaSites,
