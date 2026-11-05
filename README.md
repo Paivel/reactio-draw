@@ -4,9 +4,9 @@ A free chemical structure and reaction editor for organic chemists. Draw with th
 reagent table for every reaction (equivalents, masses, volumes, yield), predict NMR, and move drawings into Word
 and PowerPoint or to and from other chemistry editors as CDXML and CDX files. It also helps you check HRMS data.
 
-| [▶ Open in the browser](https://paivel.github.io/reactio-draw/web/) | [⬇ Apps for Windows, Mac and Linux](https://github.com/Paivel/reactio-draw/releases/latest) | [📖 Guide (PDF)](docs/Reactio%20Draw%20-%20Getting%20started.pdf) |
-| :---: | :---: | :---: |
-| nothing to install | work fully offline | every function and button explained |
+| [▶ Open in the browser](https://paivel.github.io/reactio-draw/web/) | [⬇ Apps for Windows, Mac and Linux](https://github.com/Paivel/reactio-draw/releases/latest) | [📖 Guide (PDF)](docs/Reactio%20Draw%20-%20Getting%20started.pdf) | [📝 Word test file](examples/Reactio%20Draw%20-%20marks%20test.docx) |
+| :---: | :---: | :---: | :---: |
+| nothing to install | work fully offline | every function and button explained | compound numbers in Word, every kind of mark |
 
 ![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview-1.5.1.png)
 
