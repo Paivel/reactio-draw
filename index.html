@@ -51881,7 +51881,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   {
     const st = document.createElement('style');
     st.textContent =
-      '#jabEd{width:440px}#jabEd .jabrow{display:flex;align-items:center;gap:4px;margin:2px 0;white-space:nowrap}#jabEd .jabrow select,#jabEd .jabrow input{min-width:0;flex:0 1 auto;font-size:12px}#jabEd .jabrow select[data-jt=k]{width:118px}#jabEd .jabrow select[data-jl=c]{width:78px}#jabEd .jabrow input[data-jl=t]{width:62px}#jabEd .jabrow select[data-jt=f],#jabEd .jabrow select[data-jt=to]{width:62px}#jabEd .jabrow button{flex:0 0 auto;width:24px;padding:0}#jabEd .jabrow label{font-size:11px;display:flex;align-items:center;gap:2px}';
+      '#jabEd{width:440px}#jabEd .ttl{cursor:move;display:block;user-select:none}#jabEd .jabrow{display:flex;align-items:center;gap:4px;margin:2px 0;white-space:nowrap}#jabEd .jabrow select,#jabEd .jabrow input{min-width:0;flex:0 1 auto;font-size:12px}#jabEd .jabrow select[data-jt=k]{width:118px}#jabEd .jabrow select[data-jl=c]{width:78px}#jabEd .jabrow input[data-jl=t]{width:62px}#jabEd .jabrow select[data-jt=f],#jabEd .jabrow select[data-jt=to]{width:62px}#jabEd .jabrow button{flex:0 0 auto;width:24px;padding:0}#jabEd .jabrow label{font-size:11px;display:flex;align-items:center;gap:2px}';
     document.head.appendChild(st);
   }
   jabEd.id = 'jabEd';
@@ -51901,7 +51901,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const b = (k, v, t, ti) => `<button type="button" data-je="${k}" data-v="${v}"${ti ? ` title="${ti}"` : ''}>${t}</button>`,
       lvOpts = sel => (r.lv || []).map((l, i) => `<option value="${i}"${i === sel ? ' selected' : ''}>${esc(l.t || 'level ' + (i + 1))}</option>`).join('');
     jabEd.innerHTML =
-      '<span class="ttl">Jablonski diagram</span>' +
+      '<span class="ttl" title="Drag to move this window">Jablonski diagram</span>' +
       '<div class="aer"><span>Levels</span><div style="font-size:11px;opacity:.75">name · column · energy, % of the height</div></div>' +
       `<div class="pes">${(r.lv || []).map((l, i) => `<div class="jabrow"><input type="text" data-jl="t" data-i="${i}" value="${esc(l.t || '')}" placeholder="S₁" style="width:70px"><select data-jl="c" data-i="${i}"><option value="0"${l.c ? '' : ' selected'}>singlet</option><option value="1"${l.c ? ' selected' : ''}>triplet</option></select><input type="number" data-jl="e" data-i="${i}" value="${+l.e || 0}" min="0" max="100" step="1" style="width:56px" title="Energy: 0 at the bottom, 100 at the top"><label title="Across both columns (the ground state)"><input type="checkbox" data-jl="full" data-i="${i}"${l.full ? ' checked' : ''}> wide</label>${b('ldel', i, '×', 'Remove this level and its transitions')}</div>`).join('')}</div>` +
       `<div class="aer"><span></span><div>${b('ladd', 1, '+ Level')}</div></div>` +
@@ -51929,6 +51929,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     jabEd.style.left = Math.max(8, Math.min(q.x - ed.left + 12, ed.width - w - 8)) + 'px';
     jabEd.style.top = Math.max(8, Math.min(q.y - ed.top - 20, ed.height - (jabEd.offsetHeight || 320) - 8)) + 'px';
   }
+  /* the window moves when its title is dragged */
+  jabEd.addEventListener('pointerdown', e => {
+    if (!e.target.closest('.ttl')) return;
+    e.preventDefault();
+    const x0 = e.clientX,
+      y0 = e.clientY,
+      l0 = jabEd.offsetLeft,
+      t0 = jabEd.offsetTop,
+      mv = ev => {
+        jabEd.style.left = l0 + ev.clientX - x0 + 'px';
+        jabEd.style.top = Math.max(0, t0 + ev.clientY - y0) + 'px';
+      },
+      up = () => {
+        document.removeEventListener('pointermove', mv);
+        document.removeEventListener('pointerup', up);
+      };
+    document.addEventListener('pointermove', mv);
+    document.addEventListener('pointerup', up);
+  });
   jabEd.addEventListener('input', e => {
     const x = e.target,
       r = jabEdR;
