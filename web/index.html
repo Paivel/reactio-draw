@@ -3199,6 +3199,7 @@ html {
             <dt title="Hydrogen-bond donors / acceptors (OpenChemLib)">H-bond donors / acceptors</dt><dd id="hbda">—</dd>
             <dt title="Rotatable bonds (OpenChemLib)">Rotatable bonds</dt><dd id="rotb">—</dd>
             <dt title="Lipinski's rule of five: MW ≤ 500, cLogP ≤ 5, H-bond donors ≤ 5, acceptors ≤ 10; one violation is usually allowed">Rule of five</dt><dd id="ro5">—</dd>
+            <dt title="Typical pKa of each ionizable group, by its kind: the mean ± spread of measured values for groups of that kind (Dimorphite-DL's table, Apache-2.0), not a calculation for this molecule. Bases: pKaH, the pKa of the conjugate acid, and pKb = 14 − pKaH (water, 25 °C)">pKa (typical)</dt><dd id="pka">—</dd>
           </dl>
           <div class="row" style="gap:6px;align-items:center;flex-wrap:nowrap;margin-top:8px"><span class="tlabel" style="white-space:nowrap" title="Type the m/z of the peak you found: the closest common ion (adduct) of this structure is shown with its calculated m/z and the error in ppm">HRMS found m/z</span><input id="hrmsIn" inputmode="decimal" placeholder="e.g. 203.0318" style="min-width:0;flex:1"><button class="btn ghost sm" id="hrmsCopy" title="Copy the HRMS line for the experimental part">Copy</button></div>
           <div id="hrmsOut" class="note" style="margin-top:2px"></div>
@@ -3267,6 +3268,10 @@ html {
           <label class="tlabel" for="nameIn" style="display:block;margin-bottom:4px" title="Systematic (IUPAC) names, common and trade names, abbreviations (aspirin, THF, DIPEA, Boc2O, clozapine…), CAS numbers and InChIKeys. Read here, nothing is sent anywhere; in the web version the name reader (3 MB) is downloaded on the first name, after asking">Paste name</label>
           <div class="row" style="flex-wrap:nowrap"><input id="nameIn" placeholder="2-acetyloxybenzoic acid" style="font:13px var(--sans);min-width:0"><button class="btn ghost sm" id="nameGo">Add</button></div>
         </div>
+        <div>
+          <label class="tlabel" for="pepIn" style="display:block;margin-bottom:4px" title="One-letter (YGGFL; lower case for D: cyclo(RGDfK)) or three-letter codes (Ac-Ala-D-Phe-Gly-NH2; also Aib, Sar, Nle, Orn, Abu, Nva, Phg, Cha, Hyp). Caps H, Ac, Boc, Fmoc, Cbz, Z, Bz; ends OH, NH2, NHMe, OMe, OEt, OtBu, OBn. Cysteine bridges after the sequence: CYIQNCPLG-NH2 S-S 1-6">Peptide sequence</label>
+          <div class="row" style="flex-wrap:nowrap"><input id="pepIn" placeholder="Ac-YGGFL-NH2" style="font:13px var(--mono);min-width:0"><button class="btn ghost sm" id="pepGo">Add</button></div>
+        </div>
         </div></details>
       </div>
 
@@ -3286,7 +3291,7 @@ html {
         <div class="note">AI assistants (through MCP) read and write files only in these folders, and only drawings, pictures and their data (no hidden files, nothing in Library or AppData). Only you can change the list, here.</div>
         <div id="aiFolders" class="note" style="font-family:var(--mono);font-size:11.5px"></div>
         <div class="row"><button type="button" id="aiFolderAdd">Add a folder…</button></div></div>
-        <p class="note">Commands: list, scheme, properties, calc, nmr, inchi, addSmiles, addReaction, addText, addChart, addRadar, import, delete, clear, undo, redo, clean, export, table, setStyle, setRole, setAmount, prefixStyle, picture, set, image, selection, select, atoms, highlight, check, saved, markSaved, zoom, readOnly, smilesFromName, addName (common names everywhere, systematic names in the apps); in the Mac, Windows and Linux apps also name, and the same commands from scripts on this computer (local API, see the documentation). The documentation describes the format.</p>
+        <p class="note">Commands: list, scheme, properties, calc, nmr, inchi, addSmiles, addReaction, addText, addChart, addRadar, import, delete, clear, undo, redo, clean, export, table, setStyle, setRole, setAmount, prefixStyle, picture, set, image, selection, select, atoms, highlight, check, saved, markSaved, zoom, addPeptide, readOnly, smilesFromName, addName (common names everywhere, systematic names in the apps); in the Mac, Windows and Linux apps also name, and the same commands from scripts on this computer (local API, see the documentation). The documentation describes the format.</p>
         <p class="note" id="rdVerLine" style="margin-top:6px"></p>
         <div class="row"><button type="button" id="rdUpdBtn">Check for updates</button> <span class="note" id="rdUpdOut"></span></div>
         <div class="note">Reactio Draw asks GitHub for the newest release only when you press this button; it never looks by itself. In the app for Windows, Mac and Linux, a newer version is downloaded and installed only when you say Update.</div>
@@ -16788,6 +16793,480 @@ function kdOf(st) {
   }
   /* cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and the rule of five for the structures the atoms belong to */
   const DRUG_MEMO = new Map();
+  /* ===== pKa estimates: the ionizable groups of a structure with the typical pKa of their kind, from Dimorphite-DL's table
+     of substructures (Durrant lab, Apache-2.0, https://github.com/durrantlab/dimorphite_dl: name, SMARTS, then for each
+     site its index in the SMARTS, mean pKa and standard deviation). Read in order: a pattern claims its site atoms (and
+     their H), and the heteroatoms around them once the pattern is done, as Dimorphite-DL does. 'a': an acid (its pKa),
+     'b': a base (the pKa of its conjugate acid, pKaH). The label is Reactio Draw's short name for the group ===== */
+  const PKA_TABLE = [
+    ["Hydrazoic_acid", "HN3", "a", "[H]-[N+0:1]=[N+:2]=[N+0:3]-[H]", [[1, -1000.0, 0.0], [3, 4.65, 0.07]]],
+    ["Azide", "HN3", "a", "[N+0:1]=[N+:2]=[N+0:3]-[H]", [[2, 4.65, 0.07]]],
+    ["N_nitro_amide", "N-nitro amide NH", "a", "[NX3+0;H1;$([NX3]-[NX3](=[OX1])-[OX2]),$([NX3]-[N+](=[OX1])-[OX1-]);$([NX3]-[CX3]=[OX1]):1]-[H]", [[0, 3.92, 0.91]]],
+    ["Nitro", "", "a", "[NX3;$([NX3]-[#6,#7,#8]):1](=[O:2])-[O:3]-[H]", [[2, -1000.0, 0.0]]],
+    ["Nitroguanidine", "nitroguanidine", "b", "[N:1]-[C;$(C-[NX3]-[NX3](=[OX1])-[OX2]),$(C-[NX3]-[N+](=[OX1])-[OX1-]):2](-[N:3])=[NX2:4]-[H:5]", [[3, -0.98, 1.0]]],
+    ["Nitroimine_guanidine", "nitroimino guanidine", "b", "[N:1]-[C:2](-[N:3])=[NX2;$(N-[NX3](=[OX1])-[OX2]),$(N-[N+](=[OX1])-[OX1-]):4]", [[3, 1.56, 1.0]]],
+    ["AmidineGuanidine1", "amidine/guanidine", "b", "[N:1]-[C:2](-[N:3])=[NX2:4]-[H:5]", [[3, 12.03, 1.59]]],
+    ["Amidine_carbon_substituted", "amidine", "b", "[#6,#1:1]-[CX3:2](-[NX3+0;!$(N-[!#6;!#1]);!$(N-c);!$(N-C=[O,S]);!$(N-C#N);!$(N-S(=O)=O):3])=[NX2+0;!$(N-[!#6;!#1]);!$(N-c);!$(N-C=[O,S,N]);!$(N-C#N);!$(N-S(=O)=O):4]", [[3, 12.06, 0.65]]],
+    ["AmidineGuanidine2", "amidine/guanidine", "b", "[C:1](-[N:2])=[NX2+0;!$(N-C#N);!$(N-S(=O)=O);!$(N-[OX2]):3]", [[2, 10.04, 2.13]]],
+    ["Sulfate", "sulfate OH", "a", "[SX4:1](=[O:2])(=[O:3])([O:4]-[C,c,N,n:5])-[OX2:6]-[H]", [[5, -2.36, 1.3]]],
+    ["Sulfonate", "sulfonic acid", "a", "[SX4:1](=[O:2])(=[O:3])(-[C,c,N,n:4])-[OX2:5]-[H]", [[4, -1.82, 1.41]]],
+    ["Sulfinic_acid", "sulfinic acid", "a", "[SX3:1](=[O:2])-[O:3]-[H]", [[2, 1.79, 0.44]]],
+    ["Phenyl_carboxyl", "aryl COOH", "a", "[c,n,o:1]-[C:2](=[O:3])-[O:4]-[H]", [[3, 3.46, 1.25]]],
+    ["Carboxyl", "COOH", "a", "[C:1](=[O:2])-[O:3]-[H]", [[2, 3.46, 1.29]]],
+    ["Thioic_acid", "thioic acid", "a", "[C,c,N,n:1](=[O,S:2])-[SX2,OX2:3]-[H]", [[2, 0.68, 1.5]]],
+    ["Phenyl_Thiol", "ArSH", "a", "[c,n:1]-[SX2:2]-[H]", [[1, 4.98, 2.61]]],
+    ["Alkyl_thiol", "alkyl SH", "a", "[CX4;!$([CX4]~[!#6;!#1;!#16]);!$([CX4]-[#6]~[!#6;!#1;!#16]);!$([CX4]-[#6]=[#6]);!$([CX4]-[#6]#[#6]);!$([CX4]-c):1]-[SX2:2]-[H]", [[1, 10.81, 0.3]]],
+    ["Thiol", "SH", "a", "[C,N:1]-[SX2:2]-[H]", [[1, 9.12, 1.33]]],
+    ["Phosphate", "phosphate OH", "a", "[PX4:1](=[O:2])(-[OX2:3]-[H])(-[O+0:4])-[OX2:5]-[H]", [[2, 2.42, 1.11], [5, 6.51, 0.95]]],
+    ["Internal_phosphate_polyphos_chain", "polyphosphate OH", "a", "[$([PX4:1](=O)([OX2][PX4](=O)([OX2])(O[H]))([OX2][PX4](=O)(O[H])([OX2])))][O:2]-[H]", [[1, 0.9, 1.0]]],
+    ["Initial_phosphate_like_in_ATP_ADP", "terminal phosphate OH", "a", "[$([PX4:1]([OX2][C,c,N,n])(=O)([OX2][PX4](=O)([OX2])(O[H])))]O-[H]", [[1, 2.42, 1.11]]],
+    ["Phosphonate", "phosphonic acid OH", "a", "[PX4:1](=[O:2])(-[OX2:3]-[H])(-[C,c,N,n:4])-[OX2:5]-[H]", [[2, 1.88, 0.59], [5, 7.25, 0.85]]],
+    ["Phenol_unactivated", "phenol", "a", "[c:1]1(-[O:2]-[H])[cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])]):3][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])]):4][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])]):5][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])]):6][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])]):7]1", [[1, 10.09, 0.14]]],
+    ["Phenol", "phenol (activated)", "a", "[c,n,o:1]-[O:2]-[H]", [[1, 7.07, 3.28]]],
+    ["Peroxide1", "peracid OOH", "a", "[O:1]([$(C=O),$(C[Cl]),$(CF),$(C[Br]),$(CC#N):2])-[O:3]-[H]", [[2, 8.74, 0.76]]],
+    ["Peroxide2", "OOH", "a", "[C:1]-[O:2]-[O:3]-[H]", [[2, 11.98, 0.87]]],
+    ["O=C-C=C-OH", "vinylogous acid OH", "a", "[O:1]=[C;R:2]-[C;R:3]=[C;R:4]-[O:5]-[H]", [[4, 3.55, 0.8]]],
+    ["Vinyl_alcohol", "enol OH", "a", "[C:1]=[C:2]-[O:3]-[H]", [[2, 8.87, 1.66]]],
+    ["Alcohol", "alcohol OH", "a", "[C:1]-[O:2]-[H]", [[1, 14.78, 2.55]]],
+    ["N-hydroxyamide", "hydroxamic acid", "a", "[C:1](=[O:2])-[N:3]-[O:4]-[H]", [[3, 9.3, 1.22]]],
+    ["Ringed_imide1", "cyclic imide NH", "a", "[O,S:1]=[C;R:2]([$([#8]),$([#7]),$([#16]),$([#6][Cl]),$([#6]F),$([#6][Br]):3])-[N;R:4]([C;R:5]=[O,S:6])-[H]", [[3, 6.45, 0.56]]],
+    ["Ringed_imide2", "cyclic imide NH", "a", "[O,S:1]=[C;R:2]-[N;R:3]([C;R:4]=[O,S:5])-[H]", [[2, 8.68, 1.87]]],
+    ["Imide", "imide NH", "a", "[F,Cl,Br,S,s,P,p:1][#6:2][CX3:3](=[O,S:4])-[NX3+0:5]([CX3:6]=[O,S:7])-[H]", [[4, 2.47, 1.48]]],
+    ["Imide2", "imide NH", "a", "[O,S:1]=[CX3:2]-[NX3+0:3]([CX3:4]=[O,S:5])-[H]", [[2, 10.23, 1.12]]],
+    ["Amide_electronegative", "acyl NH (activated)", "a", "[C:1](=[O:2])-[N:3](-[Br,Cl,I,F,S,O,N,P:4])-[H]", [[2, 3.49, 2.69]]],
+    ["Carboxamide", "CONH2", "a", "[CX3;!$(C(=O)(-[#7])-[!#6;!#1]):1](=[O:2])-[NX3+0;!$(N(-C=O)-[!#6;!#1]):3]-[H]", [[2, 15.1, 1.0]]],
+    ["Amide", "amide NH", "a", "[C:1](=[O:2])-[N:3]-[H]", [[2, 12.01, 4.51]]],
+    ["Primary_sulfonamide", "SO2NH2", "a", "[SX4:1](=[O:2])(=[O:3])(-[$([CX4;!$([CX4]~[!#6;!#1;!#16])]),$(c1[cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])])][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])])][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])])][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])])][cX3;$([cH]),$(c-[CX4;!$([CX4]~[!#6;!#1])])]1):4])-[NX3+0:5]([H:6])[H:7]", [[4, 10.16, 0.55]]],
+    ["Sulfonamide", "sulfonamide NH", "a", "[SX4:1](=[O:2])(=[O:3])-[NX3+0:4]-[H]", [[3, 7.92, 1.98]]],
+    ["Adenine_N9_substituted", "adenine N1", "b", "[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-[!#6;!#1]):1]-[c:2]1:[n+0;X2:3]:[c;!$(c-[!#6;!#1;!F;!Cl;!Br;!I]):4]:[n+0;X2:5]:[c:6]2:[c:7]:1:[n+0;X2:8]:[c;!$(c-[!#6;!#1;!F;!Cl;!Br;!I]):9]:[n+0;X3;H0:10]:2", [[2, 3.99, 0.17]]],
+    ["Guanine_N9_substituted_N7", "guanine N7", "b", "[n+0;X2:1]1:[c;!$(c-[!#6;!#1;!F;!Cl;!Br;!I]):2]:[nX3+0;H0:3](-[#6:4]):[c;$(c1:[n+0;X2]:c(-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-[!#6;!#1])]):[nX3+0;H1]:c(=[OX1]):c:1):5]:[c:6]:1", [[0, 2.6, 0.71]]],
+    ["Guanine_N9_substituted_N1H", "guanine N1H", "a", "[nX3+0;H1:1]1:[c:2](-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-[!#6;!#1]):3]):[n+0;X2:4]:[c;$(c1:[nX3+0;H0](-[#6]):[c;!$(c-[!#6;!#1;!F;!Cl;!Br;!I])]:[n+0;X2]:c:1):5]:[c:6]:[c:7]:1=[OX1:8]", [[0, 9.45, 0.19]]],
+    ["Cytosine_N1_substituted", "cytosine N3", "b", "[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-[!#6;!#1]):1]-[c;R1:2]1:[n+0;X2:3]:[c;R1:4](=[OX1:5]):[nX3+0;H0;R1:6](-[#6:7]):[c;R1;$([cH]),$(c-[#6]):8]:[c;R1;$([cH]),$(c-[#6]):9]:1", [[2, 4.33, 0.14]]],
+    ["Uracil_N1_substituted", "uracil N3H", "a", "[nX3+0;H1;R1:1]1:[c;R1:2](=[OX1:3]):[nX3+0;H0;R1:4](-[#6:5]):[c;R1;$([cH]),$(c-[CX4]):6]:[c;R1;$([cH]),$(c-[CX4]):7]:[c;R1:8]:1=[OX1:9]", [[0, 9.6, 0.15]]],
+    ["Anilines_primary", "ArNH2", "b", "[c:1]-[NX3+0:2]([H:3])[H:4]", [[1, 3.9, 2.07]]],
+    ["Anilines_secondary_N_alkyl", "ArNHR", "b", "[c:1]-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-N=[O,C]);!$(N-C#N);!$(N-[CX4]-[!#6;!#1]):2]([H:3])[CX4;H2,H3:4]", [[1, 4.98, 0.11]]],
+    ["Anilines_secondary", "ArNH", "b", "[c:1]-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-N=[O,C]);!$(N-C#N):2]([H:3])[!#1:4]", [[1, 4.34, 2.18]]],
+    ["Anilines_tertiary", "ArNR2", "b", "[c:1]-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-N=[O,C]);!$(N-C#N):2]([!#1:3])[!#1:4]", [[1, 4.17, 2.01]]],
+    ["Diazine", "diazine N", "b", "[n+0;X2;$(n1:[nX2]:a:a:a:a1),$(n1:a:[nX2]:a:a:a1),$(n1:a:a:[nX2]:a:a1);!$(n1:a(!@[!#6;!#1;!F;!Cl;!Br;!I]):a:a:a:a1);!$(n1:a:a(!@[!#6;!#1;!F;!Cl;!Br;!I]):a:a:a1);!$(n1:a:a:a(!@[!#6;!#1;!F;!Cl;!Br;!I]):a:a1):1]", [[0, 1.77, 1.03]]],
+    ["Aromatic_nitrogen_unprotonated", "pyridine-type N", "b", "[n+0&H0;!$(n1nnnc1);!$(n1nncn1):1]", [[0, 4.35, 2.07]]],
+    ["Fluoroalkylamine", "fluoroalkyl amine", "b", "[CX4;$([CX4]-[CX4](F)(F)F):1]-[NX3+0;!$(N-[!$([CX4]);!#1]);!$([N;r3]):2]", [[1, 5.5, 0.67]]],
+    ["Benzylic_amine", "benzylic amine", "b", "[CX4;$([CX4]-c):1]-[NX3+0;!$(N-[!$([CX4]);!#1]);!$(N-[CX4]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]-[#6]~[!#6;!#1]);!$([N;r3]):2]", [[1, 9.4, 0.29]]],
+    ["Beta_hydroxy_amine", "β-hydroxy amine", "b", "[CX4:1]-[NX3+0;$(N-[CX4]-[CX4]-[OX2]-[H]);!$(N(-[CX4]-[CX4]-[OX2])-[CX4]-[CX4]-[OX2]);!$(N-[CX4](-[CX4]-[OX2])-[CX4]-[OX2]);!$(N-[!$([CX4]);!#1]);!$(N-[CX4]-[#6]~[!#6;!#1;!$([OX2]-[H])]);!$([N;r3]):2]", [[1, 9.62, 0.22]]],
+    ["Alkylamine_primary", "RNH2", "b", "[CX4:1]-[NX3+0;H2;!$(N-[!$([CX4]);!#1]);!$(N-[CX4]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]=[#6]);!$(N-[CX4]-[#6]#[#6]);!$(N-[CX4]-c):2]", [[1, 10.54, 0.13]]],
+    ["Alkylamine_secondary", "R2NH", "b", "[CX4:1]-[NX3+0;H1;!$(N-[!$([CX4]);!#1]);!$(N-[CX4]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]=[#6]);!$(N-[CX4]-[#6]#[#6]);!$(N-[CX4]-c);!$([N;r3]):2]", [[1, 11.02, 0.28]]],
+    ["Alkylamine_tertiary", "R3N", "b", "[CX4:1]-[NX3+0;H0;!$(N-[!$([CX4]);!#1]);!$(N-[CX4]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]-[#6]~[!#6;!#1]);!$(N-[CX4]-[#6]=[#6]);!$(N-[CX4]-[#6]#[#6]);!$(N-[CX4]-c);!$([N;r3]):2]", [[1, 10.28, 0.37]]],
+    ["Amines_primary_secondary_tertiary", "amine", "b", "[C:1]-[NX3+0;!$(N-C=[O,S,N]);!$(N-S(=O)=O);!$(N-N=[O,C]);!$(N-C#N):2]", [[1, 8.16, 2.52]]],
+    ["Phosphinic_acid", "phosphinic acid", "a", "[PX4:1](=[O:2])(-[C,c,N,n,F,Cl,Br,I:3])(-[C,c,N,n,F,Cl,Br,I:4])-[OX2:5]-[H]", [[4, 2.97, 0.69]]],
+    ["Phosphate_diester", "phosphate diester OH", "a", "[PX4:1](=[O:2])(-[OX2:3]-[C,c,N,n,F,Cl,Br,I:4])(-[O+0:5]-[C,c,N,n,F,Cl,Br,I:4])-[OX2:6]-[H]", [[6, 2.73, 2.54]]],
+    ["Phosphonate_ester", "phosphonate monoester OH", "a", "[PX4:1](=[O:2])(-[OX2:3]-[C,c,N,n,F,Cl,Br,I:4])(-[C,c,N,n,F,Cl,Br,I:5])-[OX2:6]-[H]", [[5, 2.09, 0.45]]],
+    ["Primary_hydroxyl_amine", "hydroxylamine", "b", "[C,c:1]-[O:2]-[NH2:3]", [[2, 4.04, 0.85]]],
+    ["Indole_pyrrole", "indole/pyrrole NH", "a", "[c;R:1]1[c;R:2][c;R:3][c;R:4][n;R:5]1[H]", [[4, 14.53, 4.07]]],
+    ["Azole_NH", "azole NH", "a", "[n;$(n1naaa1),$(n1anaa1);!$(n1nnnc1);!$(n1nncn1);!$(n1c(=[O,S])aaa1);!$(n1ac(=[O,S])aa1):1]-[H]", [[0, 12.23, 2.31]]],
+    ["Tetrazole_NH", "tetrazole NH", "a", "[nX3+0;H1;$(n1nnn[c;$([cH]),$(c-[#6])]1),$(n1nn[c;$([cH]),$(c-[#6])]n1):1]-[H]", [[0, 5.18, 0.45]]],
+    ["Aromatic_nitrogen_protonated", "aromatic NH", "a", "[n:1]-[H]", [[0, 7.17, 2.95]]]
+  ];
+  /* a small SMARTS reader and matcher, enough for these patterns: atoms in brackets with element symbols, #n, X, D, H,
+     R, r, charges, aromatic/aliphatic, $(…) recursion, ! & , ; and bonds - = # : ~ @ */
+  function smartsParse(str) {
+    let i = 0;
+    const atoms = [],
+      bonds = [],
+      ring = {},
+      stack = [];
+    let prev = -1,
+      bond = null;
+    const ELS = ['Cl', 'Br', 'B', 'C', 'N', 'O', 'P', 'S', 'F', 'I', 'H', 'Si', 'Se', 'As', 'Na', 'K', 'Li'];
+    const parseAtomExpr = txt => {
+      /* the precedence: ! binds first, then &, then ',', then ; */
+      let j = 0;
+      const low = () => {
+        let t = orE();
+        while (txt[j] === ';') {
+          j++;
+          t = { op: 'and', a: t, b: orE() };
+        }
+        return t;
+      };
+      const orE = () => {
+        let t = andE();
+        while (txt[j] === ',') {
+          j++;
+          t = { op: 'or', a: t, b: andE() };
+        }
+        return t;
+      };
+      const andE = () => {
+        let t = notE();
+        while (j < txt.length && txt[j] !== ',' && txt[j] !== ';' && txt[j] !== ')') {
+          if (txt[j] === '&') j++;
+          t = { op: 'and', a: t, b: notE() };
+        }
+        return t;
+      };
+      const num = () => {
+        const m = /^\d+/.exec(txt.slice(j));
+        if (!m) return null;
+        j += m[0].length;
+        return +m[0];
+      };
+      const notE = () => {
+        if (txt[j] === '!') {
+          j++;
+          return { op: 'not', a: notE() };
+        }
+        return prim();
+      };
+      const prim = () => {
+        const c = txt[j];
+        if (c === '$' && txt[j + 1] === '(') {
+          let d = 0,
+            k = j + 1;
+          for (; k < txt.length; k++) {
+            if (txt[k] === '(') d++;
+            else if (txt[k] === ')' && --d === 0) break;
+          }
+          const sub = txt.slice(j + 2, k);
+          j = k + 1;
+          return { op: 'rec', q: smartsParse(sub) };
+        }
+        if (c === '#') {
+          j++;
+          return { op: 'z', v: num() };
+        }
+        if (c === '*') return (j++, { op: 'true' });
+        if (c === 'a') return (j++, { op: 'arom', v: true });
+        if (c === 'A') return (j++, { op: 'arom', v: false });
+        if (c === 'X') {
+          j++;
+          const n = num();
+          return { op: 'X', v: n == null ? 1 : n };
+        }
+        if (c === 'D') {
+          j++;
+          const n = num();
+          return { op: 'D', v: n == null ? 1 : n };
+        }
+        if (c === 'R') {
+          j++;
+          const n = num();
+          return n == null ? { op: 'ring' } : { op: 'R', v: n };
+        }
+        if (c === 'r') {
+          j++;
+          return { op: 'r', v: num() };
+        }
+        if (c === '+' || c === '-') {
+          j++;
+          let n = num();
+          if (n == null) {
+            n = 1;
+            while (txt[j] === c) (n++, j++);
+          }
+          return { op: 'chg', v: c === '+' ? n : -n };
+        }
+        if (c === 'H' && !(j === 0 && /^H(:\d+)?$/.test(txt))) {
+          j++;
+          const n = num();
+          return { op: 'H', v: n == null ? 1 : n };
+        }
+        for (const e of ELS)
+          if (txt.startsWith(e, j)) {
+            j += e.length;
+            return { op: 'el', v: e, ar: false };
+          }
+        for (const e of ['c', 'n', 'o', 's', 'p', 'se'])
+          if (txt.startsWith(e, j)) {
+            j += e.length;
+            return { op: 'el', v: e === 'se' ? 'Se' : e.toUpperCase(), ar: true };
+          }
+        throw new Error('SMARTS: cannot read ' + txt.slice(j));
+      };
+      return low();
+    };
+    const parseBond = txt => {
+      const t = [];
+      for (const c of txt) t.push(c);
+      return t.join('');
+    };
+    while (i < str.length) {
+      const c = str[i];
+      if (c === '(') {
+        stack.push(prev);
+        i++;
+        continue;
+      }
+      if (c === ')') {
+        prev = stack.pop();
+        i++;
+        continue;
+      }
+      if ('-=#:~@!'.includes(c)) {
+        let k = i;
+        while (k < str.length && '-=#:~@!;&,'.includes(str[k])) k++;
+        bond = parseBond(str.slice(i, k));
+        i = k;
+        continue;
+      }
+      if (/\d/.test(c) || c === '%') {
+        let id;
+        if (c === '%') {
+          id = str.slice(i + 1, i + 3);
+          i += 3;
+        } else {
+          id = c;
+          i++;
+        }
+        if (ring[id]) {
+          bonds.push({ a: ring[id].at, b: prev, t: bond || ring[id].bond });
+          delete ring[id];
+        } else ring[id] = { at: prev, bond };
+        bond = null;
+        continue;
+      }
+      let expr;
+      if (c === '[') {
+        let d = 0,
+          k = i;
+        for (; k < str.length; k++) {
+          if (str[k] === '[') d++;
+          else if (str[k] === ']' && --d === 0) break;
+        }
+        let body = str.slice(i + 1, k);
+        const mm = /:(\d+)$/.exec(body);
+        if (mm) body = body.slice(0, -mm[0].length);
+        expr = /^H$/.test(body) ? { op: 'z', v: 1 } : parseAtomExpr(body);
+        i = k + 1;
+      } else {
+        const two = str.slice(i, i + 2);
+        if (two === 'Cl' || two === 'Br') {
+          expr = { op: 'el', v: two, ar: false };
+          i += 2;
+        } else if ('BCNOPSFI'.includes(c)) {
+          expr = { op: 'el', v: c, ar: false };
+          i++;
+        } else if ('cnosp'.includes(c)) {
+          expr = { op: 'el', v: c.toUpperCase(), ar: true };
+          i++;
+        } else if (c === '*') {
+          expr = { op: 'true' };
+          i++;
+        } else if (c === 'a' || c === 'A') {
+          expr = { op: 'arom', v: c === 'a' };
+          i++;
+        } else throw new Error('SMARTS: cannot read ' + str.slice(i));
+      }
+      atoms.push(expr);
+      const me = atoms.length - 1;
+      if (prev >= 0) bonds.push({ a: prev, b: me, t: bond });
+      bond = null;
+      prev = me;
+    }
+    return { atoms, bonds };
+  }
+  /* a target for matching: atoms {el, ar, chg, h (implicit+explicit H written as atoms), nb: [[j, bond]]}, rings found */
+  function smartsTarget(smi) {
+    /* read by OpenChemLib: its aromaticity (a ring drawn in Kekulé form is aromatic too), hydrogens and rings */
+    let m;
+    try {
+      const O = oclLoad();
+      m = O.Molecule.fromSmiles(smi);
+      m.ensureHelperArrays(O.Molecule.cHelperRings);
+    } catch (e) {
+      return null;
+    }
+    const n = m.getAtoms(),
+      T = [];
+    for (let k = 0; k < n; k++)
+      T.push({ el: m.getAtomLabel(k), ar: m.isAromaticAtom(k), chg: m.getAtomCharge(k), h: m.getAllHydrogens(k), nb: [], rc: 0, rmin: m.isRingAtom(k) ? m.getAtomRingSize(k) : 0 });
+    const bonds = [];
+    for (let i = 0; i < m.getBonds(); i++) bonds.push([m.getBondAtom(0, i), m.getBondAtom(1, i), { o: m.getBondOrder(i), ar: m.isAromaticBond(i), ring: m.isRingBond(i) }]);
+    try {
+      const R = m.getRingSet();
+      for (let r = 0; r < R.getSize(); r++) for (const k of R.getRingAtoms(r)) T[k].rc++;
+    } catch (e) {
+      T.forEach(a => (a.rc = a.rmin ? 1 : 0));
+    }
+    /* neutral forms, as Dimorphite-DL reads them: O−/S− take an H (not beside a cation), R–NH+ gives one up */
+    const nbOf = k => bonds.filter(x => x[0] === k || x[1] === k).map(x => (x[0] === k ? x[1] : x[0]));
+    T.forEach((a, k) => {
+      if ((a.el === 'O' || a.el === 'S') && a.chg === -1 && !nbOf(k).some(o => T[o].chg > 0)) {
+        a.chg = 0;
+        a.h++;
+      } else if (a.el === 'N' && a.chg === 1 && a.h > 0 && !nbOf(k).some(o => T[o].chg < 0)) {
+        a.chg = 0;
+        a.h--;
+      }
+    });
+    for (const [x, y, bd] of bonds) {
+      T[x].nb.push([y, bd]);
+      T[y].nb.push([x, bd]);
+    }
+    /* hydrogens as atoms (the patterns name them) */
+    const heavy = T.length;
+    for (let k = 0; k < heavy; k++)
+      for (let x = 0; x < T[k].h; x++) {
+        const hi = T.length;
+        T.push({ el: 'H', ar: false, chg: 0, h: 0, nb: [[k, { o: 1, ar: false, ring: false }]], rc: 0, rmin: 0 });
+        T[k].nb.push([hi, { o: 1, ar: false, ring: false }]);
+      }
+    T.heavy = heavy;
+    return T;
+  }
+  function smartsAtomOK(e, T, k, memo) {
+    const a = T[k];
+    switch (e.op) {
+      case 'true':
+        return true;
+      case 'and':
+        return smartsAtomOK(e.a, T, k, memo) && smartsAtomOK(e.b, T, k, memo);
+      case 'or':
+        return smartsAtomOK(e.a, T, k, memo) || smartsAtomOK(e.b, T, k, memo);
+      case 'not':
+        return !smartsAtomOK(e.a, T, k, memo);
+      case 'el':
+        return a.el === e.v && (e.v === 'H' || a.ar === e.ar);
+      case 'z':
+        return ZOF(a.el) === e.v;
+      case 'arom':
+        return a.ar === e.v;
+      case 'X':
+        return a.nb.length + (a.el === 'H' ? 0 : 0) === e.v;
+      case 'D':
+        return a.nb.length === e.v;
+      case 'H':
+        return a.nb.filter(([j]) => T[j].el === 'H').length === e.v;
+      case 'ring':
+        return a.rc > 0;
+      case 'R':
+        return a.rc === e.v;
+      case 'r':
+        return a.rmin === e.v;
+      case 'chg':
+        return a.chg === e.v;
+      case 'rec': {
+        let m = memo.get(e);
+        if (!m) memo.set(e, (m = new Map()));
+        if (!m.has(k)) m.set(k, smartsMatches(e.q, T, k, memo, true).length > 0);
+        return m.get(k);
+      }
+    }
+    return false;
+  }
+  function smartsBondOK(t, b) {
+    if (t == null) return b.o === 1 || b.ar;
+    /* a bond expression: alternatives by , and ; read as "all of the ;-parts, each one of its ,-alternatives" */
+    const one = s => {
+      if (s.startsWith('!')) return !one(s.slice(1));
+      if (s === '-') return b.o === 1 && !b.ar;
+      if (s === '=') return b.o === 2 && !b.ar;
+      if (s === '#') return b.o === 3;
+      if (s === ':') return b.ar;
+      if (s === '~') return true;
+      if (s === '@') return b.ring;
+      return false;
+    };
+    const parts = t.split(';').map(p => p.split(','));
+    return parts.every(alts =>
+      alts.some(al => {
+        /* "!@", "-@", "-!@": each piece in turn */
+        const bits = al.match(/!?[-=#:~@]/g) || [];
+        return bits.every(one);
+      })
+    );
+  }
+  /* every match (query atom → target atom), or only those with the first atom on `at` */
+  function smartsMatches(Q, T, at, memo, first) {
+    memo = memo || new Map();
+    const n = Q.atoms.length,
+      qn = Array.from({ length: n }, () => []);
+    Q.bonds.forEach(b => {
+      qn[b.a].push([b.b, b.t]);
+      qn[b.b].push([b.a, b.t]);
+    });
+    const out = [],
+      map = Array(n).fill(-1),
+      used = new Set();
+    const go = qi => {
+      if (qi === n) {
+        out.push(map.slice());
+        return first;
+      }
+      /* the query atoms in written order: each but the first bonded to an earlier one */
+      const back = qn[qi].filter(([o]) => o < qi);
+      let cands;
+      if (back.length) {
+        const [o, t] = back[0];
+        cands = T[map[o]].nb.filter(([j, b]) => smartsBondOK(t, b)).map(([j]) => j);
+      } else cands = qi === 0 && at != null ? [at] : T.map((x, k) => k);
+      for (const k of cands) {
+        if (used.has(k) || !smartsAtomOK(Q.atoms[qi], T, k, memo)) continue;
+        if (
+          !back.every(([o, t]) => {
+            const e = T[map[o]].nb.find(([j]) => j === k);
+            return e && smartsBondOK(t, e[1]);
+          })
+        )
+          continue;
+        map[qi] = k;
+        used.add(k);
+        if (go(qi + 1)) return true;
+        used.delete(k);
+        map[qi] = -1;
+      }
+      return false;
+    };
+    go(0);
+    return out;
+  }
+  let PKA_Q = null;
+  /* the groups of a SMILES: [{name, label, kind 'a'|'b', pKa, sd, atom (index in the SMILES)}] */
+  function pkaSites(smi) {
+    if (!PKA_Q) PKA_Q = PKA_TABLE.map(r => ({ r, q: smartsParse(r[3]) }));
+    const out = [];
+    for (const part of String(smi).split('.')) {
+      const T = smartsTarget(part);
+      if (!T) continue;
+      const taken = new Set(),
+        memo = new Map();
+      for (const { r, q } of PKA_Q) {
+        const ms = smartsMatches(q, T, null, memo, false),
+          usedM = [];
+        for (const m of ms) {
+          if (m.some(k => taken.has(k))) continue;
+          const sites = r[4].map(s => m[s[0]]);
+          sites.forEach(k => {
+            taken.add(k);
+            T[k].nb.forEach(([j]) => T[j].el === 'H' && taken.add(j));
+          });
+          usedM.push(m);
+          r[4].forEach((s, i) => {
+            /* an aromatic N already carrying three bonds (N-methylimidazole's N1) has no lone pair to take a proton */
+            const k = sites[i],
+              threeN = r[2] === 'b' && T[k].el === 'N' && T[k].ar && T[k].nb.filter(([j]) => T[j].el !== 'H').length >= 3;
+            if (s[1] > -100 && !threeN) out.push({ name: r[0], label: r[1], kind: r[2], pKa: s[1], sd: s[2], atom: k });
+          });
+        }
+        /* the heteroatoms around the sites are the group's own: later patterns leave them */
+        for (const m of usedM) {
+          const sites = new Set(r[4].map(s => m[s[0]]));
+          m.forEach(k => !sites.has(k) && T[k].el !== 'C' && taken.add(k));
+        }
+      }
+    }
+    return out;
+  }
+  /* for the panel: the groups worth naming (well-defined ones, pKa −2…14), the same group counted once with ×n */
+  function pkaSummary(smi) {
+    const S = pkaSites(smi).filter(x => x.pKa >= -2 && x.pKa <= 14 && x.sd <= 3.5 && !/^(Amide|Carboxamide|Alcohol)$/.test(x.name));
+    const groups = new Map();
+    for (const x of S) {
+      const k = x.kind + '|' + x.label + '|' + x.pKa;
+      const g = groups.get(k);
+      if (g) g.n++;
+      else groups.set(k, { ...x, n: 1 });
+    }
+    return [...groups.values()].sort((a, b) => a.pKa - b.pKa);
+  }
   function drugProps(atoms, mw) {
     /* drug-likeness is for one compound (or a salt), not for a whole sheet of structures */
     if (!atoms || !atoms.length || atoms.length > 400) return null;
@@ -16823,6 +17302,12 @@ function kdOf(st) {
     } catch (e) {
       r = null;
     }
+    if (r)
+      try {
+        r.pka = pkaSummary(sm.replace(/\s+\|[^|]*\|\s*$/, ''));
+      } catch (e) {
+        r.pka = null;
+      }
     if (DRUG_MEMO.size > 200) DRUG_MEMO.clear();
     DRUG_MEMO.set(sm, r);
     return r;
@@ -17049,13 +17534,27 @@ function kdOf(st) {
           $('hbda').textContent = P ? P.donors + ' / ' + P.acceptors : '—';
           $('rotb').textContent = P ? String(P.rot) : '—';
           $('ro5').textContent = P ? (P.viol ? P.viol + ' violation' + (P.viol > 1 ? 's' : '') : 'passes') : '—';
+          /* the ionizable groups: acids with their pKa, bases with the pKa of their conjugate acid and pKb = 14 − pKaH */
+          $('pka').innerHTML =
+            P && P.pka
+              ? P.pka.length
+                ? P.pka
+                    .map(
+                      x =>
+                        `<div>${esc(x.label)}${x.n > 1 ? ' ×' + x.n : ''}: ${x.kind === 'a' ? 'pKa' : 'pKaH'} ${fmt(x.pKa, 1)} ± ${fmt(x.sd, 1)}${
+                          x.kind === 'b' ? ` <span style="opacity:.7">(pKb ${fmt(14 - x.pKa, 1)})</span>` : ''
+                        }</div>`
+                    )
+                    .join('')
+                : 'none'
+              : '—';
         };
         /* a big structure (OpenChemLib reads 400 atoms in a second): worked out just after the change is drawn, so an edit
            or a Clean Up is not held up by the panel; the same numbers, a moment later */
         if (target.length > 120) {
           const tok = (updateInfo.drugTok = (updateInfo.drugTok || 0) + 1),
             tg = target.slice();
-          ['clogp', 'tpsa', 'hbda', 'rotb', 'ro5'].forEach(k => ($(k).textContent = '…'));
+          ['clogp', 'tpsa', 'hbda', 'rotb', 'ro5', 'pka'].forEach(k => ($(k).textContent = '…'));
           setTimeout(() => {
             if (tok === updateInfo.drugTok) show(drugProps(tg, mw));
           }, 60);
@@ -22207,7 +22706,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       scrubAt(p);
       return;
     }
-    if (!drag.moved && dist(p, drag.p0) > (drag.mode === 'rot' || drag.mode === 'scale' ? 2 : 6)) {
+    if (!drag.moved && dist(p, drag.p0) > (drag.mode === 'rot' || drag.mode === 'scale' || drag.mode === 'ahandle' ? 2 : 6)) {
       drag.moved = true;
       if (drag.mode === 'piece') {
         const h = drag.h,
@@ -22232,7 +22731,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         drag.mode === 'chgdrag' ||
         drag.mode === 'decdrag' ||
         drag.mode === 'scale' ||
-        drag.mode === 'twrap'
+        drag.mode === 'twrap' ||
+        /* an arrow's handle (an end, its bend, its head): Undo takes the drag back, not the step before it */
+        drag.mode === 'ahandle'
       )
         snap();
       if (drag.mode === 'move') tblUnflow();
@@ -25608,6 +26109,399 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return true;
   }
+  /* ===== peptides from a sequence: one-letter (YGGFL, lower case = D: cyclo(RGDfK)) or three-letter (Ac-Ala-D-Phe-Gly-NH2),
+     N-terminal caps (H, Ac, Boc, Fmoc, Cbz/Z, Bz) and C-terminal ends (OH, NH2, OMe, OEt, OtBu, OBn), Cys–Cys bridges
+     ("S-S 1-6" after the sequence), cyclo(…) head to tail. The SMILES is written residue after residue; the structure is
+     then laid as peptides are drawn: the backbone a straight zigzag, the side chains up and down in turn, the C=O
+     opposite them, the chain bent at each Pro so its ring has room; rings (cyclo, S–S) and chains over 25 residues keep the
+     general layout ===== */
+  const PEP_AA = {
+    A: ['Ala', 'N[C@@H](C)C(=O)'],
+    R: ['Arg', 'N[C@@H](CCCNC(=N)N)C(=O)'],
+    N: ['Asn', 'N[C@@H](CC(N)=O)C(=O)'],
+    D: ['Asp', 'N[C@@H](CC(=O)O)C(=O)'],
+    C: ['Cys', 'N[C@@H](CS§)C(=O)'],
+    E: ['Glu', 'N[C@@H](CCC(=O)O)C(=O)'],
+    Q: ['Gln', 'N[C@@H](CCC(N)=O)C(=O)'],
+    G: ['Gly', 'NCC(=O)'],
+    H: ['His', 'N[C@@H](Cc1c[nH]cn1)C(=O)'],
+    I: ['Ile', 'N[C@@H]([C@@H](C)CC)C(=O)'],
+    L: ['Leu', 'N[C@@H](CC(C)C)C(=O)'],
+    K: ['Lys', 'N[C@@H](CCCCN)C(=O)'],
+    M: ['Met', 'N[C@@H](CCSC)C(=O)'],
+    F: ['Phe', 'N[C@@H](Cc1ccccc1)C(=O)'],
+    P: ['Pro', 'N1CCC[C@H]1C(=O)'],
+    S: ['Ser', 'N[C@@H](CO)C(=O)'],
+    T: ['Thr', 'N[C@@H]([C@H](O)C)C(=O)'],
+    W: ['Trp', 'N[C@@H](Cc1c[nH]c2ccccc12)C(=O)'],
+    Y: ['Tyr', 'N[C@@H](Cc1ccc(O)cc1)C(=O)'],
+    V: ['Val', 'N[C@@H](C(C)C)C(=O)']
+  };
+  /* three-letter codes beyond the twenty */
+  const PEP_MORE = {
+    aib: 'NC(C)(C)C(=O)',
+    sar: 'N(C)CC(=O)',
+    nle: 'N[C@@H](CCCC)C(=O)',
+    orn: 'N[C@@H](CCCN)C(=O)',
+    abu: 'N[C@@H](CC)C(=O)',
+    nva: 'N[C@@H](CCC)C(=O)',
+    phg: 'N[C@@H](c1ccccc1)C(=O)',
+    cha: 'N[C@@H](CC1CCCCC1)C(=O)',
+    hyp: 'N1C[C@H](O)C[C@H]1C(=O)'
+  };
+  const PEP_NCAP = { h: '', ac: 'CC(=O)', boc: 'CC(C)(C)OC(=O)', fmoc: 'O=C(OCC1c2ccccc2-c2ccccc12)', cbz: 'O=C(OCc1ccccc1)', z: 'O=C(OCc1ccccc1)', bz: 'O=C(c1ccccc1)', me: 'C' };
+  const PEP_CEND = { oh: 'O', nh2: 'N', ome: 'OC', oet: 'OCC', otbu: 'OC(C)(C)C', obn: 'OCc1ccccc1', nhme: 'NC' };
+  const pepMirror = t => t.replace(/\[C@@H\]|\[C@H\]/g, m => (m === '[C@@H]' ? '[C@H]' : '[C@@H]'));
+  const PEP3 = (() => {
+    const m = {};
+    for (const [k, v] of Object.entries(PEP_AA)) m[v[0].toLowerCase()] = v[1];
+    return Object.assign(m, PEP_MORE);
+  })();
+  /* the sequence read: {res: [{tpl, name}], ncap, cend, cyclo, ss: [[i, j]]} or {err} */
+  function pepParse(text) {
+    let t = String(text || '').trim();
+    if (!t) return { err: 'Type a sequence: YGGFL, Ac-Ala-Phe-NH2 or cyclo(RGDfK)' };
+    const ss = [];
+    /* Cys–Cys bridges written after the sequence: "S-S 1-6", "disulfide 1-6, 2-9", "(Cys1-Cys6)" */
+    t = t.replace(/[;,]?\s*(?:S\s*[-–—]\s*S|disulfides?|disulphides?|bridges?)\s*[:=]?\s*((?:\(?\s*(?:Cys)?\d+\s*[-–—]\s*(?:Cys)?\d+\s*\)?\s*[,;]?\s*)+)$/i, (m, pairs) => {
+      for (const q of pairs.matchAll(/(\d+)\s*[-–—]\s*(?:Cys)?(\d+)/gi)) ss.push([+q[1], +q[2]]);
+      return '';
+    });
+    t = t.replace(/\s*\(\s*Cys\s*(\d+)\s*[-–—]\s*Cys\s*(\d+)\s*\)\s*$/i, (m, a, b) => (ss.push([+a, +b]), ''));
+    let cyclo = false;
+    const cy = /^cyclo\s*[([]\s*([\s\S]*?)\s*[)\]]$/i.exec(t);
+    if (cy) {
+      cyclo = true;
+      t = cy[1];
+    }
+    const parts = t.split(/\s*[-–—]\s*/).filter(x => x !== ''),
+      res = [];
+    let ncap = '',
+      cend = 'O',
+      dNext = false;
+    for (let i = 0; i < parts.length; i++) {
+      const w = parts[i].replace(/\s+/g, ''),
+        lw = w.toLowerCase();
+      if (!w) continue;
+      /* a cap only before more: a sequence of one letter (H, h) is that residue */
+      if (i === 0 && parts.length > 1 && lw in PEP_NCAP) {
+        ncap = PEP_NCAP[lw];
+        continue;
+      }
+      if (i === parts.length - 1 && i > 0 && lw in PEP_CEND && !(lw in PEP3)) {
+        cend = PEP_CEND[lw];
+        continue;
+      }
+      if ((w === 'D' || w === 'L' || w === 'd' || w === 'l') && i < parts.length - 1) {
+        dNext = w.toUpperCase() === 'D';
+        continue;
+      }
+      /* a three-letter code (Ala, Phe, Aib…): capital and small letters; written all in capitals it is one-letter code */
+      if (lw in PEP3 && !(w === w.toUpperCase() && w.length === 3 && [...w].every(c => PEP_AA[c]))) {
+        res.push({ tpl: dNext ? pepMirror(PEP3[lw]) : PEP3[lw], name: (dNext ? 'D-' : '') + w });
+        dNext = false;
+        continue;
+      }
+      if (/^[A-Za-z]+$/.test(w) && [...w].every(c => PEP_AA[c.toUpperCase()])) {
+        for (const c of w) {
+          const A = PEP_AA[c.toUpperCase()],
+            isD = (c !== c.toUpperCase() && c !== 'g') || dNext;
+          res.push({ tpl: isD ? pepMirror(A[1]) : A[1], name: (isD && c.toUpperCase() !== 'G' ? 'D-' : '') + A[0] });
+          dNext = false;
+        }
+        continue;
+      }
+      return { err: 'Unknown residue “' + w + '” (one-letter codes ACDEFGHIKLMNPQRSTVWY, lower case for D; or Ala, Phe, Aib, Sar, Nle, Orn…)' };
+    }
+    if (!res.length) return { err: 'No residues in the sequence' };
+    if (cyclo && (ncap || cend !== 'O')) return { err: 'A head-to-tail cyclic peptide has no end groups' };
+    for (const [a, b] of ss) {
+      const ok = k => res[k - 1] && /S§/.test(res[k - 1].tpl);
+      if (!ok(a) || !ok(b) || a === b) return { err: 'S–S ' + a + '–' + b + ': both must be cysteines (residues counted from 1)' };
+    }
+    return { res, ncap, cend: cyclo ? '' : cend, cyclo, ss };
+  }
+  /* the SMILES, and for each residue where its atoms start in it */
+  function pepSmiles(P) {
+    const cnt = smi => {
+      const g = parseSmiles(smi.replace(/§/g, '').replace(/%\d\d/g, ''));
+      return g ? g.nodes.length : 0;
+    };
+    const ssDig = new Map();
+    P.ss.forEach(([a, b], i) => {
+      const d = '%' + (11 + i);
+      ssDig.set(a, (ssDig.get(a) || '') + d);
+      ssDig.set(b, (ssDig.get(b) || '') + d);
+    });
+    let smi = P.ncap,
+      at = P.ncap ? cnt(P.ncap) : 0;
+    const starts = [];
+    P.res.forEach((r, i) => {
+      let t = r.tpl.replace('§', ssDig.get(i + 1) || '');
+      if (P.cyclo && i === 0) t = t.replace(/^N/, 'N%99');
+      if (P.cyclo && i === P.res.length - 1) t = t + '%99';
+      starts.push({ at, n: cnt(r.tpl), tpl: r.tpl });
+      smi += t;
+      at += cnt(r.tpl);
+    });
+    smi += P.cend || '';
+    return { smi, starts, ncapN: P.ncap ? cnt(P.ncap) : 0, total: at + (P.cend ? cnt(P.cend) : 0) };
+  }
+  /* the backbone as a straight zigzag; m: the atoms in SMILES order */
+  function pepLayout(P, S, m) {
+    const nb = new Map(m.map(a => [a.id, []]));
+    for (const b of mol.bonds) if (nb.has(b.a) && nb.has(b.b)) (nb.get(b.a).push(b.b), nb.get(b.b).push(b.a));
+    const byId = new Map(m.map(a => [a.id, a])),
+      orig = new Map(m.map(a => [a.id, { x: a.x, y: a.y }])),
+      R = S.starts.length,
+      perRow = R,
+      dx = L * Math.cos(Math.PI / 6),
+      dy = L / 2;
+    /* the backbone: N, Cα, C′ of every residue, the carbonyl O */
+    const bb = [],
+      roles = S.starts.map(st => {
+        const n = st.n,
+          ia = st.at;
+        /* Cα: the atom bonded to C′ (the second-last of the residue) other than its O */
+        const C = m[ia + n - 2],
+          O = m[ia + n - 1],
+          N = m[ia],
+          CA = byId.get(nb.get(C.id).find(id => id !== O.id && byId.get(id) && m.indexOf(byId.get(id)) >= ia && m.indexOf(byId.get(id)) < ia + n));
+        return { N, CA, C, O, own: m.slice(ia, ia + n) };
+      });
+    if (roles.some(r => !r.CA)) return false;
+    roles.forEach(r => bb.push(r.N, r.CA, r.C));
+    const fixed = new Set();
+    const place = (a, x, y) => {
+      a.x = x;
+      a.y = y;
+      fixed.add(a.id);
+    };
+    /* rows: each row's height comes from its side groups, so rows are spaced after placing */
+    const k3 = perRow * 3,
+      rows = Math.ceil(bb.length / k3),
+      out = new Map(); /* backbone atom id → outward unit vector */
+    const x0 = m[0].x,
+      y0 = m[0].y;
+    for (let k = 0; k < bb.length; k++) {
+      const r = Math.floor(k / k3),
+        kl = k % k3,
+        dir = r % 2 ? -1 : 1,
+        up = kl % 2 === 1,
+        x = r % 2 ? x0 + (k3 - 1 - kl) * dx : x0 + kl * dx;
+      place(bb[k], x, y0 + (up ? -dy : 0));
+      out.set(bb[k].id, { x: 0, y: up ? -1 : 1, row: r, dir });
+    }
+    /* a group hanging on an atom: moved whole from where the first layout had it, root along u from its anchor, turned
+       or mirrored as it crowds least */
+    const groupOf = (root, stop) => {
+      const g = [root],
+        seen = new Set([root.id, ...stop]);
+      for (let i = 0; i < g.length; i++)
+        for (const id of nb.get(g[i].id)) if (!seen.has(id) && byId.has(id) && !fixed.has(id)) (seen.add(id), g.push(byId.get(id)));
+      return g;
+    };
+    const crowd = (pts, skip) => {
+      let c = 0;
+      for (const [x, y] of pts) {
+        for (const a of m) {
+          if (!fixed.has(a.id) || skip.has(a.id)) continue;
+          const d = Math.hypot(a.x - x, a.y - y);
+          if (d < L * 1.3) c += (L * 1.3 - d) ** 2;
+        }
+        /* the H written by an amide N, out on its free side */
+        for (const r of roles) {
+          if (skip.has(r.N.id) || !out.has(r.N.id) || nb.get(r.N.id).length > 2) continue;
+          const o = out.get(r.N.id),
+            d = Math.hypot(r.N.x + o.x * L * 0.6 - x, r.N.y + o.y * L * 0.6 - y);
+          if (d < L) c += (L - d) ** 2;
+        }
+      }
+      return c;
+    };
+    const hang = (A, root, u, stop) => {
+      const G = groupOf(root, stop),
+        oA = orig.get(A.id),
+        oR = orig.get(root.id),
+        a0 = Math.atan2(oR.y - oA.y, oR.x - oA.x),
+        a1 = Math.atan2(u.y, u.x);
+      let best = null;
+      /* mirrored or not, and tipped up to 20° off the outward line when that clears a neighbour */
+      for (const mir of [1, -1])
+        for (const tip of [0, 10, -10, 20, -20]) {
+          const a2 = a1 + (tip * Math.PI) / 180;
+          const pts = G.map(g => {
+            const o = orig.get(g.id);
+            let vx = o.x - oA.x,
+              vy = o.y - oA.y;
+            /* turn to the axis, mirror across it if asked, turn onto u */
+            const c0 = Math.cos(-a0),
+              s0 = Math.sin(-a0);
+            let px = vx * c0 - vy * s0,
+              py = (vx * s0 + vy * c0) * mir;
+            const c1 = Math.cos(a2),
+              s1 = Math.sin(a2);
+            return [A.x + px * c1 - py * s1, A.y + px * s1 + py * c1];
+          });
+          /* outward: the group's middle along u */
+          const mid = pts.reduce((t, p) => t + (p[0] - A.x) * u.x + (p[1] - A.y) * u.y, 0) / pts.length,
+            sc = crowd(pts, new Set([A.id])) - mid * 0.02 + Math.abs(tip) * L * 0.4;
+          if (!best || sc < best.sc) best = { sc, pts };
+        }
+      G.forEach((g, i) => place(g, best.pts[i][0], best.pts[i][1]));
+    };
+    /* Pro and other rings through N: the ring moved with N and Cα as they were, on the side that crowds least */
+    const hang2 = (N, CA, G, want) => {
+      const oN = orig.get(N.id),
+        oC = orig.get(CA.id),
+        ox = oC.x - oN.x,
+        oy = oC.y - oN.y,
+        nx = CA.x - N.x,
+        ny = CA.y - N.y,
+        ol = Math.hypot(ox, oy) || 1,
+        a0 = Math.atan2(oy, ox),
+        a1 = Math.atan2(ny, nx),
+        k = Math.hypot(nx, ny) / ol;
+      let best = null;
+      for (const mir of [1, -1]) {
+        const pts = G.map(g => {
+          const o = orig.get(g.id);
+          const vx = o.x - oN.x,
+            vy = o.y - oN.y,
+            px = (vx * Math.cos(-a0) - vy * Math.sin(-a0)) * k,
+            py = (vx * Math.sin(-a0) + vy * Math.cos(-a0)) * mir * k;
+          return [N.x + px * Math.cos(a1) - py * Math.sin(a1), N.y + px * Math.sin(a1) + py * Math.cos(a1)];
+        });
+        const side = want ? pts.reduce((t, p) => t + (p[0] - N.x) * want.x + (p[1] - N.y) * want.y, 0) / pts.length : 0,
+          sc = want ? -side : crowd(pts, new Set([N.id, CA.id]));
+        if (!best || sc < best.sc) best = { sc, pts };
+      }
+      G.forEach((g, i) => place(g, best.pts[i][0], best.pts[i][1]));
+    };
+    /* the carbonyl O straight out from C′ */
+    for (const r of roles) {
+      const u = out.get(r.C.id);
+      place(r.O, r.C.x + u.x * L, r.C.y + u.y * L);
+    }
+    const sideOf2 = r => r.own.filter(a => a !== r.N && a !== r.CA && a !== r.C && a !== r.O && nb.get(a.id).includes(r.CA.id) && !nb.get(a.id).includes(r.N.id));
+    const groupOf2 = (root, stopId) => {
+      const g = [root],
+        seen = new Set([root.id, stopId]);
+      for (let i = 0; i < g.length; i++) for (const id of nb.get(g[i].id)) if (!seen.has(id) && byId.has(id)) (seen.add(id), g.push(byId.get(id)));
+      return g;
+    };
+    /* rings through N and Cα first (Pro, Hyp): on N's free side, where the ring bond takes N's outward place */
+    const sideOf = r => {
+      const bbIds = new Set([r.N.id, r.CA.id, r.C.id, r.O.id]);
+      return r.own.filter(a => !bbIds.has(a.id) && !fixed.has(a.id));
+    };
+    const proN = [];
+    for (const r of roles) {
+      const ring = sideOf(r).find(a => nb.get(a.id).includes(r.N.id) && groupOf(a, [r.N.id]).some(g => nb.get(g.id).includes(r.CA.id)));
+      if (ring) {
+        /* the ring on the inner side of N (toward the residue before); N's outward place goes to the bond before it */
+        const o = out.get(r.N.id);
+        hang2(r.N, r.CA, groupOf(ring, [r.N.id, r.CA.id]), { x: -o.x, y: -o.y });
+        proN.push(r);
+      }
+    }
+    /* the ends: the N-terminal cap and the C-terminal group go on along the zigzag */
+    const along = k => {
+      const o = out.get(bb[k].id),
+        sign = k === 0 ? -1 : 1;
+      return { x: sign * o.dir * dx, y: o.y < 0 ? dy : -dy };
+    };
+    const unit = v => {
+      const l = Math.hypot(v.x, v.y) || 1;
+      return { x: v.x / l, y: v.y / l };
+    };
+    if (S.ncapN) {
+      const N = roles[0].N,
+        root = byId.get(nb.get(N.id).find(id => m.indexOf(byId.get(id)) < S.ncapN));
+      if (root) hang(N, root, unit(along(0)), [N.id]);
+    }
+    const last = roles[roles.length - 1].C,
+      tail = nb.get(last.id).map(id => byId.get(id)).find(a => a && !fixed.has(a.id));
+    if (tail) hang(last, tail, unit(along(bb.length - 1)), [last.id]);
+    /* side groups: out from Cα; two on one Cα (Aib) spread either side of the outward line; an N-alkyl (Sar) out from N */
+    for (const r of roles) {
+      const side = sideOf(r);
+      if (!side.length) continue;
+      const onCA = side.filter(a => nb.get(a.id).includes(r.CA.id)),
+        onN = side.filter(a => nb.get(a.id).includes(r.N.id)),
+        u = out.get(r.CA.id);
+      if (onCA.length === 1) hang(r.CA, onCA[0], u, [r.CA.id]);
+      else
+        onCA.forEach((root, i) => {
+          const t = ((i ? -1 : 1) * 35 * Math.PI) / 180;
+          hang(r.CA, root, { x: u.x * Math.cos(t) - u.y * Math.sin(t), y: u.x * Math.sin(t) + u.y * Math.cos(t) }, [r.CA.id]);
+        });
+      for (const root of onN) if (!fixed.has(root.id)) hang(r.N, root, out.get(r.N.id), [r.N.id]);
+      for (const a of side) if (!fixed.has(a.id)) hang(r.CA, a, u, [r.CA.id]);
+    }
+    /* before a Pro: everything earlier in its row (and the N-terminal cap) mirrored across the line through N that halves
+       the angle between the bond before N and N's outward line, so that bond takes N's free place beside the ring */
+    for (const r of proN) {
+      const N = r.N,
+        i = roles.indexOf(r),
+        row = Math.floor((i * 3) / k3),
+        prev = nb.get(N.id).map(id => byId.get(id)).find(a => a && a !== r.CA && !r.own.includes(a));
+      if (!prev) continue;
+      const chunk = new Set();
+      roles.forEach((q, j) => {
+        if (j < i && Math.floor((j * 3) / k3) === row) q.own.forEach(a => chunk.add(a));
+      });
+      if (row === 0) m.slice(0, S.ncapN).forEach(a => chunk.add(a));
+      if (!chunk.has(prev)) continue;
+      const o = out.get(N.id),
+        v = { x: prev.x - N.x, y: prev.y - N.y },
+        lv = Math.hypot(v.x, v.y) || 1,
+        bx = v.x / lv + o.x,
+        by = v.y / lv + o.y,
+        lb = Math.hypot(bx, by) || 1,
+        ax = bx / lb,
+        ay = by / lb;
+      for (const a of chunk) {
+        const px = a.x - N.x,
+          py = a.y - N.y,
+          d = px * ax + py * ay;
+        a.x = N.x + 2 * d * ax - px;
+        a.y = N.y + 2 * d * ay - py;
+      }
+    }
+    /* once all is placed: each side group laid again among all the others (the bends at Pro moved its neighbours) */
+    for (const r of roles) {
+      const onCA = sideOf2(r);
+      if (onCA.length !== 1) continue;
+      const root = onCA[0],
+        G = groupOf2(root, r.CA.id);
+      if (G.some(g => g === r.N || g === r.C)) continue;
+      G.forEach(g => fixed.delete(g.id));
+      const n1 = { x: r.N.x - r.CA.x, y: r.N.y - r.CA.y },
+        n2 = { x: r.C.x - r.CA.x, y: r.C.y - r.CA.y },
+        l1 = Math.hypot(n1.x, n1.y) || 1,
+        l2 = Math.hypot(n2.x, n2.y) || 1,
+        ux = -(n1.x / l1 + n2.x / l2),
+        uy = -(n1.y / l1 + n2.y / l2),
+        lu = Math.hypot(ux, uy) || 1;
+      hang(r.CA, root, { x: ux / lu, y: uy / lu }, [r.CA.id]);
+    }
+    return true;
+  }
+  const PEP_STRAIGHT_MAX = 25;
+  function addPeptide(text, at) {
+    const P = pepParse(text);
+    if (P.err) throw new Error(P.err);
+    const S = pepSmiles(P),
+      g = parseSmiles(S.smi);
+    if (!g || g.nodes.length !== S.total) throw new Error('Could not build that peptide');
+    snap();
+    const m = placeGraph(g, at || null);
+    /* a ring (cyclo, S–S) keeps the ring layout; a very long chain the rows of the general layout */
+    if (!P.cyclo && !P.ss.length && P.res.length <= PEP_STRAIGHT_MAX) pepLayout(P, S, m);
+    applySmilesStereo(S.smi, m);
+    return { atoms: m, smiles: S.smi, residues: P.res.length };
+  }
   function pasteSmilesNow(text) {
     /* a SMILES with a piece repeated ten times or more: asked first whether to draw one repeat unit or the whole chain */
     {
@@ -28932,6 +29826,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       btnBusy($('nameGo'), false);
     }
   };
+  $('pepGo').onclick = () => {
+    const t = $('pepIn').value.trim();
+    if (!t) return;
+    try {
+      const inView = lastPtr && lastPtr.x >= view.x && lastPtr.x <= view.x + view.w && lastPtr.y >= view.y && lastPtr.y <= view.y + view.h;
+      const r = addPeptide(t, inView ? lastPtr : null);
+      clearSel();
+      r.atoms.forEach(a => sel.add(a.id));
+      setTool('select', true);
+      commit();
+      toast('Added a peptide of ' + r.residues + ' residue' + (r.residues === 1 ? '' : 's') + ': ' + formulaText(countsOf(r.atoms)));
+      $('pepIn').value = '';
+    } catch (e) {
+      toast((e && e.message) || String(e), true);
+    }
+  };
+  $('pepIn').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $('pepGo').click();
+    }
+  });
   $('nameIn').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
       e.preventDefault();
@@ -34339,6 +35255,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (r.shaft === 'eq') at += ' ArrowShaftSpacing="4"';
       if (r.shaft === 'retro') at += ' ArrowShaftSpacing="4" ArrowheadCenterSize="0"';
       if (r.shaft === 'dashed') at += ' LineType="Dashed"';
+      if (r.shaft === 'wavy') at += ' LineType="Wavy"';
       if (r.cross) at += ` NoGo="${r.cross === 'x' ? 'Cross' : 'Hash'}"`;
       if (r.curve) {
         const A = arcInfo(r);
@@ -34352,7 +35269,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const B = arrowBox(r),
         bbx = `BoundingBox="${P(B.x0 - 9, B.y0 - 9)} ${P(B.x1 + 9, B.y1 + 9)}"`;
       /* a retrosynthetic arrow's head has no centre (written above): the attribute only once, or the file is not valid XML */
-      at += ` HeadSize="1000"${r.shaft === 'retro' ? '' : ' ArrowheadCenterSize="875"'} ArrowheadWidth="250" FillType="None"`;
+      /* a head given its own size goes out as it is (CDXML: hundredths of the line width) */
+      if (r.hL && r.shaft !== 'retro')
+        at += ` HeadSize="${Math.round(r.hL * 100)}" ArrowheadCenterSize="${Math.round(r.hL * (1 - (r.hN != null ? r.hN : 0.18)) * 100)}" ArrowheadWidth="${Math.round((r.hW || 2.5) * 100)}" FillType="None"`;
+      else at += ` HeadSize="1000"${r.shaft === 'retro' ? '' : ' ArrowheadCenterSize="875"'} ArrowheadWidth="250" FillType="None"`;
       if (!r.curve) {
         const mx = (r.x1 + r.x2) / 2,
           my = (r.y1 + r.y2) / 2,
@@ -42920,6 +43840,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         else o.head = 'open';
       }
       if (r.getAttribute('LineType') === 'Dashed') o.shaft = 'dashed';
+      if (r.getAttribute('LineType') === 'Wavy') o.shaft = 'wavy';
+      /* a head of its own size (anything but the usual 1000 / 875 / 250) is kept */
+      {
+        const hz = +r.getAttribute('HeadSize'),
+          hc = +r.getAttribute('ArrowheadCenterSize'),
+          hwd = +r.getAttribute('ArrowheadWidth');
+        if (hz > 0 && hwd > 0 && hc >= 0 && !(hz === 1000 && hc === 875 && hwd === 250) && !o.shaft && !o.curve && (o.head || 'full') === 'full') {
+          o.hL = +(hz / 100).toFixed(2);
+          o.hW = +(hwd / 100).toFixed(2);
+          o.hN = +(1 - hc / hz).toFixed(3);
+        }
+      }
       const ng = r.getAttribute('NoGo');
       if (ng) o.cross = ng === 'Cross' ? 'x' : 'slash';
       if (ang) {
@@ -42987,6 +43919,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         o.hside = /Right/.test(H) ? 1 : -1;
       } else delete o.head;
       if (c.getAttribute('LineType') === 'Dashed') o.shaft = 'dashed';
+      if (c.getAttribute('LineType') === 'Wavy') o.shaft = 'wavy';
       else delete o.shaft;
       {
         const cl = colOf(c.getAttribute('color'));
@@ -46652,7 +47585,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   });
 
   /* ===== arrows: straight, curved, equilibrium, retrosynthetic, block, no-go ===== */
-  const ARROW_KEYS = ['head', 'tail', 'hs', 'shaft', 'eq', 'eqf', 'hside', 'cross', 'curve'];
+  const ARROW_KEYS = ['head', 'tail', 'hs', 'shaft', 'eq', 'eqf', 'hside', 'cross', 'curve', 'hL', 'hW', 'hN', 'hC'];
   /* polyline of the arrow shaft (straight or circular arc through both ends; curve = sweep in degrees, sign = side of the bulge) */
   function arcInfo(r) {
     const dx = r.x2 - r.x1,
@@ -46834,11 +47767,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return P;
   }
-  function headSVG(tip, ux, uy, type, hl, hw, side, col, aw) {
+  function headSVG(tip, ux, uy, type, hl, hw, side, col, aw, shape) {
     const nx = -uy,
       ny = ux,
       bx = tip.x - ux * hl,
       by = tip.y - uy * hl;
+    /* a head shaped by hand (its handles): the notch shn of its length back from the corners, the sides hollowed by shc of
+       the half width */
+    if (type === 'full' && shape && (shape.n != null || shape.c)) {
+      const nn = shape.n != null ? shape.n : 0.18,
+        c = shape.c || 0,
+        f = v => +v.toFixed(2),
+        side2 = sg => {
+          const cx = bx + nx * hw * sg,
+            cy = by + ny * hw * sg,
+            mx = (cx + tip.x) / 2 - nx * hw * sg * c,
+            my = (cy + tip.y) / 2 - ny * hw * sg * c;
+          return { cx, cy, mx, my };
+        },
+        A = side2(1),
+        B = side2(-1);
+      return `<path d="M${f(tip.x)},${f(tip.y)}Q${f(A.mx)},${f(A.my)} ${f(A.cx)},${f(A.cy)}L${f(bx + ux * hl * nn)},${f(by + uy * hl * nn)}L${f(B.cx)},${f(B.cy)}Q${f(B.mx)},${f(B.my)} ${f(tip.x)},${f(tip.y)}Z" style="fill:${col}"/>`;
+    }
     if (type === 'full')
       return `<polygon points="${tip.x},${tip.y} ${bx + nx * hw},${by + ny * hw} ${bx + ux * hl * 0.18},${by + uy * hl * 0.18} ${bx - nx * hw},${by - ny * hw}" style="fill:${col}"/>`;
     /* a half head: its straight edge on the shaft's inner edge, so the shaft runs into it with no step */
@@ -47003,8 +47953,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const col = r.col || 'var(--ink)',
       aw = o.aw || lwOf(r),
       hs = r.hs || 1,
-      hl = (9 + aw) * hs,
-      hw = (3.2 + aw) * hs,
+      /* a head given its own size (in line widths: hL long, hW half wide) by its handles or a menu item */
+      hl = r.hL ? r.hL * aw : (9 + aw) * hs,
+      hw = r.hW ? r.hW * aw : (3.2 + aw) * hs,
+      hShape = r.hN != null || r.hC ? { n: r.hN, c: r.hC } : null,
       head = r.head || 'full',
       tail = r.tail || 'none',
       side = r.hside || 1;
@@ -47117,22 +48069,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const bent = !!(r.curve || isPen(r)),
       keepTo = h => h === 'harpoon' || h === 'half';
     const halfCut = Math.min(hl * 0.8, (aw * hl) / (hw || 1));
-    if (head !== 'none' && head !== 'open' && head !== 'harpoon') P = trimEnd(P, head === 'half' ? halfCut : hl * 0.8);
-    if (tail !== 'none' && tail !== 'open' && tail !== 'harpoon') P = trimEnd(P.slice().reverse(), tail === 'half' ? halfCut : hl * 0.8).reverse();
+    if (head !== 'none' && head !== 'open' && head !== 'harpoon') P = trimEnd(P, head === 'half' ? halfCut : hShape && hShape.n != null ? hl * Math.max(0.3, 1 - hShape.n - 0.03) : hl * 0.8);
+    if (tail !== 'none' && tail !== 'open' && tail !== 'harpoon') P = trimEnd(P.slice().reverse(), tail === 'half' ? halfCut : hShape && hShape.n != null ? hl * Math.max(0.3, 1 - hShape.n - 0.03) : hl * 0.8).reverse();
     if (r.shaft === 'wavy') {
-      const len = Math.hypot(r.x2 - r.x1, r.y2 - r.y1),
-        N = Math.max(12, Math.round(len / 2)),
+      /* the wave runs between the shaft's ends (short of a head), so a wavy arrow's head is not crossed by it */
+      const A = P[0] || { x: r.x1, y: r.y1 },
+        B = P[P.length - 1] || { x: r.x2, y: r.y2 },
+        len = Math.hypot(B.x - A.x, B.y - A.y),
+        N = Math.max(24, Math.round(len)),
+        /* the wave of the Jablonski diagram's arrows: a fifth of the letter size high, 0.6 of it long, easing in at the ends */
+        fsW = (STY().text || 13) * Math.max(0.6, Math.min(2, aw / Math.max(0.4, docLW()))),
+        amp = fsW * 0.2,
+        wl = fsW * 0.6,
         pts = [];
       for (let i = 0; i <= N; i++) {
         const t = i / N,
-          w = Math.sin(((t * len) / 9) * 2 * Math.PI) * 2.8;
-        pts.push(`${r.x1 + (r.x2 - r.x1) * t + nx * w},${r.y1 + (r.y2 - r.y1) * t + ny * w}`);
+          d = t * len,
+          w = Math.sin((d / wl) * 2 * Math.PI) * amp * Math.min(1, d / wl, (len - d) / wl);
+        pts.push(`${A.x + (B.x - A.x) * t + nx * w},${A.y + (B.y - A.y) * t + ny * w}`);
       }
-      return (
-        s + `<polyline points="${pts.join(' ')}" fill="none" style="stroke:${col}" stroke-width="${aw}"/>`
-      );
+      s += `<polyline points="${pts.join(' ')}" fill="none" style="stroke:${col}" stroke-width="${aw}"/>`;
     }
-    s += line(P, r.shaft === 'dashed' ? `stroke-dasharray="${(4 * aw) / 1.6} ${(3.4 * aw) / 1.6}"` : '');
+    else s += line(P, r.shaft === 'dashed' ? `stroke-dasharray="${(4 * aw) / 1.6} ${(3.4 * aw) / 1.6}"` : '');
     const endDir = (a, b) => {
       const L2 = Math.hypot(b.x - a.x, b.y - a.y) || 1;
       return [(b.x - a.x) / L2, (b.y - a.y) / L2];
@@ -47156,7 +48114,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           r.curve || isPen(r)
             ? endDir(backPt(P0, keepTo(head) ? hl * 0.5 : hl * 0.9), P0[n - 1])
             : endDir(P0[r.curve || isPen(r) ? Math.max(0, n - 1 - Math.ceil(n * 0.12)) : 0], P0[n - 1]);
-      s += head === 'harpoon' ? headSVG(P0[n - 1], vx, vy, head, hl, hw * 1.15, side, col, aw) : headSVG(P0[n - 1], vx, vy, head, hl, hw, side, col, aw);
+      s += head === 'harpoon' ? headSVG(P0[n - 1], vx, vy, head, hl, hw * 1.15, side, col, aw) : headSVG(P0[n - 1], vx, vy, head, hl, hw, side, col, aw, hShape);
     }
     if (tail !== 'none') {
       const n = P0.length,
@@ -47164,7 +48122,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           r.curve || isPen(r)
             ? endDir(backPt(P0.slice().reverse(), keepTo(tail) ? hl * 0.5 : hl * 0.9), P0[0])
             : endDir(P0[r.curve || isPen(r) ? Math.min(n - 1, Math.ceil(n * 0.12)) : n - 1], P0[0]);
-      s += headSVG(P0[0], vx, vy, tail, hl, tail === 'harpoon' ? hw * 1.15 : hw, -side, col, aw);
+      s += headSVG(P0[0], vx, vy, tail, hl, tail === 'harpoon' ? hw * 1.15 : hw, -side, col, aw, hShape);
     }
     if (r.cross) {
       const mi = P0[Math.floor(P0.length / 2)],
@@ -47219,6 +48177,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         ...H3.map(h => AT({ head: 'half', hside: 1, hs: h }))
       ]
     },
+
     {
       col: 1,
       name: 'Retrosynthesis and block arrows',
@@ -47251,7 +48210,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       items: [...H3.map(h => AT({ cross: 'x', hs: h })), ...H3.map(h => AT({ cross: 'slash', hs: h }))]
     },
     /* a catalytic cycle: drawn as an oval (Shift: a circle); structures put on it cut it, right-click one near it for in and out */
-    { col: 1, name: 'Catalytic cycle', items: [AT({ cycle: 1 }), AT({ cycle: -1 })] }
+    { col: 1, name: 'Catalytic cycle', items: [AT({ cycle: 1 }), AT({ cycle: -1 })] },
+    /* a long narrow head, notched an eighth: the smallest 10 line widths long and 2.5 half wide (the size CDXML gives a head) */
+    { col: 1, name: 'Long head', items: [10, 13, 16].map(k => AT({ hL: k, hW: k / 4, hN: 0.125 })) },
+    /* light in, light out: hν and the transitions of photochemistry */
+    { col: 1, name: 'Wavy', items: H3.map(h => AT({ shaft: 'wavy', hs: h })) }
   ];
   const ARROW_TPL = ARROW_GROUPS.flatMap(g => g.items);
   let curArrow = ARROW_TPL[0];
@@ -47639,6 +48602,40 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (r.curve && r.sq) return { e1: P[0], e2: P[P.length - 1], m };
     return { e1: { x: r.x1, y: r.y1 }, e2: { x: r.x2, y: r.y2 }, m };
   }
+  /* the head of a straight arrow with a full head: its two back corners (length and width, both sides together), the middle
+     of its notch (how deep), and the middle of a side (hollowed or straight) */
+  function headHandles(r) {
+    if (r.kind || r.curve || isPen(r) || r.cycle || (r.head || 'full') !== 'full' || r.shaft === 'eq' || r.shaft === 'retro' || r.shaft === 'hollow') return null;
+    const aw = lwOf(r),
+      hs = r.hs || 1,
+      hl = r.hL ? r.hL * aw : (9 + aw) * hs,
+      hw = r.hW ? r.hW * aw : (3.2 + aw) * hs,
+      n = r.hN != null ? r.hN : 0.18,
+      c = r.hC || 0,
+      dx = r.x2 - r.x1,
+      dy = r.y2 - r.y1,
+      l = Math.hypot(dx, dy);
+    if (l < hl * 1.5) return null;
+    const ux = dx / l,
+      uy = dy / l,
+      nx = -uy,
+      ny = ux,
+      bx = r.x2 - ux * hl,
+      by = r.y2 - uy * hl;
+    return {
+      aw,
+      hl,
+      hw,
+      ux,
+      uy,
+      nx,
+      ny,
+      c1: { x: bx + nx * hw, y: by + ny * hw },
+      c2: { x: bx - nx * hw, y: by - ny * hw },
+      nt: { x: bx + ux * hl * n, y: by + uy * hl * n },
+      sd: { x: (bx + nx * hw + r.x2) / 2 - nx * hw * c * 0.5, y: (by + ny * hw + r.y2) / 2 - ny * hw * c * 0.5 }
+    };
+  }
   function bendable(r) {
     return !r.kind && (!r.shaft || r.shaft === 'solid' || r.shaft === 'dashed');
   }
@@ -47675,6 +48672,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       s += `<circle cx="${H[k].x}" cy="${H[k].y}" r="5" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.6"><title>Drag to lengthen, shorten or turn the arrow. On a curved arrow the end slides along its circle or oval (up to a full ring); hold Alt to move it freely</title></circle>`;
     if (bendable(r))
       s += `<rect x="${H.m.x - 4.5}" y="${H.m.y - 4.5}" width="9" height="9" transform="rotate(45 ${H.m.x} ${H.m.y})" style="fill:var(--accent);stroke:var(--panel)" stroke-width="1.2"><title>Drag sideways to bend the arrow; drag back onto the line to straighten it</title></rect>`;
+    const HH = headHandles(r);
+    if (HH) {
+      for (const k of ['c1', 'c2'])
+        s += `<circle cx="${HH[k].x}" cy="${HH[k].y}" r="3.2" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.3"><title>Drag to make the head longer or shorter, wider or narrower (both corners together)</title></circle>`;
+      s += `<circle cx="${HH.nt.x}" cy="${HH.nt.y}" r="3.2" style="fill:var(--accent);stroke:var(--panel)" stroke-width="1"><title>Drag along the arrow: how deep the notch at the back of the head is</title></circle>`;
+      s += `<circle cx="${HH.sd.x}" cy="${HH.sd.y}" r="2.6" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.1"><title>Drag inward to hollow the sides of the head, out to straighten them</title></circle>`;
+    }
     return s;
   }
   function hitHandle(p) {
@@ -47686,13 +48690,46 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (Math.hypot(p.x - H.sz.x, p.y - H.sz.y) < 7) return { r, k: 'osz' };
       return null;
     }
-    const H = arrowHandles(r);
+    const H = arrowHandles(r),
+      HH = headHandles(r);
+    if (HH) for (const k of ['nt', 'sd', 'c1', 'c2']) if (Math.hypot(p.x - HH[k].x, p.y - HH[k].y) < 5) return { r, k: 'h' + k };
     if (bendable(r) && Math.hypot(p.x - H.m.x, p.y - H.m.y) < 8) return { r, k: 'm' };
     for (const k of ['e1', 'e2']) if (Math.hypot(p.x - H[k].x, p.y - H[k].y) < 8) return { r, k };
     return null;
   }
   function dragHandle(d, p, shift, alt) {
     const r = d.r;
+    /* the head's own handles: its size, notch and sides, kept in line widths so a new style keeps the shape */
+    if (d.k && d.k[0] === 'h' && ['hc1', 'hc2', 'hnt', 'hsd'].includes(d.k)) {
+      const HH = headHandles(r);
+      if (!HH) return;
+      const { aw, ux, uy, nx, ny } = HH,
+        ax = r.x2 - p.x,
+        ay = r.y2 - p.y,
+        along = ax * ux + ay * uy,
+        across = Math.abs(ax * nx + ay * ny),
+        r2 = v => Math.round(v * 100) / 100;
+      if (d.k === 'hc1' || d.k === 'hc2') {
+        r.hL = r2(Math.max(2.5, Math.min(40, along / aw)));
+        r.hW = r2(Math.max(1, Math.min(15, across / aw)));
+        if (r.hN == null) r.hN = 0.18;
+      } else if (d.k === 'hnt') {
+        r.hN = r2(Math.max(-0.2, Math.min(0.7, 1 - along / HH.hl)));
+        if (!r.hL) (r.hL = r2(HH.hl / aw)), (r.hW = r2(HH.hw / aw));
+      } else {
+        /* the side's middle: how far it is pulled in from the straight side, against the half width */
+        const sgn = (p.x - r.x2) * nx + (p.y - r.y2) * ny >= 0 ? 1 : -1,
+          mx = (HH.c1.x + r.x2) / 2,
+          my = (HH.c1.y + r.y2) / 2,
+          inward = sgn > 0 ? (mx - p.x) * nx + (my - p.y) * ny : (p.x - (HH.c2.x + r.x2) / 2) * nx + (p.y - (HH.c2.y + r.y2) / 2) * ny;
+        r.hC = r2(Math.max(0, Math.min(0.9, (inward / HH.hw) * 2)));
+        if (!r.hC) delete r.hC;
+        if (!r.hL) (r.hL = r2(HH.hl / aw)), (r.hW = r2(HH.hw / aw));
+        if (r.hN == null) r.hN = 0.18;
+      }
+      render();
+      return;
+    }
     if (d.k === 'orot' || d.k === 'osz') {
       const dx = r.x2 - r.x1,
         dy = r.y2 - r.y1,
@@ -51972,6 +53009,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return out + esc(s.slice(i));
   }
+  /* about how wide a name is drawn (sub- and superscripts smaller), for finding it under the pointer */
+  function jabTextW(s, fs) {
+    s = String(s || '');
+    const small = [...s.matchAll(/[_^]\{([^{}]*)\}/g)].reduce((t, m) => t + m[1].length, 0),
+      plain = s.replace(/[_^]\{[^{}]*\}/g, '').length;
+    return Math.max(plain * fs * 0.62 + small * fs * 0.45, fs * 0.6);
+  }
   function jabGeo(r) {
     const fs = pieFs(r),
       x0 = Math.min(r.x1, r.x2),
@@ -51985,17 +53029,32 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         { a: x0 + W * 0.66, b: x1 - lab }
       ],
       yOf = e => y1 - fs * 0.3 - (Math.max(0, Math.min(100, +e || 0)) / 100) * (y1 - y0 - fs * 1.8),
+      /* a level moved or stretched by hand: its ends shifted by l.da, l.db (in letter sizes) */
       L = (r.lv || []).map((l, i) => {
         const c = C[l.c ? 1 : 0];
-        return { i, l, y: yOf(l.e), a: l.full ? C[0].a : c.a, b: l.full ? C[1].b : c.b, c: l.c ? 1 : 0 };
+        return { i, l, y: yOf(l.e), a: (l.full ? C[0].a : c.a) + (+l.da || 0) * fs, b: (l.full ? C[1].b : c.b) + (+l.db || 0) * fs, c: l.c ? 1 : 0 };
       });
-    return { fs, x0, x1, y0, y1, C, L };
+    return { fs, x0, x1, y0, y1, C, L, yOf };
   }
   function jabBox(r) {
     const G = jabGeo(r);
-    return { x0: G.x0, y0: G.y0 - G.fs * 0.2, x1: G.x1, y1: G.y1 + G.fs * 0.2 };
+    let x0 = G.x0,
+      x1 = G.x1;
+    /* levels and labels moved out of the frame by hand stay inside the box */
+    for (const p of jabParts(r)) {
+      x0 = Math.min(x0, p.x0);
+      x1 = Math.max(x1, p.x1);
+    }
+    return { x0, y0: G.y0 - G.fs * 0.2, x1, y1: G.y1 + G.fs * 0.2 };
   }
-  function jabSVG(r) {
+  /* the parts that can be dragged while the diagram's window is open: levels (and their ends), their names, the
+     transition arrows and their labels, each with a box to find it by */
+  function jabParts(r) {
+    const parts = [];
+    jabSVG(r, parts);
+    return parts;
+  }
+  function jabSVG(r, parts) {
     const G = jabGeo(r),
       { fs, C, L } = G,
       ink = 'var(--ink)',
@@ -52013,8 +53072,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (y < top + fs * 0.25) break;
         s += `<line x1="${f2(q.a)}" y1="${f2(y)}" x2="${f2(q.b)}" y2="${f2(y)}" stroke="${ink}" style="stroke:${ink}" stroke-width="${f2(lw * 0.6)}" opacity=".55"/>`;
       }
-      const right = q.c === 1 && !q.l.full;
-      s += `<text x="${f2(right ? q.b + fs * 0.35 : q.a - fs * 0.35)}" y="${f2(q.y + fs * 0.35)}" text-anchor="${right ? 'start' : 'end'}" ${font} style="fill:${ink}">${jabText(q.l.t, fs)}</text>`;
+      const right = q.c === 1 && !q.l.full,
+        lx = (right ? q.b + fs * 0.35 : q.a - fs * 0.35) + (+q.l.lx || 0) * fs,
+        ly = q.y + fs * 0.35 + (+q.l.ly || 0) * fs,
+        tw = jabTextW(q.l.t, fs);
+      s += `<text x="${f2(lx)}" y="${f2(ly)}" text-anchor="${right ? 'start' : 'end'}" ${font} style="fill:${ink}">${jabText(q.l.t, fs)}</text>`;
+      if (parts) {
+        parts.push({ kind: 'lvl', i: q.i, x0: q.a, x1: q.b, y0: q.y - fs * 0.3, y1: q.y + fs * 0.3 });
+        parts.push({ kind: 'lvlname', i: q.i, x0: right ? lx : lx - tw, x1: right ? lx + tw : lx, y0: ly - fs * 0.9, y1: ly + fs * 0.4 });
+      }
     }
     /* transitions: in the column of their start, side by side in their order; ISC and energy transfer across */
     const tr = (r.tr || []).filter(t => L[t.f] && L[t.to] && t.f !== t.to),
@@ -52025,7 +53091,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         w = fs * 0.24;
       return `<path d="M${f2(x)},${f2(y)}L${f2(x - ux * h - uy * w)},${f2(y - uy * h + ux * w)}L${f2(x - ux * h + uy * w)},${f2(y - uy * h - ux * w)}Z" style="fill:${col}" fill="${col}"/>`;
     };
-    const arrow = (ax, ay, bx, by, k, label, lside) => {
+    const arrow = (ax, ay, bx, by, k, label, lside, ti) => {
+      const T = (r.tr || [])[ti] || {};
       const K = JAB_K[k] || JAB_K.abs,
         col = K.c || ink,
         dx = bx - ax,
@@ -52047,13 +53114,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       } else d = `M${f2(ax)},${f2(ay)}L${f2(ax + ux * stop)},${f2(ay + uy * stop)}`;
       let o = `<path d="${d}" fill="none" stroke="${col}" style="stroke:${col}" stroke-width="${f2(lw)}"${K.dash ? ` stroke-dasharray="${f2(fs * 0.4)} ${f2(fs * 0.25)}"` : ''}/>` + head(bx, by, ux, uy, col);
+      if (parts) parts.push({ kind: 'tr', i: ti, x0: Math.min(ax, bx) - fs * 0.35, x1: Math.max(ax, bx) + fs * 0.35, y0: Math.min(ay, by), y1: Math.max(ay, by) });
       if (label) {
-        const mx = (ax + bx) / 2,
-          my = (ay + by) / 2,
-          vertical = Math.abs(uy) > 0.7;
-        o += vertical
-          ? `<text x="${f2(mx + (lside ? -1 : 1) * fs * 0.45)}" y="${f2(my + fs * 0.35)}" text-anchor="${lside ? 'end' : 'start'}" ${font} style="fill:${col}">${jabText(label, fs)}</text>`
-          : `<text x="${f2(mx + fs * 0.4)}" y="${f2(my - fs * 0.7)}" text-anchor="start" ${font} style="fill:${col}">${jabText(label, fs)}</text>`;
+        const mx = (ax + bx) / 2 + (+T.lx || 0) * fs,
+          my = (ay + by) / 2 + (+T.ly || 0) * fs,
+          vertical = Math.abs(uy) > 0.7,
+          tw = jabTextW(label, fs),
+          tx = vertical ? mx + (lside ? -1 : 1) * fs * 0.45 : mx + fs * 0.4,
+          ty = vertical ? my + fs * 0.35 : my - fs * 0.7,
+          end = vertical && lside;
+        o += `<text x="${f2(tx)}" y="${f2(ty)}" text-anchor="${end ? 'end' : 'start'}" ${font} style="fill:${col}">${jabText(label, fs)}</text>`;
+        if (parts) parts.push({ kind: 'trlabel', i: ti, x0: end ? tx - tw : tx, x1: end ? tx : tx + tw, y0: ty - fs * 0.9, y1: ty + fs * 0.4 });
       }
       return o;
     };
@@ -52061,17 +53132,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const c = C[ci],
         n = list.length;
       list.forEach((t, j) => {
-        const x = c.a + ((j + 1) * (c.b - c.a)) / (n + 1);
-        s += arrow(x, L[t.f].y, x, L[t.to].y, t.k, t.t, j === 0 && n > 1);
+        /* an arrow moved sideways by hand: t.dx letter sizes from its place in the row */
+        const x = c.a + ((j + 1) * (c.b - c.a)) / (n + 1) + (+t.dx || 0) * fs;
+        s += arrow(x, L[t.f].y, x, L[t.to].y, t.k, t.t, j === 0 && n > 1, r.tr.indexOf(t));
       });
     });
     for (const t of tr)
       if (['isc', 'et'].includes(t.k)) {
         const A = L[t.f],
           B = L[t.to],
-          ax = A.c < B.c || A.l.full ? A.b - fs * 0.6 : A.a + fs * 0.6,
-          bx = B.c > A.c || B.l.full ? B.a + fs * 0.6 : B.b - fs * 0.6;
-        s += arrow(ax, A.y - fs * 0.25, bx, B.y - fs * 0.25, t.k, t.t, false);
+          ax = (A.c < B.c || A.l.full ? A.b - fs * 0.6 : A.a + fs * 0.6) + (+t.dx || 0) * fs,
+          bx = (B.c > A.c || B.l.full ? B.a + fs * 0.6 : B.b - fs * 0.6) + (+t.dx || 0) * fs;
+        s += arrow(ax, A.y - fs * 0.25, bx, B.y - fs * 0.25, t.k, t.t, false, r.tr.indexOf(t));
       }
     return s;
   }
@@ -52112,8 +53184,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       `<div class="aer"><span></span><div>${b('tadd', 1, '+ Transition')}</div></div>` +
       `<div class="aer"><span>Sublevels</span><div><input type="number" data-jz="vib" value="${r.vib ?? 3}" min="0" max="5" step="1" style="width:52px" title="Vibrational levels drawn above each level"></div></div>` +
       `<div class="aer"><span>Text size</span><div><input type="number" data-jz="fs" value="${+(r.fs || STY().text || 13).toFixed(1)}" min="4" max="60" step="0.5" style="width:64px">${b('fs', '', 'Style default')}</div></div>` +
-      `<div class="aer"><span></span><div>${b('dup', 1, 'Duplicate')}${b('delchart', 1, 'Delete diagram')}</div></div>` +
-      '<p class="note" style="margin:2px 0 0">The arrows are tied to the levels: change a level\'s energy and they follow. Sub- and superscripts: S_{1}, T^{3}, or S₁ from the Characters tab.</p>';
+      `<div class="aer"><span></span><div>${b('dup', 1, 'Duplicate')}${b('delchart', 1, 'Delete diagram')}${b('jreset', 1, 'Reset positions', 'Put the moved levels, arrows and labels back in their places')}</div></div>` +
+      '<p class="note" style="margin:2px 0 0">The arrows are tied to the levels: change a level\'s energy and they follow. While this window is open, drag the parts on the sheet: a level up or down and sideways (drag an end to stretch it), a name, an arrow sideways, a label. Sub- and superscripts: S_{1}, T^{3}, or S₁ from the Characters tab.</p>';
   }
   /* after Undo and Redo the open window shows the diagram as it now is, or closes when it is gone */
   function jabEdSync() {
@@ -52139,6 +53211,94 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const w = jabEd.offsetWidth || 420;
     jabEd.style.left = Math.max(8, Math.min(q.x - ed.left + 12, ed.width - w - 8)) + 'px';
     jabEd.style.top = Math.max(8, Math.min(q.y - ed.top - 20, ed.height - (jabEd.offsetHeight || 320) - 8)) + 'px';
+  }
+  /* while the window is open the diagram's parts move on the sheet: a level up or down (its energy) and sideways, its
+     ends stretched; a level's name, an arrow sideways (it stays on its levels), an arrow's label. Undo takes a move back;
+     Reset positions puts everything back in its place */
+  function jabHit(r, p) {
+    const fs = pieFs(r),
+      P = jabParts(r),
+      inside = q => p.x >= q.x0 && p.x <= q.x1 && p.y >= q.y0 && p.y <= q.y1;
+    for (const k of ['lvlname', 'trlabel', 'tr', 'lvl']) {
+      const hit = P.filter(q => q.kind === k && inside(q));
+      if (!hit.length) continue;
+      const q = hit[hit.length - 1];
+      if (k === 'lvl') return { ...q, end: Math.abs(p.x - q.x0) < fs * 0.5 ? 'a' : Math.abs(p.x - q.x1) < fs * 0.5 ? 'b' : null };
+      return q;
+    }
+    return null;
+  }
+  {
+    const svgEl = $('mol');
+    let jd = null;
+    svgEl.addEventListener(
+      'pointerdown',
+      e => {
+        if (jabEd.hidden || e.button !== 0) return;
+        const r = jabEdCur();
+        if (!r) return;
+        const p = pt(e),
+          h = jabHit(r, p);
+        if (!h) return;
+        e.preventDefault();
+        e.stopPropagation();
+        snap();
+        const G = jabGeo(r),
+          o = h.kind === 'lvl' || h.kind === 'lvlname' ? r.lv[h.i] : r.tr[h.i];
+        jd = { h, p0: p, o, s0: { ...o }, fs: G.fs, per: (G.y1 - G.y0 - G.fs * 1.8) / 100 };
+        try {
+          svgEl.setPointerCapture(e.pointerId);
+        } catch (x) {}
+      },
+      true
+    );
+    svgEl.addEventListener(
+      'pointermove',
+      e => {
+        if (!jd) {
+          /* the pointer shows what can be dragged */
+          if (!jabEd.hidden) {
+            const r = jabEdCur(),
+              h = r && jabHit(r, pt(e));
+            svgEl.style.cursor = h ? ((h.kind === 'lvl' && h.end) || h.kind === 'tr' ? 'ew-resize' : 'move') : '';
+          }
+          return;
+        }
+        e.stopPropagation();
+        const p = pt(e),
+          dx = (p.x - jd.p0.x) / jd.fs,
+          dy = (p.y - jd.p0.y) / jd.fs,
+          { o, s0, h } = jd,
+          r2 = v => Math.round(v * 100) / 100;
+        if (h.kind === 'lvl') {
+          if (h.end === 'a') o.da = r2((+s0.da || 0) + dx);
+          else if (h.end === 'b') o.db = r2((+s0.db || 0) + dx);
+          else {
+            o.da = r2((+s0.da || 0) + dx);
+            o.db = r2((+s0.db || 0) + dx);
+            o.e = Math.round(Math.max(0, Math.min(100, (+s0.e || 0) - (dy * jd.fs) / jd.per)));
+          }
+        } else if (h.kind === 'tr') o.dx = r2((+s0.dx || 0) + dx);
+        else {
+          o.lx = r2((+s0.lx || 0) + dx);
+          o.ly = r2((+s0.ly || 0) + dy);
+        }
+        render();
+      },
+      true
+    );
+    const end = e => {
+      if (!jd) return;
+      e.stopPropagation();
+      const moved = JSON.stringify(jd.o) !== JSON.stringify(jd.s0);
+      jd = null;
+      if (moved) {
+        commit();
+        renderJabEd();
+      }
+    };
+    svgEl.addEventListener('pointerup', end, true);
+    svgEl.addEventListener('pointercancel', end, true);
   }
   /* the window moves when its title is dragged */
   jabEd.addEventListener('pointerdown', e => {
@@ -52223,6 +53383,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (k === 'tadd') r.tr.push({ f: 0, to: Math.min(1, r.lv.length - 1), k: 'abs', t: 'hν' });
     else if (k === 'tdel') r.tr.splice(v, 1);
     else if (k === 'fs') delete r.fs;
+    else if (k === 'jreset') {
+      for (const l of r.lv || []) ['da', 'db', 'lx', 'ly'].forEach(q => delete l[q]);
+      for (const t of r.tr || []) ['dx', 'lx', 'ly'].forEach(q => delete t[q]);
+    }
     else if (k === 'dup') {
       const B = jabBox(r),
         n = JSON.parse(JSON.stringify(r));
@@ -62088,10 +63252,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return {
           ...P,
           ...(D
-            ? { cLogP: +D.logP.toFixed(2), tpsa: +D.tpsa.toFixed(1), hDonors: D.donors, hAcceptors: D.acceptors, rotatableBonds: D.rot, ruleOfFive: D.viol ? D.viol + ' violation' + (D.viol > 1 ? 's' : '') : 'passes' }
+            ? { cLogP: +D.logP.toFixed(2), tpsa: +D.tpsa.toFixed(1), hDonors: D.donors, hAcceptors: D.acceptors, rotatableBonds: D.rot, ruleOfFive: D.viol ? D.viol + ' violation' + (D.viol > 1 ? 's' : '') : 'passes', ...(D.pka ? { pKa: D.pka.map(x => ({ group: x.label, kind: x.kind === 'a' ? 'acid' : 'base (pKaH)', pKa: x.pKa, sd: x.sd, count: x.n })) } : {}) }
             : { drugLikeness: 'not computed (one compound up to 400 atoms)' }),
           stereo: st,
-          methods: { cLogP: 'OpenChemLib (atom contributions)', tpsa: 'OpenChemLib (Ertl)', stereo: 'CIP rules (OpenChemLib), atoms numbered as in smiles' }
+          methods: { cLogP: 'OpenChemLib (atom contributions)', tpsa: 'OpenChemLib (Ertl)', pKa: 'typical value of each group kind (Dimorphite-DL table, Apache-2.0); bases as pKaH', stereo: 'CIP rules (OpenChemLib), atoms numbered as in smiles' }
         };
       };
       if (a.smiles != null)
@@ -64958,6 +66122,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         render();
       } else if (a && +a.value > 0) setZoom((BW * PX1 * +a.value) / (svg.clientWidth || BW));
       return { zoom: +((svg.clientWidth || BW) / view.w / PX1).toFixed(3) };
+    },
+    /* a peptide from its sequence: YGGFL, Ac-Ala-D-Phe-NH2, cyclo(RGDfK), "CYIQNCPLG-NH2 S-S 1-6" */
+    addPeptide: a => {
+      const r = addPeptide(String((a && (a.sequence ?? a.seq)) || ''), a && a.x != null ? { x: +a.x, y: +(a.y || BH / 2) } : null);
+      commit();
+      const i = fragments().findIndex(f => f.includes(r.atoms[0]));
+      return Object.assign(apiDescribe(fragments()[i], i), { residues: r.residues });
     }
   };
   /* the format of a text given to the API: json, cdxml, rxn, sdf, mol or smiles */
@@ -65103,6 +66274,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       saved: { d: 'unsaved changes?', a: {} },
       markSaved: { d: 'mark the drawing as saved', a: {} },
       zoom: { d: 'zoom', a: { value: '1 = 100 %', fit: 'true: fit the drawing in the window' } },
+      addPeptide: { d: 'draw a peptide from its sequence, backbone straight, side chains up and down in turn (rows for long chains)', a: { sequence: 'one-letter (YGGFL; lower case = D) or three-letter (Ac-Ala-D-Phe-Gly-NH2; Aib, Sar, Nle, Orn, Abu, Nva, Phg, Cha, Hyp); caps H, Ac, Boc, Fmoc, Cbz, Z, Bz; ends OH, NH2, NHMe, OMe, OEt, OtBu, OBn; cyclo(…) head to tail; Cys bridges after it: "S-S 1-6, 2-9"', x: 'where (sheet units)', y: '' } },
       setLabel: { d: 'change an atom\'s label or element in place: "Cl" an element, "SO2Ar" a group, "" back to carbon; direction keep (as written) or reverse fixes which way the label reads', a: { index: IX, atom: 'the atom (from 1)', label: 'the new label', direction: 'auto, keep or reverse', mirror: 'true: written the other way round from how it is drawn now (OtBu ↔ tBuO, CO2Me ↔ MeO2C)', atoms: 'several: [{atom, label, direction, mirror}, …]' } },
       duplicate: { d: 'a copy of a structure with its looks, moved, mirrored or turned (a mirror-image pair, a row of analogues); answers its id', a: { index: IX, dx: 'units to the right (its width and a bond if left out)', dy: 'units down', x: 'or put its centre at x', y: 'and y', flip: 'h or v', rotate: 'degrees, clockwise' } },
       key: { d: 'press a key of the editor with the pointer on an atom or a bond: the hotkey table (J an η6-benzene with Cr, j twice a Cp sandwich, K tBu, o OH, a fused ring on a bond… and the user\'s own keys); keys lists them', a: { index: IX, atom: 'the atom (from 1)', bond: 'or the bond [n1, n2]', key: '"J", "j", "4", "Shift+KeyJ"…', keys: 'or several in a row ["j", "j"] (the pointer moves on as in the editor)' } },
@@ -69672,6 +70844,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    jabParts,
+    pkaSites,
+    pkaSummary,
     tableSVG,
     gridAct,
     gridLayout,

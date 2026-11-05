@@ -5,6 +5,11 @@
 - **Jablonski diagrams.** In the Charts menu (click the Charts tool again): energy levels (singlets in one column, triplets in the other, sublevels above each) and the transitions between them, absorption, fluorescence, phosphorescence, internal conversion and intersystem crossing, each drawn as photochemistry draws it. Double-click it to edit: change a level's energy and its arrows follow; names with sub- and superscripts (S_{1}, T^{3}); the window moves by its title.
 - **A bond to the middle of a ring.** Drag a bond from a metal to the middle of a drawn ring (a Cp, a benzene) and it ends on the ring's centre, an η bond, as the J key makes one: two such bonds from Fe to two Cp rings give ferrocene, C10H10Fe.
 - **Greek letters by name in texts.** Type \delta, \nu, \Delta, \pm… in a text and it becomes δ, ν, Δ, ± at the next space or sign (the LaTeX names; the space after the name is taken, so \nu h gives νh).
+- **Peptides from a sequence.** Add a structure → Peptide sequence: one-letter (YGGFL; lower case for D: cyclo(RGDfK)) or three-letter codes (Ac-Ala-D-Phe-Gly-NH2; also Aib, Sar, Nle, Orn, Abu, Nva, Phg, Cha, Hyp), caps (Ac, Boc, Fmoc, Cbz, Bz) and C-terminal ends (OH, NH2, NHMe, OMe, OEt, OtBu, OBn), Cys–Cys bridges (CYIQNCPLG-NH2 S-S 1-6). The backbone is drawn as a straight zigzag with the side chains up and down in turn, bent at each Pro to give its ring room.
+- **pKa (typical)** in Properties: each ionizable group with the typical pKa of its kind, acids as pKa, bases as pKaH with pKb (from Dimorphite-DL's table of measured values; an estimate by group, not a calculation for the molecule).
+- **Wavy arrow** in the arrow menu, drawn with the wave of the Jablonski diagram's arrows, for hν and emission; it goes to CDXML as a wavy arrow and comes back.
+- **The head of an arrow shaped by hand.** A selected straight arrow has points on its head: the back corners (longer or shorter, wider or narrower), the middle of the notch (how deep) and the middle of a side (hollowed or straight). The shape goes to CDXML and comes back. The Reaction group's last item is a long narrow head.
+- **Jablonski diagrams arranged by hand.** While the diagram's window is open, drag its parts on the sheet: a level up or down and sideways (an end stretches it), a level's name, an arrow sideways, an arrow's label; the arrows stay on their levels. Reset positions puts everything back.
 
 ## Changed
 
@@ -13,6 +18,7 @@
 
 ## Fixed
 
+- Undo after dragging an arrow's end or its bend takes back just that drag (it could take back the step before it as well).
 - **Catalytic cycles in CDXML.** A cycle went into CDXML and CDX files as nothing (they have no such object), so other editors showed the structures without the arrows. Its arcs and the curves into and out of it are now written as curves with their arrowheads.
 
 # Reactio Draw 1.11
