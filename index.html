@@ -2984,7 +2984,7 @@ html {
         <button class="tb" data-tool="cutFwd" title="Reaction from a disconnection: draw a line across the bonds; the molecule stays, the pieces appear before a reaction arrow"><svg viewBox="0 0 22 22"><path d="M2 6l3 5M2 16l3-5" stroke="currentColor" stroke-width="1.4"/><path d="M8 11h9" stroke="currentColor" stroke-width="1.4"/><path d="M20 11l-4-2.6v5.2z" fill="currentColor"/></svg></button>
         <button class="tb" data-tool="bracket" title="Brackets: drag a box around a structure (single brackets: drag up or down); click again for the bracket menu"><span style="font:18px Georgia,serif">[ ]</span></button>
         <button class="tb" data-tool="shape" title="Shapes and lines: click again for the shape menu"></button>
-        <button class="tb" data-tool="chart" title="Charts: product ratios (pie) and sensitivity screens (radar); click again for the chart menu"></button>
+        <button class="tb" data-tool="chart" title="Charts: product ratios (pie), sensitivity screens (radar) and Jablonski diagrams; click again for the chart menu"></button>
         <button class="tb" data-tool="table" title="Table: click on the sheet to put a table there and type in its cells (Tab and Enter go on); right-click it for rows, columns, rules, fill, a structure in a cell and footnotes"><svg viewBox="0 0 22 22"><path d="M3 5h16M3 8.5h16M3 18h16" stroke="currentColor" stroke-width="1.5"/><path d="M8.5 10.5v5.5M13.5 10.5v5.5" stroke="currentColor" stroke-width="1" opacity=".55"/><path d="M5 12.5h2M10 12.5h2M15 12.5h2M5 15.5h2M10 15.5h2M15 15.5h2" stroke="currentColor" stroke-width="1.2"/></svg></button>
       </div>
       <span class="tlabel">Bonds</span>
@@ -4829,6 +4829,7 @@ function kdOf(st) {
     hover = null;
     commit();
     if (typeof syncTable === 'function') syncTable();
+    if (typeof jabEdSync === 'function') jabEdSync();
   }
   function redo() {
     if (!redoSt.length) return;
@@ -4838,6 +4839,7 @@ function kdOf(st) {
     hover = null;
     commit();
     if (typeof syncTable === 'function') syncTable();
+    if (typeof jabEdSync === 'function') jabEdSync();
   }
 
   /* ===== chemistry ===== */
@@ -14325,8 +14327,46 @@ function kdOf(st) {
     }
     return best;
   }
+  /* a carbon of a cyclohexane chair: its six ring atoms alternate high and low on the page (a flat hexagon never does).
+     Its first new bond is axial (straight up from a high atom, straight down from a low one), the next equatorial
+     (parallel to the ring bonds one away, outward); one already equatorial: the new one axial. null otherwise */
+  function chairSpot(a) {
+    const nb = neighbors(a);
+    for (const b of bondsOf(a)) {
+      const R = smallestRing(b);
+      if (!R || R.length !== 6 || !R.includes(a)) continue;
+      const n = 6,
+        i = R.indexOf(a),
+        at = k => R[((k % n) + n) % n],
+        hi = k => at(k).y < at(k - 1).y && at(k).y < at(k + 1).y,
+        lo = k => at(k).y > at(k - 1).y && at(k).y > at(k + 1).y;
+      let alt = true;
+      for (let k = 0; k < n && alt; k++) if (!(hi(k) || lo(k)) || hi(k) === hi(k + 1)) alt = false;
+      if (!alt) continue;
+      const ringNb = nb.filter(q => R.includes(q)),
+        subs = nb.filter(q => !R.includes(q));
+      if (ringNb.length !== 2 || subs.length > 1) return null;
+      const bl = R.reduce((t, q, k) => t + Math.hypot(q.x - at(k + 1).x, q.y - at(k + 1).y), 0) / n,
+        cx = R.reduce((t, q) => t + q.x, 0) / n,
+        cy = R.reduce((t, q) => t + q.y, 0) / n,
+        ax = { x: 0, y: hi(i) ? -1 : 1 };
+      let eq = { x: at(i + 2).x - at(i + 1).x, y: at(i + 2).y - at(i + 1).y };
+      const el = Math.hypot(eq.x, eq.y) || 1;
+      eq = { x: eq.x / el, y: eq.y / el };
+      if (eq.x * (a.x - cx) + eq.y * (a.y - cy) < 0) eq = { x: -eq.x, y: -eq.y };
+      let d = ax;
+      if (subs.length === 1) {
+        const s0 = subs[0],
+          sl = Math.hypot(s0.x - a.x, s0.y - a.y) || 1;
+        /* the bond there is axial when it runs (nearly) up or down */
+        d = Math.abs((s0.y - a.y) / sl) > 0.9 ? eq : ax;
+      }
+      return { x: a.x + d.x * bl, y: a.y + d.y * bl };
+    }
+    return null;
+  }
   function addChainAtom(a) {
-    const p = freeSpot(a);
+    const p = chairSpot(a) || freeSpot(a);
     let t = findAtom(p, 10, a);
     if (!t) {
       t = newAtom(p.x, p.y, 'C');
@@ -34099,6 +34139,42 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         continue;
       }
+      /* a catalytic cycle: no such object in CDXML, so its arcs and the curves into and out of it go out as Bézier curves,
+         each arc and each curve out with its arrowhead at the end, as it is drawn */
+      if (r.kind === 'shp' && r.sh === 'cycle') {
+        let lines = [];
+        try {
+          lines = cycleLines(r);
+        } catch (e) {
+          lines = [];
+        }
+        const dash = r.dash === 'dashed' || r.st === 'dashed';
+        let first = true;
+        for (const ln of lines) {
+          const Q = ln.P;
+          if (!Q || Q.length < 2) continue;
+          /* a few anchors along it, each with handles a sixth of the way to its neighbours (Catmull-Rom) */
+          const n = Math.min(14, Math.max(2, Math.round(Q.length / 6))),
+            A = [];
+          for (let k = 0; k < n; k++) A.push(Q[Math.round((k * (Q.length - 1)) / (n - 1))]);
+          const pts = [];
+          A.forEach((p, k) => {
+            const q0 = A[Math.max(0, k - 1)],
+              q1 = A[Math.min(A.length - 1, k + 1)],
+              tx = (q1.x - q0.x) / 6,
+              ty = (q1.y - q0.y) / 6;
+            pts.push({ x: p.x - tx, y: p.y - ty }, p, { x: p.x + tx, y: p.y + ty });
+          });
+          const xs = Q.map(q => q.x),
+            ys = Q.map(q => q.y),
+            cid = first ? i : id++;
+          first = false;
+          out.push(
+            `<curve id="${cid}"${colAt(r.col, 'color')} BoundingBox="${P(Math.min(...xs), Math.min(...ys))} ${P(Math.max(...xs), Math.max(...ys))}" CurvePoints="${pts.map(q => P(q.x, q.y)).join(' ')}"${ln.head ? ' ArrowheadHead="Full" ArrowheadType="Solid"' : ''} HeadSize="1000" ArrowheadCenterSize="875" ArrowheadWidth="250"${dash ? ' LineType="Dashed"' : ''}/>`
+          );
+        }
+        continue;
+      }
       /* rectangles and ovals go out as the CDXML graphic objects: Rectangle (RoundEdge for a rounded one) and Oval, with their style flags */
       if (r.kind === 'shp' && ['rect', 'rrect', 'circle', 'ellipse'].includes(r.sh)) {
         const R = shpRect(r),
@@ -48449,6 +48525,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return out;
   }
+  /* the cycle as lines, the same as it is drawn: each a list of points and whether it ends in a head (for CDXML, which
+     has no cycle object: written as curves with arrowheads) */
+  function cycleLines(r) {
+    const items = cycleItems(),
+      Pc = cyclePieces(r, items),
+      G = Pc.G,
+      out = [];
+    if (Pc.whole) {
+      const d = r.dir || 1,
+        t0 = -Math.PI / 2 + d * 0.02,
+        P = [];
+      for (let k = 0; k <= 96; k++) P.push(cyclePt(G, t0 + d * (k / 96) * (2 * Math.PI - 0.04)));
+      out.push({ P, head: true });
+    } else for (const P of Pc.pieces) out.push({ P, head: true });
+    for (const { j, it, J, u } of cycleJoins(r, G, Pc, items)) out.push({ P: cycleBranch(J, u, it, j.io), head: !(j.io === 'in' && !j.head) });
+    return out;
+  }
   function cycleSVG(r, o) {
     const col = r.col || 'var(--ink)',
       aw = (o && o.aw) || lwOf(r),
@@ -51926,6 +52019,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       `<div class="aer"><span>Text size</span><div><input type="number" data-jz="fs" value="${+(r.fs || STY().text || 13).toFixed(1)}" min="4" max="60" step="0.5" style="width:64px">${b('fs', '', 'Style default')}</div></div>` +
       `<div class="aer"><span></span><div>${b('dup', 1, 'Duplicate')}${b('delchart', 1, 'Delete diagram')}</div></div>` +
       '<p class="note" style="margin:2px 0 0">The arrows are tied to the levels: change a level\'s energy and they follow. Sub- and superscripts: S_{1}, T^{3}, or S₁ from the Characters tab.</p>';
+  }
+  /* after Undo and Redo the open window shows the diagram as it now is, or closes when it is gone */
+  function jabEdSync() {
+    if (jabEd.hidden) return;
+    if (jabEdCur()) renderJabEd();
+    else {
+      jabEd.hidden = true;
+      jabEdId = null;
+    }
   }
   function openJabEd(r) {
     jabEdId = r.id;
@@ -69489,6 +69591,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     switchStep,
     wordNumber,
     cmpdSettingsZ,
+    fileBody,
     rdCliRun,
     unzipAll,
     rdUntag,
