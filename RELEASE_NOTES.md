@@ -3,6 +3,8 @@
 ## New
 
 - **Jablonski diagrams.** In the Charts menu (click the Charts tool again): energy levels (singlets in one column, triplets in the other, sublevels above each) and the transitions between them, absorption, fluorescence, phosphorescence, internal conversion and intersystem crossing, each drawn as photochemistry draws it. Double-click it to edit: change a level's energy and its arrows follow; names with sub- and superscripts (S_{1}, T^{3}); the window moves by its title.
+- **A bond to the middle of a ring.** Drag a bond from a metal to the middle of a drawn ring (a Cp, a benzene) and it ends on the ring's centre, an η bond, as the J key makes one: two such bonds from Fe to two Cp rings give ferrocene, C10H10Fe.
+- **Greek letters by name in texts.** Type \delta, \nu, \Delta, \pm… in a text and it becomes δ, ν, Δ, ± at the next space or sign (the LaTeX names; the space after the name is taken, so \nu h gives νh).
 
 ## Changed
 

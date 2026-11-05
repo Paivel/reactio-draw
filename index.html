@@ -12320,6 +12320,44 @@ function kdOf(st) {
     }
   }
   /* rings of the drawn molecule (for ring fill and properties) */
+  /* a bond dragged from an atom (a metal) to the middle of a drawn ring ends on the ring's centre: an η bond (η5 for a Cp,
+     η6 for an arene), as the J key makes one; the ring's atoms become hapto atoms. The ring under the pointer: its
+     centre within 0.45 of its radius, the atom the bond starts from not in it */
+  function ringCentreNear(p, from) {
+    const near = mol.atoms.filter(a => !a.multi && Math.hypot(a.x - p.x, a.y - p.y) < L * 2.2);
+    if (near.length < 3) return null;
+    let best = null;
+    for (const R of molRings(near)) {
+      if (R.length < 3 || R.length > 8 || R.includes(from)) continue;
+      const cx = R.reduce((t, a) => t + a.x, 0) / R.length,
+        cy = R.reduce((t, a) => t + a.y, 0) / R.length,
+        rad = R.reduce((t, a) => t + Math.hypot(a.x - cx, a.y - cy), 0) / R.length,
+        d = Math.hypot(p.x - cx, p.y - cy);
+      if (d < rad * 0.45 && (!best || d < best.d)) best = { x: cx, y: cy, ring: R, d };
+    }
+    return best;
+  }
+  function hapBondTo(a, rc) {
+    const ids = rc.ring.map(q => q.id),
+      key = [...ids].sort((x, y) => x - y).join(',');
+    let m = mol.atoms.find(q => q.multi && [...q.multi].sort((x, y) => x - y).join(',') === key);
+    if (!m) {
+      m = newAtom(rc.x, rc.y, 'C');
+      m.multi = ids;
+      const inRing = new Set(ids);
+      for (const q of rc.ring) {
+        q.hap = 1;
+        /* a ring carbon keeps one H (C5H5, C6H6) unless it carries a group (Cp*: its methyls) */
+        if (q.el === 'C' && !q.label) {
+          const out = neighbors(q).filter(n => !inRing.has(n.id) && !n.multi).length;
+          q.hExp = out ? 0 : 1;
+          q.hUsed = usedVal(q);
+        }
+      }
+    }
+    if (m === a || bondBetween(a, m)) return;
+    mol.bonds.push({ id: mol.next++, a: a.id, b: m.id, order: 1, stereo: null });
+  }
   function molRings(atoms) {
     const ids = new Map(atoms.map((a, i) => [a.id, i]));
     const edges = mol.bonds
@@ -19580,9 +19618,49 @@ function kdOf(st) {
     const t = (e.clipboardData || window.clipboardData).getData('text/plain');
     document.execCommand('insertText', false, t);
   });
+  /* \delta, \nu, \Delta… typed in a text turn into δ, ν, Δ at the next character that is not a letter (the LaTeX names);
+     a space right after the name is taken by it, as in LaTeX, so \nu h gives νh and \delta+ gives δ+ */
+  const TEX_GREEK = (() => {
+    const lo = 'alpha α beta β gamma γ delta δ epsilon ε varepsilon ε zeta ζ eta η theta θ vartheta ϑ iota ι kappa κ lambda λ mu μ nu ν xi ξ omicron ο pi π varpi ϖ rho ρ varrho ϱ sigma σ varsigma ς tau τ upsilon υ phi φ varphi ϕ chi χ psi ψ omega ω',
+      up = 'Alpha Α Beta Β Gamma Γ Delta Δ Epsilon Ε Zeta Ζ Eta Η Theta Θ Iota Ι Kappa Κ Lambda Λ Mu Μ Nu Ν Xi Ξ Omicron Ο Pi Π Rho Ρ Sigma Σ Tau Τ Upsilon Υ Phi Φ Chi Χ Psi Ψ Omega Ω',
+      more = 'pm ± mp ∓ deg ° times × cdot · infty ∞ hbar ħ approx ≈ leq ≤ geq ≥ neq ≠ rightarrow → leftarrow ← rightleftharpoons ⇌ ddagger ‡ dagger † AA Å';
+    const m = {},
+      w = (lo + ' ' + up + ' ' + more).split(' ');
+    for (let i = 0; i + 1 < w.length; i += 2) m[w[i]] = w[i + 1];
+    return m;
+  })();
+  function texGreekAtCaret(eatSpace) {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount || !sel.isCollapsed) return false;
+    const n = sel.anchorNode,
+      o = sel.anchorOffset;
+    if (!n || n.nodeType !== 3 || !ovl.contains(n)) return false;
+    const before = n.data.slice(0, o),
+      m = /\\([A-Za-z]+)$/.exec(before);
+    if (!m || !TEX_GREEK[m[1]]) return false;
+    const ch = TEX_GREEK[m[1]],
+      at = o - m[0].length;
+    n.data = n.data.slice(0, at) + ch + n.data.slice(o);
+    const r = document.createRange();
+    r.setStart(n, at + ch.length);
+    r.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(r);
+    try {
+      ovl.dispatchEvent(new Event('input', { bubbles: true }));
+    } catch (e) {}
+    return true;
+  }
   ovl.addEventListener('keydown', e => {
     const mod = e.ctrlKey || e.metaKey,
       k = e.key.toLowerCase();
+    if (!mod && !e.altKey && (e.key === 'Enter' || e.key === 'Tab' || (e.key.length === 1 && !/[A-Za-z]/.test(e.key)))) {
+      if (texGreekAtCaret() && e.key === ' ') {
+        e.preventDefault();
+        e.stopPropagation();
+        return;
+      }
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       closeOverlay(true);
@@ -22356,8 +22434,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (drag.mode === 'bond') {
       const t = drag.orbTip ? null : findAtom(p, 14, drag.start);
       let end;
+      drag.ringC = !drag.orbTip && !t && drag.start ? ringCentreNear(p, drag.start) : null;
       if (drag.orbTip) end = orbTipNear(p, 12, drag.orbTip) || { x: p.x, y: p.y };
       else if (t) end = t;
+      else if (drag.ringC) end = { x: drag.ringC.x, y: drag.ringC.y };
       else if (freeBond || e.altKey) end = { x: p.x, y: p.y };
       else {
         let g = Math.atan2(p.y - s.y, p.x - s.x);
@@ -22862,7 +22942,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (d.mode === 'bond') {
       snap();
-      if (d.moved && d.end) {
+      if (d.moved && d.end && d.ringC && d.start) hapBondTo(d.start, d.ringC);
+      else if (d.moved && d.end) {
         const st = d.start || newAtom(d.p0.x, d.p0.y, curEl);
         const tx = !d.target && !findAtom(d.end, 10, st) && findText(d.end),
           t =
