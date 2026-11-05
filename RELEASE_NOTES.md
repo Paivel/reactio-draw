@@ -26,6 +26,7 @@
 - A text dragged next to a plain line (a rule of a table) stays where it is put; it held on to the line and moved by itself.
 - Zoom and dragging on large sheets are faster.
 - Compound numbers from the panel go below a label under the structure (OMe, CO2Me), not over it.
+- A reaction copied together with its reagent table pastes with the table and its data (roles, amounts, limiting reagent, conditions); before, only the reaction was pasted.
 
 # Reactio Draw 1.10
 

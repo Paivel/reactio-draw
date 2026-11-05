@@ -24118,11 +24118,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } finally {
       mol = saved;
     }
+    /* a reaction copied takes its reagent data along (roles, amounts, limiting reagent, conditions), and its reagent
+       table goes with it when the table is copied too; a table without its reaction stays behind */
+    const rxIds = new Set(rxnArrows().map(a => a.id)),
+      allA = sub ? sub.arrows : pick(mol.arrows),
+      stepIds = new Set(allA.filter(r => rxIds.has(r.id)).map(r => r.id));
+    const steps = {};
+    for (const id of stepIds)
+      steps[id] = withStep(id, () => pick(Object.fromEntries(STEPF.filter(k => S[k] !== undefined).map(k => [k, S[k]]))));
     clip = {
       atoms: sub ? sub.atoms : pick(mol.atoms),
       bonds: sub ? sub.bonds : pick(mol.bonds),
-      arrows: (sub ? sub.arrows : pick(mol.arrows)).filter(r => r.kind !== 'tbl'),
+      arrows: allA.filter(r => {
+        if (r.kind !== 'tbl') return true;
+        if (r.step == null && rxIds.size === 1 && stepIds.size === 1) r.step = [...stepIds][0];
+        return r.step != null && stepIds.has(r.step);
+      }),
       texts: sub ? sub.texts : pick(mol.texts),
+      steps,
       text: cdx,
       n: 0
     };
@@ -24375,6 +24388,37 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (txtMap.has(o[k].id)) o[k].id = txtMap.get(o[k].id);
           else delete o[k];
         }
+      /* a reagent table belongs to the copy of its reaction */
+      if (o.kind === 'tbl' && o.step != null) {
+        if (arrMap.has(o.step)) o.step = arrMap.get(o.step);
+        else delete o.step;
+      }
+    }
+    /* the copied reactions keep their reagent data, tied to the copies of their structures and texts */
+    if (clip.steps && Object.keys(clip.steps).length) {
+      const fresh = new Set(arrMap.values()),
+        old = rxnArrows().filter(a => !fresh.has(a.id));
+      /* the sheet had one reaction: its data is the one in the grid now, so it stays that reaction's */
+      if (old.length === 1 && S.cur !== old[0].id) S.cur = old[0].id;
+      if (!S.stepData) S.stepData = {};
+      const mapId = i => {
+        if (typeof i === 'string' && i[0] === 'T') {
+          const t = txtMap.get(+i.slice(1));
+          return t == null ? null : 'T' + t;
+        }
+        return map[i] ? map[i].id : null;
+      };
+      for (const [oid, d0] of Object.entries(clip.steps)) {
+        const nid = arrMap.get(+oid);
+        if (nid == null || !d0) continue;
+        const d = JSON.parse(JSON.stringify(d0));
+        d.fmap = (d.fmap || [])
+          .map(e => ({ ...e, atoms: e.atoms.map(mapId).filter(x => x != null) }))
+          .filter(e => e.atoms.length);
+        if (!d.memo) d.memo = {};
+        if (!d.manual) d.manual = [];
+        S.stepData[nid] = d;
+      }
     }
     setTool('select', true);
     commit();
