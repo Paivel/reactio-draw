@@ -35551,7 +35551,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fragIds.push([fr, fid]);
       let s = `<fragment id="${fid}">`;
       const nodeX = (a, i, inner) =>
-        `<n id="${i}" p="${P(a.x, a.y)}"${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : ''}>${inner}</n>`;
+        `<n id="${i}" p="${P(a.x, a.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(a.x, a.y)} ${(a.d3 * k).toFixed(2)}"` : ''}${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : ''}>${inner}</n>`;
       const bondX = (b, B, E) => {
         const d =
           b.stereo === 'wedge'
@@ -40836,6 +40836,36 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* the stages of the sheet (or of the selection): the structures between one reaction arrow and the next, in reading
      order; a structure over or under an arrow is its reagent and stays out; with no arrows each structure is a stage */
+  /* equivalency signs (≡: three short parallel lines, or the character as a text): the same molecule drawn again,
+     turned; the middle of each */
+  function animEquivs() {
+    const out = [];
+    const ln = mol.arrows.filter(r => !r.kind && !r.curve && r.head === 'none' && (!r.tail || r.tail === 'none') && !r.points && Math.hypot(r.x2 - r.x1, r.y2 - r.y1) < 2.5 * L);
+    const used = new Set();
+    for (const r of ln) {
+      if (used.has(r)) continue;
+      const mid = q => [(q.x1 + q.x2) / 2, (q.y1 + q.y2) / 2],
+        [mx, my] = mid(r),
+        dir = Math.atan2(r.y2 - r.y1, r.x2 - r.x1);
+      const g = ln.filter(q => {
+        if (used.has(q)) return false;
+        const [x, y] = mid(q),
+          d = Math.atan2(q.y2 - q.y1, q.x2 - q.x1),
+          da = Math.abs(Math.sin(d - dir));
+        return da < 0.1 && Math.hypot(x - mx, y - my) < 0.8 * L;
+      });
+      if (g.length >= 3) {
+        g.forEach(q => used.add(q));
+        out.push({ x: g.reduce((t, q) => t + mid(q)[0], 0) / g.length, y: g.reduce((t, q) => t + mid(q)[1], 0) / g.length });
+      }
+    }
+    for (const t of mol.texts) if (String(t.text || '').trim() === '≡') out.push({ x: t.x, y: t.y });
+    return out;
+  }
+  /* the stages of the sheet (or of the selection): the structures between one reaction arrow (or ≡) and the next, in
+     reading order; a structure over or under an arrow is its reagent and stays out; with no arrows each structure is a
+     stage. A structure with a 3D place (from a crystal file) straight above another is that one's 3D pose, not a stage.
+     stages.gaps: 'rxn' or 'turn' between one stage and the next; stages.poses: the pose atoms of each stage (or null) */
   function animStages() {
     let frs = fragments().filter(f => f.length >= 1 && !f.every(a => a.multi));
     if (sel.size) {
@@ -40851,6 +40881,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       for (const a of f) ((x0 = Math.min(x0, a.x)), (y0 = Math.min(y0, a.y)), (x1 = Math.max(x1, a.x)), (y1 = Math.max(y1, a.y)));
       return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
     };
+    /* 3D poses: every atom with a depth, and a structure without one below it */
+    const poseOf = new Map();
+    {
+      const bx = frs.map(box),
+        is3 = frs.map(f => f.length > 1 && f.every(a => a.d3 != null));
+      frs.forEach((f, i) => {
+        if (!is3[i]) return;
+        let best = -1,
+          bd = 1e9;
+        frs.forEach((g, j) => {
+          if (is3[j] || g.length < 2) return;
+          const d = bx[j].cy - bx[i].cy;
+          if (bx[j].cx > bx[i].x0 && bx[j].cx < bx[i].x1 && d > 0 && d < bd && !poseOf.has(g)) ((best = j), (bd = d));
+        });
+        if (best >= 0) poseOf.set(frs[best], f);
+      });
+      const poses = new Set(poseOf.values());
+      frs = frs.filter(f => !poses.has(f));
+    }
     const ars = mol.arrows.filter(r => isRxnArrow(r) && !r.kind);
     const items = [];
     for (const f of frs) {
@@ -40866,20 +40915,42 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       });
       if (!reag) items.push({ f, k: [rows(b.cy), b.cx] });
     }
-    for (const r of ars) items.push({ r, k: [rows((r.y1 + r.y2) / 2), (r.x1 + r.x2) / 2] });
+    for (const r of ars) items.push({ sep: 'rxn', k: [rows((r.y1 + r.y2) / 2), (r.x1 + r.x2) / 2] });
+    for (const e of animEquivs()) items.push({ sep: 'turn', k: [rows(e.y), e.x] });
     items.sort((p, q) => p.k[0] - q.k[0] || p.k[1] - q.k[1]);
-    const stages = [];
-    let cur = [];
-    const hasArrows = ars.length > 0;
+    const stages = [],
+      gaps = [],
+      poses = [];
+    let cur = [],
+      curPose = null,
+      gap = 'rxn';
+    const hasSeps = items.some(it => it.sep);
+    const close = () => {
+      if (!cur.length) return;
+      if (stages.length) gaps.push(gap);
+      stages.push(cur);
+      poses.push(curPose);
+      cur = [];
+      curPose = null;
+    };
     for (const it of items) {
-      if (it.r) {
-        if (cur.length) stages.push(cur);
-        cur = [];
-      } else if (hasArrows) cur.push(...it.f);
-      else stages.push([...it.f]);
+      if (it.sep) {
+        close();
+        gap = it.sep;
+      } else if (hasSeps) {
+        cur.push(...it.f);
+        if (poseOf.has(it.f)) curPose = poseOf.get(it.f);
+      } else {
+        cur = [...it.f];
+        curPose = poseOf.get(it.f) || null;
+        gap = 'rxn';
+        close();
+      }
     }
-    if (hasArrows && cur.length) stages.push(cur);
-    return stages.filter(s => s.length);
+    close();
+    stages.gaps = gaps;
+    stages.poses = poses;
+    return stages;
   }
   /* the plan: scenes of every stage, each placed over the one before it (only moved, not turned), the pairings */
   function animPlan(forcedList) {
@@ -40891,7 +40962,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const SA = scenes[i],
         SB = scenes[i + 1],
         forced = forcedList && forcedList[i] ? new Map(forcedList[i]) : null,
-        m = animMatch(SA, SB, forced);
+        isTurn = stages.gaps[i] === 'turn' && !forced;
+      let m = animMatch(SA, SB, forced),
+        X = null;
+      /* the same molecule drawn turned (≡): paired atom for atom through its 3D shape */
+      if (isTurn) ({ X, m } = animTurnPair(SA, SB, m, stages.poses[i], stages.poses[i + 1]));
       /* B moved over A: by the mean offset of the pairs (or of the centres when nothing pairs) */
       let dx = 0,
         dy = 0;
@@ -40908,9 +40983,313 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       for (const a of SB.A) ((a.x -= dx), (a.y -= dy));
       const bm = animMatchBonds(SA, SB, m);
-      steps.push({ m, bm, mo: animMotion(SA, SB, m), kept: bm.size, broken: SA.B.length - bm.size, formed: SB.B.length - bm.size, paired: m.size, ofA: SA.A.length, ofB: SB.A.length });
+      /* the same molecule drawn turned (≡): turned in 3D, by its pose from the file or a computed shape */
+      const turn = isTurn && m.size >= 3 ? animTurn3D(SA, SB, m, X) : null;
+      steps.push({ m, bm, mo: animMotion(SA, SB, m), turn, kept: bm.size, broken: SA.B.length - bm.size, formed: SB.B.length - bm.size, paired: m.size, ofA: SA.A.length, ofB: SB.A.length });
     }
     return { scenes, steps };
+  }
+  /* ---- turns in 3D (≡ between two drawings of one molecule) ---- */
+  const v3 = {
+    mul: (R, p) => [R[0][0] * p[0] + R[0][1] * p[1] + R[0][2] * p[2], R[1][0] * p[0] + R[1][1] * p[1] + R[1][2] * p[2], R[2][0] * p[0] + R[2][1] * p[1] + R[2][2] * p[2]],
+    mm: (A, B) => A.map(r => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j])),
+    tr: A => [0, 1, 2].map(i => [A[0][i], A[1][i], A[2][i]]),
+    cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+    rot: (ax, th) => {
+      const [x, y, z] = ax,
+        c = Math.cos(th),
+        s = Math.sin(th),
+        C = 1 - c;
+      return [
+        [c + x * x * C, x * y * C - z * s, x * z * C + y * s],
+        [y * x * C + z * s, c + y * y * C, y * z * C - x * s],
+        [z * x * C - y * s, z * y * C + x * s, c + z * z * C]
+      ];
+    }
+  };
+  /* the turn and size that best show the 3D points X (centred) as the drawn points P: an orthographic view */
+  function animView(X, P) {
+    const n = X.length,
+      pc = [P.reduce((t, p) => t + p[0], 0) / n, P.reduce((t, p) => t + p[1], 0) / n],
+      Q = P.map(p => [p[0] - pc[0], p[1] - pc[1]]);
+    /* a start: the linear map X → P, made a turn */
+    const XtX = [0, 1, 2].map(i => [0, 1, 2].map(j => X.reduce((t, x) => t + x[i] * x[j], 0) + (i === j ? 1e-6 : 0)));
+    const det = M => M[0][0] * (M[1][1] * M[2][2] - M[1][2] * M[2][1]) - M[0][1] * (M[1][0] * M[2][2] - M[1][2] * M[2][0]) + M[0][2] * (M[1][0] * M[2][1] - M[1][1] * M[2][0]);
+    const inv = M => {
+      const d = det(M) || 1e-12,
+        c = (i, j) => {
+          const r = [0, 1, 2].filter(k => k !== i),
+            q = [0, 1, 2].filter(k => k !== j);
+          return (M[r[0]][q[0]] * M[r[1]][q[1]] - M[r[0]][q[1]] * M[r[1]][q[0]]) * ((i + j) % 2 ? -1 : 1);
+        };
+      return [0, 1, 2].map(i => [0, 1, 2].map(j => c(j, i) / d));
+    };
+    const Ii = inv(XtX),
+      rows = [0, 1].map(k => {
+        const b = [0, 1, 2].map(i => X.reduce((t, x, j) => t + x[i] * Q[j][k], 0));
+        return [0, 1, 2].map(i => Ii[i][0] * b[0] + Ii[i][1] * b[1] + Ii[i][2] * b[2]);
+      });
+    const nrm = v => {
+      const l = Math.hypot(...v) || 1;
+      return v.map(x => x / l);
+    };
+    let r1 = nrm(rows[0]),
+      d = rows[1][0] * r1[0] + rows[1][1] * r1[1] + rows[1][2] * r1[2],
+      r2 = nrm([rows[1][0] - d * r1[0], rows[1][1] - d * r1[1], rows[1][2] - d * r1[2]]);
+    let R = [r1, r2, v3.cross(r1, r2)],
+      s = 1,
+      err = 0;
+    for (let it = 0; it < 25; it++) {
+      const Y = X.map(x => v3.mul(R, x));
+      let num = 0,
+        den = 0;
+      for (let i = 0; i < n; i++) ((num += Y[i][0] * Q[i][0] + Y[i][1] * Q[i][1]), (den += Y[i][0] ** 2 + Y[i][1] ** 2));
+      s = num / (den || 1) || 1;
+      R = fitRot(
+        X,
+        Q.map((q, i) => [q[0] / s, q[1] / s, Y[i][2]])
+      );
+    }
+    const Y = X.map(x => v3.mul(R, x));
+    for (let i = 0; i < n; i++) err += Math.hypot(s * Y[i][0] - Q[i][0], s * Y[i][1] - Q[i][1]);
+    return { R, s, pc, err: err / n };
+  }
+  /* the pairings of two drawings of one molecule atom for atom (the heavy atoms by element and bonds, then the H on
+     them), each scored by score(map) (lower is better); the best, or null when they are not the same molecule */
+  function animIso(SA, SB, score) {
+    const hv = (S, i) => S.A[i].el !== 'H' || S.nb[i].length !== 1;
+    const elA = i => SA.A[i].el,
+      elB = i => SB.A[i].el;
+    const HA = SA.A.map((a, i) => i).filter(i => hv(SA, i)),
+      HB = SB.A.map((a, i) => i).filter(i => hv(SB, i));
+    if (HA.length !== HB.length || !HA.length) return null;
+    const hnb = (S, i) => S.nb[i].filter(j => hv(S, j));
+    const degA = HA.map(i => hnb(SA, i).length);
+    /* the atoms of the first drawing in an order along the bonds, so each new one has a placed neighbour */
+    const order = [],
+      seen = new Set();
+    for (const r of HA) {
+      if (seen.has(r)) continue;
+      const q = [r];
+      seen.add(r);
+      while (q.length) {
+        const x = q.shift();
+        order.push(x);
+        for (const y of hnb(SA, x)) if (!seen.has(y)) (seen.add(y), q.push(y));
+      }
+    }
+    const dB = new Map(HB.map(i => [i, hnb(SB, i).length])),
+      dA = new Map(HA.map((i, k) => [i, degA[k]]));
+    const map = new Map(),
+      used = new Set();
+    let best = null,
+      bs = Infinity,
+      found = 0,
+      steps = 0;
+    const withH = () => {
+      const m = new Map(map),
+        taken = new Set(m.values());
+      for (const [a, b] of map) {
+        const ha = SA.nb[a].filter(j => !hv(SA, j)),
+          hb = SB.nb[b].filter(j => !hv(SB, j) && !taken.has(j));
+        ha.forEach((h, k) => {
+          if (k < hb.length) (m.set(h, hb[k]), taken.add(hb[k]));
+        });
+      }
+      return m;
+    };
+    const go = k => {
+      if (++steps > 300000 || found >= 400) return;
+      if (k === order.length) {
+        found++;
+        const m = withH(),
+          sc = score(m);
+        if (sc < bs) ((bs = sc), (best = m));
+        return;
+      }
+      const a = order[k],
+        nbA = hnb(SA, a).filter(x => map.has(x));
+      let cands;
+      if (nbA.length) cands = hnb(SB, map.get(nbA[0])).filter(b => !used.has(b));
+      else cands = HB.filter(b => !used.has(b));
+      for (const b of cands) {
+        if (elB(b) !== elA(a) || dB.get(b) !== dA.get(a)) continue;
+        if (!nbA.every(x => SB.nb[b].includes(map.get(x)))) continue;
+        /* bonds to placed atoms that the second drawing lacks */
+        if (hnb(SB, b).some(y => used.has(y) && ![...map].some(([x, v]) => v === y && SA.nb[a].includes(x)))) continue;
+        map.set(a, b);
+        used.add(b);
+        go(k + 1);
+        map.delete(a);
+        used.delete(b);
+      }
+    };
+    go(0);
+    return best;
+  }
+  /* an H paired by its place: the H of each paired atom matched to the H nearest where the first drawing's H would land */
+  function animIsoH(SA, SB, m, where) {
+    const out = new Map([...m].filter(([a]) => SA.A[a].el !== 'H' || SA.nb[a].length !== 1)),
+      taken = new Set(out.values());
+    for (const [a, b] of [...out]) {
+      const ha = SA.nb[a].filter(j => SA.A[j].el === 'H' && SA.nb[j].length === 1),
+        hb = SB.nb[b].filter(j => SB.A[j].el === 'H' && SB.nb[j].length === 1 && !taken.has(j));
+      for (const h of ha) {
+        const w = where(h);
+        let bj = -1,
+          bd = Infinity;
+        for (const j of hb) {
+          if (taken.has(j)) continue;
+          const d = w ? Math.hypot(SB.A[j].x - w[0], SB.A[j].y - w[1]) : 0;
+          if (d < bd) ((bd = d), (bj = j));
+        }
+        if (bj >= 0) (out.set(h, bj), taken.add(bj));
+      }
+    }
+    return out;
+  }
+  /* the 3D places of the atoms of scene S: from its pose (a structure with 3D places, paired by bonds), its own depths,
+     or OpenChemLib's shape of it; [x, y, z] or null for each atom */
+  function anim3D(S, pose) {
+    if (pose && pose.length > 2) {
+      const PS = animScene(pose),
+        P3 = PS.A.map(a => (a.d3 != null ? [a.x, a.y, a.d3] : null));
+      /* paired by bonds, the pairing that shows the pose best as the drawing */
+      const fit = mm => {
+        const k = [...mm].filter(([p]) => P3[p]);
+        if (k.length < 3) return Infinity;
+        const c = [0, 1, 2].map(i => k.reduce((t, [p]) => t + P3[p][i], 0) / k.length);
+        let e = Infinity;
+        for (const f of [1, -1])
+          e = Math.min(e, animView(k.map(([p]) => [P3[p][0] - c[0], P3[p][1] - c[1], f * (P3[p][2] - c[2])]), k.map(([, a]) => [S.A[a].x, S.A[a].y])).err);
+        return e;
+      };
+      const m = animIso(PS, S, fit) || animMatch(PS, S),
+        X = S.A.map(() => null);
+      for (const [p, a] of m) if (PS.A[p].d3 != null) X[a] = [PS.A[p].x, PS.A[p].y, PS.A[p].d3];
+      if (X.filter(Boolean).length >= 3) return X;
+    }
+    if (S.A.every(a => a.d3 != null)) return S.A.map(a => [a.x, a.y, a.d3]);
+    const full = mol;
+    try {
+      const O = oclLoad();
+      mol = { ...full, atoms: S.A, bonds: S.B };
+      const P = oclShape(O, oclSpec(S.A));
+      if (!P) return null;
+      const k = L / 1.5;
+      return P.map(p => [p[0] * k, p[1] * k, p[2] * k]);
+    } catch (e) {
+      return null;
+    } finally {
+      mol = full;
+    }
+  }
+  /* a turn's 3D places of the first drawing and its pairing with the second: atom for atom, the pairing that shows the
+     same 3D shape best as the second drawing */
+  function animTurnPair(SA, SB, m0, poseA, poseB) {
+    let X = anim3D(SA, poseA);
+    if (!X && poseB) {
+      const XB = anim3D(SB, poseB);
+      if (XB) {
+        X = SA.A.map(() => null);
+        for (const [a, b] of m0) X[a] = XB[b];
+      }
+    }
+    if (!X) return { X: null, m: m0 };
+    const shown = (mm, f) => {
+      const k = [...mm].filter(([a]) => X[a]);
+      if (k.length < 3) return null;
+      const c = [0, 1, 2].map(i => k.reduce((t, [a]) => t + X[a][i], 0) / k.length),
+        Xc = k.map(([a]) => [X[a][0] - c[0], X[a][1] - c[1], f * (X[a][2] - c[2])]);
+      return { k, c, V: animView(Xc, k.map(([, b]) => [SB.A[b].x, SB.A[b].y])) };
+    };
+    const score = mm => Math.min(...[1, -1].map(f => (shown(mm, f) || { V: { err: Infinity } }).V.err));
+    let m = animIso(SA, SB, score);
+    if (!m) return { X, m: m0 };
+    /* the H again, each to the H of the second drawing nearest where it is shown */
+    let bf = 1;
+    if (score(m) !== Math.min(...[1].map(f => (shown(m, f) || { V: { err: Infinity } }).V.err))) bf = -1;
+    const sh = shown(m, bf);
+    if (sh) {
+      const where = h => {
+        if (!X[h]) return null;
+        const y = v3.mul(sh.V.R, [X[h][0] - sh.c[0], X[h][1] - sh.c[1], bf * (X[h][2] - sh.c[2])]);
+        return [sh.V.pc[0] + sh.V.s * y[0], sh.V.pc[1] + sh.V.s * y[1]];
+      };
+      m = animIsoH(SA, SB, m, where);
+    }
+    return { X, m };
+  }
+  function animTurn3D(SA, SB, m, X) {
+    if (!X) return null;
+    const ks = [...m].filter(([a]) => X[a]);
+    if (ks.length < 3) return null;
+    const c = [0, 1, 2].map(i => ks.reduce((t, [a]) => t + X[a][i], 0) / ks.length);
+    let best = null;
+    /* the pose may be the mirror of the drawing's frame: both tried */
+    for (const f of [1, -1]) {
+      const Xc = SA.A.map((a, i) => (X[i] ? [X[i][0] - c[0], X[i][1] - c[1], f * (X[i][2] - c[2])] : null)),
+        VA = animView(ks.map(([a]) => Xc[a]), ks.map(([a]) => [SA.A[a].x, SA.A[a].y])),
+        VB = animView(ks.map(([a]) => Xc[a]), ks.map(([, b]) => [SB.A[b].x, SB.A[b].y]));
+      if (!best || VA.err + VB.err < best.err) best = { Xc, VA, VB, err: VA.err + VB.err };
+    }
+    const { Xc, VA, VB } = best;
+    /* the turn from the first view to the second, as an axis and an angle */
+    const D = v3.mm(VB.R, v3.tr(VA.R)),
+      tr = D[0][0] + D[1][1] + D[2][2];
+    let th = Math.acos(Math.max(-1, Math.min(1, (tr - 1) / 2))),
+      ax = [D[2][1] - D[1][2], D[0][2] - D[2][0], D[1][0] - D[0][1]];
+    if (Math.hypot(...ax) < 1e-6) {
+      /* a half turn (or none): the axis from D + I */
+      const M = [0, 1, 2].map(i => [0, 1, 2].map(j => D[i][j] + (i === j ? 1 : 0)));
+      ax = M.map(r => r).reduce((b, col) => (Math.hypot(...col) > Math.hypot(...b) ? col : b), [0, 0, 0]);
+    }
+    const al = Math.hypot(...ax) || 1;
+    ax = ax.map(v => v / al);
+    const view = (V, i) => {
+      const y = v3.mul(V.R, Xc[i]);
+      return [V.pc[0] + V.s * y[0], V.pc[1] + V.s * y[1]];
+    };
+    const resA = SA.A.map((a, i) => (Xc[i] ? ((q => [a.x - q[0], a.y - q[1]])(view(VA, i))) : null)),
+      resB = SA.A.map((a, i) => {
+        const b = m.get(i);
+        if (b == null || !Xc[i]) return null;
+        const q = view(VB, i);
+        return [SB.A[b].x - q[0], SB.A[b].y - q[1]];
+      });
+    return { Xc, VA, VB, ax, th, resA, resB, err: best.err };
+  }
+  /* the places of both scenes at time t during a turn */
+  function animTurnPlaces(SA, SB, m, T, t) {
+    const R = v3.mm(v3.rot(T.ax, T.th * t), T.VA.R),
+      s = T.VA.s + (T.VB.s - T.VA.s) * t,
+      pc = [T.VA.pc[0] + (T.VB.pc[0] - T.VA.pc[0]) * t, T.VA.pc[1] + (T.VB.pc[1] - T.VA.pc[1]) * t];
+    const dA = SA.A.map(() => null),
+      PA = SA.A.map(p => [p.x, p.y]);
+    for (let i = 0; i < SA.A.length; i++) {
+      if (!T.Xc[i]) continue;
+      const y = v3.mul(R, T.Xc[i]),
+        rA = T.resA[i],
+        rB = T.resB[i] || rA;
+      PA[i] = [pc[0] + s * y[0] + (1 - t) * rA[0] + t * rB[0], pc[1] + s * y[1] + (1 - t) * rA[1] + t * rB[1]];
+      dA[i] = [PA[i][0] - SA.A[i].x, PA[i][1] - SA.A[i].y];
+    }
+    const carry = (S, d) => {
+      for (let it = 0; it < 8; it++)
+        for (let i = 0; i < S.A.length; i++) {
+          if (d[i]) continue;
+          const v = S.nb[i].map(n => d[n]).filter(Boolean);
+          if (v.length) d[i] = [v.reduce((q, w) => q + w[0], 0) / v.length, v.reduce((q, w) => q + w[1], 0) / v.length];
+        }
+    };
+    carry(SA, dA);
+    for (let i = 0; i < SA.A.length; i++) if (!T.Xc[i] && dA[i]) PA[i] = [SA.A[i].x + dA[i][0], SA.A[i].y + dA[i][1]];
+    const dB = SB.A.map(() => null);
+    for (const [a, b] of m) dB[b] = [PA[a][0] - SB.A[b].x, PA[a][1] - SB.A[b].y];
+    carry(SB, dB);
+    /* an atom of the second drawing with nothing paired near it waits where it is drawn */
+    const PB = SB.A.map((q, b) => (dB[b] ? [q.x + dB[b][0] * 1, q.y + dB[b][1] * 1] : [q.x, q.y]));
+    return [PA, PB];
   }
   /* the best turn (about the centres) that lays the points P over the points Q */
   function animTurn(P, Q) {
@@ -40995,7 +41374,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* where every atom of both scenes is at time t (0…1): paired ones on their way, the others carried with their paired
      neighbours (cdxmorph's flow) */
-  function animPlaces(SA, SB, m, mo, t) {
+  function animPlaces(SA, SB, m, mo, t, turn) {
+    if (turn) return animTurnPlaces(SA, SB, m, turn, t);
     const PA = SA.A.map(p => [p.x, p.y]),
       PB = SB.A.map(q => [q.x, q.y]);
     if (!mo) return [PA, PB];
@@ -41103,7 +41483,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* and every place on the way (a turning structure swings out) */
     steps.forEach((st, i) => {
       for (let k = 1; k < 8; k++)
-        for (const P of animPlaces(scenes[i], scenes[i + 1], st.m, st.mo, animEase(k / 8)))
+        for (const P of animPlaces(scenes[i], scenes[i + 1], st.m, st.mo, animEase(k / 8), st.turn))
           for (const [x, y] of P) ((x0 = Math.min(x0, x)), (y0 = Math.min(y0, y)), (x1 = Math.max(x1, x)), (y1 = Math.max(y1, y)));
     });
     const pad = L * 1.2;
@@ -41135,7 +41515,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         st = steps[i];
       for (let f = 1; f < n; f++) {
         const t = animEase(f / n),
-          [PA, PB] = animPlaces(SA, SB, st.m, st.mo, t);
+          [PA, PB] = animPlaces(SA, SB, st.m, st.mo, t, st.turn);
         const [ia, ib] = await Promise.all([animImg(animSVG(SA, PA, box)), animImg(animSVG(SB, PB, box))]);
         const c = cv(),
           g = c.getContext('2d');
@@ -41147,6 +41527,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       await still(SB, i + 1 < steps.length ? Math.max(1 / fps, pause) : hold);
     }
+    /* there and back: the film played backwards after it, to the first structure again */
+    if (o.back) frames.push(...frames.slice(0, -1).reverse());
     return { frames, W, H, fps };
   }
   /* a GIF of the frames: one palette for the whole film (the commonest colours), LZW, looping */
@@ -41311,11 +41693,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const st = plan.steps
       .map(
         (s, i) =>
-          `<li>Step ${i + 1}: ${s.paired} of ${s.ofA} atoms paired with ${s.ofB}; ${s.kept} bond${s.kept === 1 ? '' : 's'} kept, ${s.broken} broken, ${s.formed} formed</li>`
+          `<li>Step ${i + 1}: ${s.paired} of ${s.ofA} atoms paired with ${s.ofB}; ${s.kept} bond${s.kept === 1 ? '' : 's'} kept, ${s.broken} broken, ${s.formed} formed${s.turn ? '; turned in 3D' : ''}</li>`
       )
       .join('');
-    box.innerHTML = `<div class="card"><b>Animation</b><div class="note">Each structure turns into the next: atoms move, bonds that break or form dissolve. ${plan.scenes.length} structures, ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}.</div><ul class="warn">${st}</ul>
-      <div class="grid"><label>Width, px <input type="number" data-o="width" value="800" min="200" max="2000" step="50"></label><label>Each step, s <input type="number" data-o="duration" value="2" min="0.3" max="20" step="0.1"></label><label>Frames a second <input type="number" data-o="fps" value="24" min="5" max="60" step="1"></label><label>Hold at the ends, s <input type="number" data-o="hold" value="0.6" min="0" max="10" step="0.1"></label><label>Pause between steps, s <input type="number" data-o="pause" value="0.3" min="0" max="10" step="0.1"></label></div>
+    box.innerHTML = `<div class="card"><b>Animation</b><div class="note">Each structure turns into the next: atoms move, bonds that break or form dissolve; between two drawings of one molecule joined by ≡ it turns in 3D (by the 3D structure drawn above it, from a crystal file, or a computed one). ${plan.scenes.length} structures, ${plan.steps.length} step${plan.steps.length === 1 ? '' : 's'}.</div><ul class="warn">${st}</ul>
+      <div class="grid"><label>Width, px <input type="number" data-o="width" value="800" min="200" max="2000" step="50"></label><label>Each step, s <input type="number" data-o="duration" value="2" min="0.3" max="20" step="0.1"></label><label>Frames a second <input type="number" data-o="fps" value="24" min="5" max="60" step="1"></label><label>Hold at the ends, s <input type="number" data-o="hold" value="0.6" min="0" max="10" step="0.1"></label><label>Pause between steps, s <input type="number" data-o="pause" value="0.3" min="0" max="10" step="0.1"></label><label><input type="checkbox" data-o="back"> There and back</label></div>
       <canvas class="prev" hidden></canvas><div class="tx note"></div><div class="row"></div></div>`;
     document.body.appendChild(box);
     ANIMBOX = box;
@@ -41327,7 +41709,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       playing = 0;
     const opts = () => {
       const o = {};
-      box.querySelectorAll('[data-o]').forEach(i => (o[i.dataset.o] = +i.value));
+      box.querySelectorAll('[data-o]').forEach(i => (o[i.dataset.o] = i.type === 'checkbox' ? i.checked : +i.value));
       return o;
     };
     const make = async () => {
@@ -44984,6 +45366,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (isoA === 2 && el === 'H') el = 'D';
       const a = newAtom(p.x + ox, p.y, el);
       a.chg = parseInt(n.getAttribute('Charge') || '0') || 0;
+      {
+        /* a 3D place (a structure from a crystal file): its depth is kept, the animation turns the drawing below by it */
+        const v = (n.getAttribute('xyz') || '').trim().split(/\s+/).map(Number);
+        if (v.length === 3 && v.every(isFinite)) a.d3 = v[2] * k;
+      }
       if (isoA && el !== 'D' && (isoA + el) in AW) a.iso = isoA;
       {
         const c = colOf(n.getAttribute('color')),
