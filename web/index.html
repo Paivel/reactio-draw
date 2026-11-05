@@ -3249,7 +3249,7 @@ html {
           <div class="note" id="inchiNote" style="margin-top:2px"></div>
         </div>
         <div>
-          <div class="row" style="justify-content:space-between;margin-bottom:4px"><span class="tlabel" title="IUPAC name of the selected structure (or the only one on the sheet), made two ways: Name it uses openclatura (in the Reactio Draw app for Mac, Windows and Linux; needs Python with openclatura); Alternative name uses the namer of Octet Draw, which runs here, in the browser too. Each name is read back with OPSIN and compared with the drawing">Name</span><span class="row" style="gap:4px"><button class="btn sm" id="nameIt" title="openclatura (lamalab-org): in the Reactio Draw app for Mac, Windows and Linux">Name it</button><button class="btn sm" id="nameOctet" title="Made by the namer of Octet Draw (Sam Ellis, Apache-2.0): runs here, in the browser too">Alternative name</button><button class="btn ghost sm" id="copyName">Copy</button></span></div>
+          <div class="row" style="justify-content:space-between;margin-bottom:4px"><span class="tlabel" title="IUPAC name of the selected structure (or the only one on the sheet), made two ways: Name it uses openclatura (in the Reactio Draw app for Mac, Windows and Linux; needs Python with openclatura); Alternative name uses the namer of Octet Draw, which runs here, in the browser too. Each name is read back with OPSIN and compared with the drawing">Name</span><span class="row" style="gap:4px"><button class="btn sm" id="nameIt" title="openclatura (lamalab-org): in the Reactio Draw app for Mac, Windows and Linux">Name it</button><button class="btn sm" id="nameOctet" title="Made by the namer of Octet Draw (Sam Ellis, Apache-2.0): runs here, in the browser too">Alternative name</button><button class="btn ghost sm" id="copyName">Copy</button><button class="btn ghost sm" id="numIupac" title="Write the IUPAC numbers (locants) beside the atoms of the structure, as its name counts them (the namer of Octet Draw); press again to take them off">Numbering</button></span></div>
           <div class="note" style="margin:0 0 2px">Name it: openclatura (apps)</div>
           <div class="smiles" id="iupac" style="font-family:var(--sans);min-height:22px"></div>
           <div class="note" id="iupacNote" style="margin-top:2px"></div>
@@ -17863,7 +17863,146 @@ function kdOf(st) {
   }
   /* the labels drawn on the sheet, each where it covers no bond, atom label, text or other label: tried first in the widest
      gap between the atom's bonds (beside a double bond: on its open side), then turned round the atom and moved out */
+  /* the R/S and E/Z labels on the sheet: where each was drawn (for dragging it and its right-click menu); a label dragged
+     keeps its place by its atom or bond (a.cipo / b.cipo: dx, dy from the atom or the bond's middle), its own colour in cipc */
+  const CIPBOX = [];
+  const cipAt = p => {
+    for (let i = CIPBOX.length - 1; i >= 0; i--) {
+      const c = CIPBOX[i];
+      if (Math.abs(p.x - c.x) <= c.w / 2 + 2 && Math.abs(p.y - c.y) <= c.h / 2 + 2) return c;
+    }
+    return null;
+  };
+  {
+    const svgEl = $('mol');
+    let cd = null;
+    const on = () => $('cipShow') && $('cipShow').checked;
+    svgEl.addEventListener(
+      'pointerdown',
+      e => {
+        if (!on() || e.button !== 0 || !isSelTool()) return;
+        const c = cipAt(pt(e));
+        if (!c) return;
+        e.preventDefault();
+        e.stopPropagation();
+        cd = { c, p0: pt(e), x0: c.x - c.ox, y0: c.y - c.oy, moved: false };
+        try {
+          svgEl.setPointerCapture(e.pointerId);
+        } catch (x) {}
+      },
+      true
+    );
+    svgEl.addEventListener(
+      'pointermove',
+      e => {
+        if (!cd) {
+          if (on() && isSelTool()) {
+            const c = cipAt(pt(e));
+            if (c) svgEl.style.cursor = 'move';
+            else if (svgEl.style.cursor === 'move' && !drag) svgEl.style.cursor = '';
+          }
+          return;
+        }
+        e.stopPropagation();
+        const p = pt(e),
+          dx = p.x - cd.p0.x,
+          dy = p.y - cd.p0.y;
+        if (!cd.moved && Math.hypot(dx, dy) < 2) return;
+        if (!cd.moved) snap();
+        cd.moved = true;
+        cd.c.it.cipo = { dx: Math.round((cd.x0 + dx) * 10) / 10, dy: Math.round((cd.y0 + dy) * 10) / 10 };
+        render();
+      },
+      true
+    );
+    const end = () => {
+      if (!cd) return;
+      const m = cd.moved;
+      cd = null;
+      if (m) commit();
+    };
+    svgEl.addEventListener('pointerup', end, true);
+    svgEl.addEventListener('pointercancel', end, true);
+  }
+  /* right-click a label: its colour (or all of them), back to its own place */
+  const cipPop = document.createElement('div');
+  cipPop.className = 'pop';
+  cipPop.id = 'cippop';
+  cipPop.hidden = true;
+  cipPop.style.cssText = 'display:flex;flex-direction:column;gap:4px;padding:6px;min-width:200px';
+  document.body.appendChild(cipPop);
+  let cipTarget = null;
+  const CIP_COLS = ['', '#d0312d', '#2448c4', '#1d7a4b', '#7a3fb5', '#b0580c', '#8a94a6'];
+  $('mol').addEventListener(
+    'contextmenu',
+    e => {
+      if (!($('cipShow') && $('cipShow').checked)) return;
+      const c = cipAt(pt(e));
+      if (!c) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cipTarget = c.it;
+      const sw = CIP_COLS.map(
+        k =>
+          `<button type="button" class="sw" data-cipc="${k}" title="${k || 'Ink (as the bonds)'}" style="background:${k || 'var(--ink)'};${(c.it.cipc || '') === k ? 'outline:2px solid var(--accent);outline-offset:1px' : ''}"></button>`
+      ).join('');
+      cipPop.innerHTML =
+        '<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">R/S and E/Z label</span>' +
+        `<div style="display:flex;gap:5px;align-items:center;padding:0 4px">${sw}<input type="color" data-cipcx value="${/^#[0-9a-f]{6}$/i.test(c.it.cipc || '') ? c.it.cipc : '#15202d'}" title="Another colour" style="width:26px;height:24px;padding:0;border:1px solid var(--line)"></div>` +
+        '<button type="button" class="btn ghost sm" style="justify-content:flex-start" data-cipall>This colour for all the labels</button>' +
+        `<button type="button" class="btn ghost sm" style="justify-content:flex-start" data-cipback${c.it.cipo ? '' : ' disabled'}>Back to its own place</button>` +
+        `<button type="button" class="btn ghost sm" style="justify-content:flex-start" data-cipallback${[...mol.atoms, ...mol.bonds].some(q => q.cipo) ? '' : ' disabled'}>All labels back to their places</button>`;
+      Object.assign(cipPop.style, { position: 'fixed', left: e.clientX + 2 + 'px', top: e.clientY + 2 + 'px', zIndex: 60 });
+      cipPop.hidden = false;
+      const R = cipPop.getBoundingClientRect();
+      if (R.right > innerWidth - 4) cipPop.style.left = Math.max(4, innerWidth - R.width - 4) + 'px';
+      if (R.bottom > innerHeight - 4) cipPop.style.top = Math.max(4, e.clientY - R.height - 8) + 'px';
+    },
+    true
+  );
+  const cipSet = (it, col) => {
+    if (col) it.cipc = col;
+    else delete it.cipc;
+  };
+  cipPop.addEventListener('click', e => {
+    const it = cipTarget;
+    if (!it) return;
+    const b = e.target.closest('[data-cipc]');
+    if (b) {
+      snap();
+      cipSet(it, b.dataset.cipc);
+      commit();
+      cipPop.hidden = true;
+    } else if (e.target.closest('[data-cipall]')) {
+      snap();
+      const col = it.cipc || '';
+      for (const q of [...mol.atoms, ...mol.bonds]) cipSet(q, col);
+      commit();
+      cipPop.hidden = true;
+    } else if (e.target.closest('[data-cipback]')) {
+      snap();
+      delete it.cipo;
+      commit();
+      cipPop.hidden = true;
+    } else if (e.target.closest('[data-cipallback]')) {
+      snap();
+      for (const q of [...mol.atoms, ...mol.bonds]) delete q.cipo;
+      commit();
+      cipPop.hidden = true;
+    }
+  });
+  cipPop.addEventListener('change', e => {
+    if (!e.target.matches('[data-cipcx]') || !cipTarget) return;
+    snap();
+    cipSet(cipTarget, e.target.value);
+    commit();
+    cipPop.hidden = true;
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!cipPop.hidden && !e.target.closest('#cippop')) cipPop.hidden = true;
+  });
   function cipSVG() {
+    CIPBOX.length = 0;
     const r = cipMarks(),
       fs = Math.max(8, L * 0.3),
       w = fs * 1.75,
@@ -17924,8 +18063,11 @@ function kdOf(st) {
       for (const bx of placed) if (boxHits(x0, y0, x1, y1, bx)) n += 3;
       return n;
     };
-    const put = (ox, oy, dir0, s) => {
+    const put = (ox, oy, dir0, s, it) => {
       let best = null;
+      /* a label moved by hand keeps its place by its atom or bond */
+      if (it && it.cipo && isFinite(it.cipo.dx)) best = { c: 0, cx: ox + it.cipo.dx, cy: oy + it.cipo.dy };
+      if (!best)
       for (const rad of [0.5, 0.62, 0.75, 0.9, 1.05])
         for (let k = 0; k <= 12 && !(best && best.c === 0); k++)
           for (const sg of k ? [1, -1] : [1]) {
@@ -17938,8 +18080,9 @@ function kdOf(st) {
           }
       if (!best) return;
       placed.push([best.cx - w / 2, best.cy - h / 2, best.cx + w / 2, best.cy + h / 2]);
+      if (it) CIPBOX.push({ it, ox, oy, x: best.cx, y: best.cy, w, h });
       out.push(
-        `<text x="${best.cx.toFixed(1)}" y="${best.cy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" style="fill:var(--ink);font:italic ${fs.toFixed(1)}px var(--sans)">(${s})</text>`
+        `<text x="${best.cx.toFixed(1)}" y="${best.cy.toFixed(1)}" text-anchor="middle" dominant-baseline="central" style="fill:${it && it.cipc ? esc(it.cipc) : 'var(--ink)'};font:italic ${fs.toFixed(1)}px var(--sans)">(${s})</text>`
       );
     };
     for (const [id, s] of r.atoms) {
@@ -17961,7 +18104,7 @@ function kdOf(st) {
           }
         });
       }
-      put(a.x, a.y, dir, s);
+      put(a.x, a.y, dir, s, a);
     }
     for (const [id, s] of r.bonds) {
       const b = mol.bonds.find(x => x.id === id);
@@ -17978,7 +18121,7 @@ function kdOf(st) {
         nx = -nx;
         ny = -ny;
       }
-      put(mx, my, Math.atan2(ny, nx), s);
+      put(mx, my, Math.atan2(ny, nx), s, b);
     }
     return out.join('');
   }
@@ -34461,6 +34604,90 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return null;
     }
   }
+  /* the IUPAC numbers (locants) of one structure, by atom id: the namer of Octet Draw numbers its graph as it names it */
+  function iupacNumbers(f) {
+    const N = octetNamerLoad();
+    if (!N.iupacLocants) throw new Error('this copy of the namer gives no numbers');
+    const O = oclLoad(),
+      T = O.Molecule,
+      m = expandedCopy(),
+      ids = new Set(f.map(a => a.id)),
+      fe = m.atoms.filter(a => ids.has(a.id) || (a.from != null && ids.has(a.from))),
+      eids = new Set(fe.map(a => a.id));
+    /* the atoms of the labels written out (OMe → O, C) belong to the structure too */
+    for (let more = true; more; ) {
+      more = false;
+      for (const b of m.bonds)
+        if (eids.has(b.a) !== eids.has(b.b)) {
+          const n = eids.has(b.a) ? b.b : b.a;
+          if (!atomById(n)) {
+            eids.add(n);
+            fe.push(m.atoms.find(a => a.id === n));
+            more = true;
+          }
+        }
+    }
+    const fb = fragBonds(m, fe),
+      M = T.fromMolfile(molBlock(fe, fb, '').replace(CHIRAL_RX, CHIRAL_ON));
+    M.ensureHelperArrays(T.cHelperCIP);
+    const n = Math.min(fe.length, M.getAllAtoms()),
+      keep = [];
+    for (let i = 0; i < n; i++) if (M.getAtomicNo(i) !== 1 || M.getAtomMass(i) || M.getConnAtoms(i) === 0) keep.push(i);
+    const ix = new Map(keep.map((i, k) => [i, k]));
+    const g = {
+      atoms: keep.map(i => {
+        const p = M.getAtomCIPParity(i),
+          a = { el: M.getAtomLabel(i), charge: M.getAtomCharge(i), h: M.getAllHydrogens(i) };
+        if (p === T.cAtomCIPParityRorM) a.cip = 'R';
+        else if (p === T.cAtomCIPParitySorP) a.cip = 'S';
+        if (M.getAtomMass(i)) a.iso = M.getAtomMass(i);
+        return a;
+      }),
+      bonds: []
+    };
+    for (let k = 0; k < M.getAllBonds(); k++) {
+      const a = M.getBondAtom(0, k),
+        b = M.getBondAtom(1, k);
+      if (ix.has(a) && ix.has(b)) g.bonds.push({ a: ix.get(a), b: ix.get(b), order: M.getBondOrder(k) });
+    }
+    const loc = N.iupacLocants(g);
+    if (!loc) return null;
+    const out = new Map();
+    keep.forEach((i, k) => {
+      const id = fe[i].id;
+      if (loc[k] != null && loc[k] !== '' && atomById(id) && ids.has(id)) out.set(id, String(loc[k]));
+    });
+    return out;
+  }
+  $('numIupac').onclick = () => {
+    const t = analysisTarget();
+    if (!t || !t.atoms || !t.atoms.length) {
+      toast('Select one structure (or draw just one) to number.', true);
+      return;
+    }
+    const f = t.atoms;
+    /* numbers put here before: pressed again, they go */
+    if (f.some(a => a.anum && a.anum.iu)) {
+      snap();
+      for (const a of f) if (a.anum && a.anum.iu) delete a.anum;
+      commit();
+      return;
+    }
+    let r = null;
+    try {
+      r = iupacNumbers(f);
+    } catch (e) {
+      toast('Could not number it: ' + ((e && e.message) || e), true);
+      return;
+    }
+    if (!r || !r.size) {
+      toast('No IUPAC numbering for this structure (the namer could not name it).', true);
+      return;
+    }
+    snap();
+    for (const a of f) if (r.has(a.id)) a.anum = { t: r.get(a.id), iu: 1 };
+    commit();
+  };
   $('nameOctet').onclick = async () => {
     const smi = currentSmiles();
     if (!smi || />>/.test(smi)) {
@@ -86332,7 +86559,7 @@ function axialLabels(m) {
 
   };
   var n = Object.assign({}, require("namer.ts"), require("complexes.ts"));
-  window.OctetNamer = { iupacName: n.iupacName, iupacNameWhy: n.iupacNameWhy, complexName: n.complexName };
+  window.OctetNamer = { iupacName: n.iupacName, iupacNameWhy: n.iupacNameWhy, complexName: n.complexName, iupacLocants: n.iupacLocants };
 })();
 </script>
 <script type="text/plain" id="depictLib">fnca@@H`RYiYgUY~]dIVjh@`B`h@@@	167309	C,1102,-1061;C,1188,-1111;C,1275,-1061;C,1362,-1111;C,1448,-1061;O,1275,-961;C,1432,-1182;C,1291,-1182;C,1529,-1156;C,1406,-1278;C,1600,-1227;C,1477,-1349;C,1574,-1323;C,1317,-1278;C,1194,-1156;C,1246,-1349;C,1124,-1227;C,1150,-1323;C,1448,-961;N,1535,-911;C,1362,-911;C,1621,-961;C,1535,-811	2,1,1;3,2,1;4,3,1;5,4,1;3,6,2;7,4,1;8,4,1;9,7,1;10,7,2;11,9,2;12,10,1;13,11,1;13,12,2;14,8,1;15,8,2;16,14,2;17,15,1;18,16,1;18,17,2;5,19,1;19,20,1;19,21,1;20,22,1;20,23,1	
