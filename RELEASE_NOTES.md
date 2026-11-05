@@ -3,11 +3,6 @@
 ## Changed
 
 - **A reaction arrow fits its texts both ways.** It grew for a longer text over or under it and now also gets shorter when the texts get shorter (down to the length of an arrow drawn with a click): a long arrow drawn just now shortens to its Et3N. An arrow of an older drawing keeps its length until its texts change. Right-click the arrow: **Length: fits its texts / as drawn**; as drawn, the texts stay with the arrow and its length stays. Dragging an arrow with texts longer or shorter by hand sets it to as drawn.
-- **Substituents on a chair.** A bond added to a carbon of a cyclohexane chair is axial first, straight up from a high carbon and straight down from a low one, then equatorial, parallel to the ring bonds one away; on every carbon of the chair.
-
-## Fixed
-
-- **Catalytic cycles in CDXML.** A cycle went into CDXML and CDX files as nothing (they have no such object), so other editors showed the structures without the arrows. Its arcs and the curves into and out of it are now written as curves with their arrowheads.
 
 # Reactio Draw 1.11
 
