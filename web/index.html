@@ -2636,6 +2636,25 @@ tr.grp th.solv {
   font-size: 12px;
   padding: 0;
 }
+.sbar {
+  position: absolute;
+  z-index: 3;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--line) 35%, transparent);
+  cursor: default;
+}
+.sbar .sbthumb {
+  position: absolute;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--muted) 55%, transparent);
+}
+.sbar .sbthumb:hover,
+.sbar .sbthumb:active {
+  background: var(--muted);
+}
+.sbar[hidden] {
+  display: none;
+}
 .toast {
   font-size: 12px;
   color: var(--ok);
@@ -3104,6 +3123,7 @@ html {
           <button class="tb" data-act="gridT" aria-pressed="true" title="Show or hide the grid"><svg viewBox="0 0 22 22"><path d="M3 8h16M3 14h16M8 3v16M14 3v16" stroke="currentColor" stroke-width="1.2"/><rect x="3" y="3" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
           <button class="tb" data-act="copyPic" title="Copy as a picture for Word / PowerPoint (Ctrl+Shift+C): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-1.5 2 3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+          <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -3249,7 +3269,7 @@ html {
           <div class="note" id="inchiNote" style="margin-top:2px"></div>
         </div>
         <div>
-          <div class="row" style="justify-content:space-between;margin-bottom:4px"><span class="tlabel" title="IUPAC name of the selected structure (or the only one on the sheet), made two ways: Name it uses openclatura (in the Reactio Draw app for Mac, Windows and Linux; needs Python with openclatura); Alternative name uses the namer of Octet Draw, which runs here, in the browser too. Each name is read back with OPSIN and compared with the drawing">Name</span><span class="row" style="gap:4px"><button class="btn sm" id="nameIt" title="openclatura (lamalab-org): in the Reactio Draw app for Mac, Windows and Linux">Name it</button><button class="btn sm" id="nameOctet" title="Made by the namer of Octet Draw (Sam Ellis, Apache-2.0): runs here, in the browser too">Alternative name</button><button class="btn ghost sm" id="copyName">Copy</button><button class="btn ghost sm" id="numIupac" title="Write the IUPAC numbers (locants) beside the atoms of the structure, as its name counts them (the namer of Octet Draw); press again to take them off">Numbering</button></span></div>
+          <div class="row" style="justify-content:space-between;margin-bottom:4px"><span class="tlabel" title="IUPAC name of the selected structure (or the only one on the sheet), made two ways: Name it uses openclatura (in the Reactio Draw app for Mac, Windows and Linux; needs Python with openclatura); Alternative name uses the namer of Octet Draw, which runs here, in the browser too. Each name is read back with OPSIN and compared with the drawing">Name</span><span class="row" style="gap:4px"><button class="btn sm" id="nameIt" title="openclatura (lamalab-org): in the Reactio Draw app for Mac, Windows and Linux">Name it</button><button class="btn sm" id="nameOctet" title="Made by the namer of Octet Draw (Sam Ellis, Apache-2.0): runs here, in the browser too">Alternative name</button><button class="btn ghost sm" id="copyName">Copy</button><button class="btn ghost sm" id="numIupac" title="Write the IUPAC numbers (locants) beside the atoms of the structure, as its name counts them (the namer of Octet Draw); press again to take them off">Numbering</button><button class="btn ghost sm" id="numHand" title="Number atoms by hand: click them in turn, 1, 2, 3…; a numbered atom clicked again loses its number. Files (Molfile, SDF, XYZ) list the atoms in this order">By hand</button></span></div>
           <div class="note" style="margin:0 0 2px">Name it: openclatura (apps)</div>
           <div class="smiles" id="iupac" style="font-family:var(--sans);min-height:22px"></div>
           <div class="note" id="iupacNote" style="margin-top:2px"></div>
@@ -4824,7 +4844,10 @@ function kdOf(st) {
     HIST.push({ step: ++histStep, by: histApi ? 'api' : 'user', ...(histApi && histOp ? { op: histOp } : {}), changes: ch });
     if (HIST.length > 3000) HIST.splice(0, HIST.length - 3000);
   }
+  /* the first id made after the last snap(): what one step adds (sizeNewParts) */
+  let SNAP_NEXT = null;
   function snap() {
+    SNAP_NEXT = mol.next;
     undoSt.push(undoEntry());
     if (undoSt.length > 200) undoSt.shift();
     redoSt.length = 0;
@@ -11317,6 +11340,14 @@ function kdOf(st) {
   let CLEAN_DEPTH = 0;
   function cleanFragments(frs) {
     let r;
+    /* a structure with its 3D shape is laid flat first, its centres read from the 3D places (a new layout read them from
+       the wedges of its projection, and could give the mirror image) */
+    if (!CLEAN_DEPTH)
+      for (const f of frs || [])
+        if (f && f.length > 2 && f.every(a => a.z !== undefined) && !f.some(a => a.xray))
+          try {
+            flatten3D(f);
+          } catch (e) {}
     CLEAN_DEPTH++;
     try {
       r = cleanFragmentsWithH(frs);
@@ -11328,12 +11359,182 @@ function kdOf(st) {
       for (const f of frs || []) {
         const live = f && f.find(a => mol.atoms.includes(a)),
           g = live && fragments().find(x => x.includes(live));
-        if (g && g.length >= 3)
+        if (g && g.length >= 3) {
           try {
             wedgeTidy(g, true);
           } catch (e) {}
+          try {
+            dropRingWedges(g);
+          } catch (e) {}
+        }
       }
     return r;
+  }
+  /* a four-membered ring fused on one bond of a larger ring (the oxetane of a taxane) drawn as a square on that bond,
+     outside the larger ring; what else hangs on the two shared atoms (OAc) stays, or turns to the middle of the room left
+     when the square comes too close. Kept only if the molecule (its configuration) reads the same */
+  function squareFused4(f) {
+    const ids = new Set(f.map(a => a.id)),
+      rings = molRings(f).filter(r => r.every(a => ids.has(a.id)));
+    const r4 = rings.filter(r => r.length === 4);
+    if (!r4.length) return;
+    const before = fragSmilesS(f);
+    const keep = f.map(a => [a, a.x, a.y]);
+    let changed = false;
+    for (const R of r4) {
+      const inR = new Set(R.map(a => a.id));
+      /* the bond shared with exactly one other ring */
+      let shared = null,
+        big = null;
+      for (const Q of rings) {
+        if (Q === R || Q.length < 5) continue;
+        const common = Q.filter(a => inR.has(a.id));
+        if (common.length === 2) {
+          if (shared) {
+            shared = null;
+            break;
+          }
+          shared = common;
+          big = Q;
+        }
+      }
+      if (!shared) continue;
+      const [u, v] = shared,
+        others = R.filter(a => a !== u && a !== v);
+      /* the two other atoms: each on one of u, v, in no other ring */
+      const onU = others.find(a => neighbors(a).includes(u)),
+        onV = others.find(a => neighbors(a).includes(v) && a !== onU);
+      if (!onU || !onV || rings.some(Q => Q !== R && Q.some(a => a === onU || a === onV))) continue;
+      const len = Math.hypot(v.x - u.x, v.y - u.y) || L,
+        cx = big.reduce((t, a) => t + a.x, 0) / big.length,
+        cy = big.reduce((t, a) => t + a.y, 0) / big.length,
+        mx = (u.x + v.x) / 2,
+        my = (u.y + v.y) / 2;
+      let nx = -(v.y - u.y) / len,
+        ny = (v.x - u.x) / len;
+      if (nx * (mx - cx) + ny * (my - cy) < 0) ((nx = -nx), (ny = -ny));
+      /* what hangs on onU and onV (an H, a methyl) goes along */
+      const carry = (a, dx, dy) => {
+        const seen = new Set([a.id, u.id, v.id, onU.id, onV.id]),
+          st = [a];
+        a.x += dx;
+        a.y += dy;
+        while (st.length) {
+          const x = st.pop();
+          for (const n of neighbors(x))
+            if (!seen.has(n.id)) {
+              seen.add(n.id);
+              n.x += dx;
+              n.y += dy;
+              st.push(n);
+            }
+        }
+      };
+      carry(onU, u.x + nx * len - onU.x, u.y + ny * len - onU.y);
+      carry(onV, v.x + nx * len - onV.x, v.y + ny * len - onV.y);
+      /* the other groups on u and v: into the middle of the widest gap left */
+      for (const c of [u, v]) {
+        const ring = new Set([...R, ...big].map(a => a.id));
+        const subs = neighbors(c).filter(n => !ring.has(n.id));
+        if (subs.length !== 1) continue;
+        const s0 = subs[0],
+          angs = neighbors(c)
+            .filter(n => n !== s0)
+            .map(n => Math.atan2(n.y - c.y, n.x - c.x))
+            .sort((p, q) => p - q);
+        let best = -1,
+          dir = 0;
+        angs.forEach((p, i) => {
+          const q = i + 1 < angs.length ? angs[i + 1] : angs[0] + 2 * Math.PI;
+          if (q - p > best) ((best = q - p), (dir = (p + q) / 2));
+        });
+        const cur = Math.atan2(s0.y - c.y, s0.x - c.x),
+          gap = Math.min(...angs.map(t => Math.abs(Math.atan2(Math.sin(t - cur), Math.cos(t - cur)))));
+        /* left as it is unless the square came within 40° of it */
+        if (gap >= (40 * Math.PI) / 180) continue;
+        const seen = new Set([c.id]),
+          st = [s0],
+          br = [s0];
+        seen.add(s0.id);
+        while (st.length) {
+          const x = st.pop();
+          for (const n of neighbors(x))
+            if (!seen.has(n.id)) {
+              seen.add(n.id);
+              st.push(n);
+              br.push(n);
+            }
+        }
+        if (br.some(a => ring.has(a.id))) continue;
+        const P0 = br.map(a => [a.x, a.y]),
+          inBr = new Set(br.map(a => a.id)),
+          rest = f.filter(a => !inBr.has(a.id) && a !== c);
+        /* the turn, within the widest gap, that keeps the group furthest from the rest (labels count wider) */
+        const place = th => {
+          const d = th - cur,
+            co = Math.cos(d),
+            sn = Math.sin(d);
+          br.forEach((a, k) => {
+            const x = P0[k][0] - c.x,
+              y = P0[k][1] - c.y;
+            a.x = c.x + x * co - y * sn;
+            a.y = c.y + x * sn + y * co;
+          });
+        };
+        const clear = () => {
+          let m = Infinity;
+          for (const a of br)
+            for (const o of rest) {
+              const d = Math.hypot(a.x - o.x, a.y - o.y) - (labeled(a) ? L * 0.25 : 0) - (labeled(o) ? L * 0.25 : 0);
+              if (d < m) m = d;
+            }
+          return m;
+        };
+        let bt = cur,
+          bc = -Infinity;
+        for (let k = 1; k < 12; k++) {
+          const th = dir - best / 2 + (best * k) / 12;
+          place(th);
+          const cl = clear();
+          if (cl > bc + 0.5) ((bc = cl), (bt = th));
+        }
+        place(bt);
+      }
+      changed = true;
+    }
+    if (!changed) return;
+    SSMI.clear();
+    if (fragSmilesS(f) !== before) for (const [a, x, y] of keep) ((a.x = x), (a.y = y));
+  }
+  /* a wedge or hash on a ring bond at a centre that a wedge or hash outside the rings already shows (the oxetane CH2 of
+     a taxane beside its OAc): the ring one is taken off when the molecule reads the same without it */
+  function dropRingWedges(f) {
+    if (f.some(a => a.label || a.multi || a.z !== undefined)) return;
+    const ids = new Set(f.map(a => a.id)),
+      bs = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
+      st = b => b.stereo === 'wedge' || b.stereo === 'hash';
+    if (!bs.some(st)) return;
+    const inRing = new Set();
+    for (const r of molRings(f)) for (let i = 0; i < r.length; i++) {
+      const p = r[i],
+        q = r[(i + 1) % r.length];
+      const b = bs.find(x => (x.a === p.id && x.b === q.id) || (x.a === q.id && x.b === p.id));
+      if (b) inRing.add(b);
+    }
+    const key = () => {
+      SSMI.clear();
+      return fragSmilesS(f);
+    };
+    const want = key();
+    for (const b of bs) {
+      if (!st(b) || !inRing.has(b)) continue;
+      const c = b.a;
+      if (!bs.some(x => x !== b && st(x) && !inRing.has(x) && x.a === c)) continue;
+      const was = b.stereo;
+      b.stereo = null;
+      if (key() !== want) b.stereo = was;
+    }
+    SSMI.clear();
   }
   function cleanFragmentsWithH(frs) {
     /* where each metal's ligands pointed before (metalStar keeps them on those sides, so a second Clean Up moves nothing) */
@@ -14763,6 +14964,115 @@ function kdOf(st) {
     gr.setAttribute('width', view.w);
     gr.setAttribute('height', view.h);
     $('zoomv').textContent = Math.round(((svg.clientWidth || BW) / view.w / PX1) * 100) + '%';
+    try {
+      scrollBars();
+    } catch (e) {}
+  }
+  /* scroll bars at the right and bottom edges of the sheet: where the view is in all that is drawn (and a little round
+     it); drag a bar or click beside it to move the view. Hidden while everything is in view */
+  let SB = null;
+  function scrollBars() {
+    if (!SB) {
+      const mk = dir => {
+        const tr = document.createElement('div'),
+          th = document.createElement('div');
+        tr.className = 'sbar sbar-' + dir;
+        th.className = 'sbthumb';
+        tr.appendChild(th);
+        svg.parentElement.appendChild(tr);
+        tr.addEventListener('pointerdown', e => {
+          if (e.button !== 0 || !SB || !SB.lastExt) return;
+          e.preventDefault();
+          e.stopPropagation();
+          if (!zoom) zoom = { cx: view.x + view.w / 2, cy: view.y + view.h / 2, s: BW / view.w };
+          SB.ext = SB.lastExt;
+          const horiz = dir === 'h',
+            r = tr.getBoundingClientRect(),
+            len = horiz ? r.width : r.height,
+            E = SB.ext,
+            per = (horiz ? E.w : E.h) / len;
+          if (e.target === th) {
+            const p0 = horiz ? e.clientX : e.clientY,
+              c0 = horiz ? zoom.cx : zoom.cy,
+              mv = ev => {
+                const d = ((horiz ? ev.clientX : ev.clientY) - p0) * per;
+                if (horiz) zoom.cx = c0 + d;
+                else zoom.cy = c0 + d;
+                fitView();
+              },
+              up = () => {
+                document.removeEventListener('pointermove', mv);
+                document.removeEventListener('pointerup', up);
+                SB.ext = null;
+                scrollBars();
+              };
+            document.addEventListener('pointermove', mv);
+            document.addEventListener('pointerup', up);
+          } else {
+            /* a click beside the bar: a view's width that way */
+            const at = horiz ? e.clientX - r.left : e.clientY - r.top,
+              tr0 = horiz ? th.offsetLeft : th.offsetTop;
+            const step = (horiz ? view.w : view.h) * 0.9 * (at < tr0 ? -1 : 1);
+            if (horiz) zoom.cx += step;
+            else zoom.cy += step;
+            SB.ext = null;
+            fitView();
+          }
+        });
+        return { tr, th };
+      };
+      SB = { h: mk('h'), v: mk('v'), ext: null };
+    }
+    /* the extent: the drawing with half a view round it, and the view; kept while a bar is dragged */
+    let E = SB.ext;
+    const live = !E;
+    if (!E) {
+      let bb = null;
+      try {
+        bb = contentBox();
+      } catch (e) {}
+      E = { x0: view.x, y0: view.y, x1: view.x + view.w, y1: view.y + view.h };
+      if (bb) {
+        E.x0 = Math.min(E.x0, bb.x0 - view.w / 2);
+        E.y0 = Math.min(E.y0, bb.y0 - view.h / 2);
+        E.x1 = Math.max(E.x1, bb.x1 + view.w / 2);
+        E.y1 = Math.max(E.y1, bb.y1 + view.h / 2);
+      }
+      E.w = E.x1 - E.x0;
+      E.h = E.y1 - E.y0;
+    }
+    const fitsAll = (() => {
+      let bb = null;
+      try {
+        bb = contentBox();
+      } catch (e) {}
+      return !bb || (bb.x0 >= view.x && bb.x1 <= view.x + view.w && bb.y0 >= view.y && bb.y1 <= view.y + view.h);
+    })();
+    /* (an svg element has no offset box: its place from the bounding boxes) */
+    const sr = svg.getBoundingClientRect(),
+      pr = svg.parentElement.getBoundingClientRect(),
+      ox = sr.left - pr.left + svg.parentElement.scrollLeft,
+      oy = sr.top - pr.top + svg.parentElement.scrollTop,
+      W = sr.width,
+      H = sr.height,
+      T = 8;
+    for (const [k, o] of [
+      ['h', SB.h],
+      ['v', SB.v]
+    ]) {
+      const horiz = k === 'h';
+      o.tr.hidden = fitsAll;
+      if (fitsAll) continue;
+      Object.assign(o.tr.style, horiz ? { left: ox + 'px', top: oy + H - T - 2 + 'px', width: W - T - 4 + 'px', height: T + 'px' } : { left: ox + W - T - 2 + 'px', top: oy + 'px', width: T + 'px', height: H - T - 4 + 'px' });
+      const len = horiz ? W - T - 4 : H - T - 4,
+        a = horiz ? (view.x - E.x0) / E.w : (view.y - E.y0) / E.h,
+        f = horiz ? view.w / E.w : view.h / E.h,
+        tl = Math.max(24, f * len),
+        pos = Math.max(0, Math.min(len - tl, a * len));
+      Object.assign(o.th.style, horiz ? { left: pos + 'px', top: '0', width: tl + 'px', height: '100%' } : { top: pos + 'px', left: '0', height: tl + 'px', width: '100%' });
+    }
+    if (live) SB.lastExt = E;
+    if (SB.h.tr.matches(':active') || SB.v.tr.matches(':active')) SB.ext = SB.ext || E;
   }
   function setZoom(s, anchor, quick) {
     if (!zoom) zoom = { cx: view.x + view.w / 2, cy: view.y + view.h / 2, s: BW / view.w };
@@ -15653,6 +15963,12 @@ function kdOf(st) {
       BIDX = bondIndex();
     }
     try {
+      LABOR = new Map();
+      LABOR = labelLayout();
+    } catch (e) {
+      LABOR = new Map();
+    }
+    try {
       return render0();
     } finally {
       if (own) RIDX = BIDX = null;
@@ -15906,8 +16222,10 @@ function kdOf(st) {
           `<line x1="${x1 + nx * o + ux * sh1}" y1="${y1 + ny * o + uy * sh1}" x2="${x2 + nx * o - ux * sh2}" y2="${y2 + ny * o - uy * sh2}" ${ink} stroke-width="${w || bw}" stroke-linecap="round" ${extra || ''}/>`;
         /* the narrow end is as wide as a plain bond, so a bond running into it has no pinch */
         if (b.stereo === 'wedge') {
-          const ww = st.wedge * wk,
-            h0 = bw / 2;
+          /* one shape whatever stands at its end: the triangle runs to the atom's centre and is cut where the label begins,
+             so a wedge to OH or Br opens at the same angle as one to a CH2 (it was as wide at the label as at a centre) */
+          const h0 = bw / 2,
+            ww = t2 > 0 && l > 0 ? h0 + (st.wedge * wk - h0) * Math.max(0.35, (l - t2) / l) : st.wedge * wk;
           let cP = [x2 + nx * ww, y2 + ny * ww],
             cM = [x2 - nx * ww, y2 - ny * ww];
           /* wedges whose wide ends meet at one atom (the bridge of a norbornane in perspective): their sides run on until they
@@ -15955,15 +16273,18 @@ function kdOf(st) {
        end, each as wide as the wedge would be there (1.5 bold widths at the end) */
         if (b.stereo === 'hash' || b.stereo === 'hashplain') {
           /* at least four strokes, kept apart: on a short bond they get thinner rather than run together into a wedge */
-          const k = Math.max(4, Math.round(l / ((st.hash + st.lw) * wk))),
-            last = l - bw * 1.3,
+          /* laid on the part of the bond that is drawn, each as wide as the wedge's triangle (narrow at the first atom's
+             centre, full at the second's) is there: a hash to OH or Br keeps the angle of one to a CH2 */
+          const lt = Math.hypot(x2 - x1, y2 - y1) || 1,
+            k = Math.max(4, Math.round(lt / ((st.hash + st.lw) * wk))),
+            last = lt - bw * 1.3,
             sp = last / (k - 0.07),
-            hw = Math.min(bw, ((sp * Math.hypot(x2 - x1, y2 - y1)) / l) * 0.5);
+            hw = Math.min(bw, sp * 0.5);
           for (let i = 0; i < k; i++) {
             const d = last - (k - 1 - i) * sp,
-              t = d / l,
-              cx = x1 + (x2 - x1) * t,
-              cy = y1 + (y2 - y1) * t,
+              cx = x1 + ux * d,
+              cy = y1 + uy * d,
+              t = Math.min(1, (t1 + d) / (l || 1)),
               w = b.stereo === 'hash' ? st.wedge * wk * t : (st.bold || st.wedge) * wk * 0.35;
             s += `<line x1="${cx + nx * w}" y1="${cy + ny * w}" x2="${cx - nx * w}" y2="${cy - ny * w}" ${ink} stroke-width="${hw}"/>`;
           }
@@ -17829,11 +18150,12 @@ function kdOf(st) {
             }
         }
         if (f.length < 3) continue;
-        /* a structure in 3D (a crystal structure) has no wedges to read the configuration from */
-        if (f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
+        /* a structure in 3D (3D shape, a crystal structure): the configuration from its 3D places */
+        const d3 = is3D(f);
+        if (!d3 && f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
         const fb = fragBonds(m, f);
-        if (!fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
-        const mb = molBlock(f, fb, '').replace(CHIRAL_RX, CHIRAL_ON);
+        if (!d3 && !fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
+        const mb = (d3 ? molBlock3D(f, fb, '') : molBlock(f, fb, '')).replace(CHIRAL_RX, CHIRAL_ON);
         const M = O.Molecule.fromMolfile(mb);
         M.ensureHelperArrays(O.Molecule.cHelperCIP);
         const n = Math.min(f.length, M.getAllAtoms());
@@ -18004,9 +18326,9 @@ function kdOf(st) {
   function cipSVG() {
     CIPBOX.length = 0;
     const r = cipMarks(),
-      fs = Math.max(8, L * 0.3),
-      w = fs * 1.75,
-      h = fs * 1.15,
+      fs0 = Math.max(8, L * 0.3),
+      w0 = fs0 * 1.75,
+      h0 = fs0 * 1.15,
       out = [],
       placed = [],
       segs = mol.bonds
@@ -18052,7 +18374,7 @@ function kdOf(st) {
       );
     };
     const boxHits = (x0, y0, x1, y1, [p0, q0, p1, q1]) => x0 < p1 && x1 > p0 && y0 < q1 && y1 > q0;
-    const cost = (cx, cy) => {
+    const cost = (cx, cy, w, h) => {
       const x0 = cx - w / 2,
         x1 = cx + w / 2,
         y0 = cy - h / 2,
@@ -18065,6 +18387,11 @@ function kdOf(st) {
     };
     const put = (ox, oy, dir0, s, it) => {
       let best = null;
+      /* on a structure made larger or smaller, at its size */
+      const ka = it ? it.ss || (it.a != null && atomById(it.a) && atomById(it.a).ss) || 1 : 1,
+        w = w0 * ka,
+        h = h0 * ka,
+        fs = fs0 * ka;
       /* a label moved by hand keeps its place by its atom or bond */
       if (it && it.cipo && isFinite(it.cipo.dx)) best = { c: 0, cx: ox + it.cipo.dx, cy: oy + it.cipo.dy };
       if (!best)
@@ -18072,9 +18399,9 @@ function kdOf(st) {
         for (let k = 0; k <= 12 && !(best && best.c === 0); k++)
           for (const sg of k ? [1, -1] : [1]) {
             const d = dir0 + (sg * k * Math.PI) / 12,
-              cx = ox + Math.cos(d) * (L * rad + Math.abs(Math.cos(d)) * (w / 2 - h / 2)),
-              cy = oy + Math.sin(d) * L * rad,
-              c = cost(cx, cy) + rad * 0.01;
+              cx = ox + Math.cos(d) * (L * ka * rad + Math.abs(Math.cos(d)) * (w / 2 - h / 2)),
+              cy = oy + Math.sin(d) * L * ka * rad,
+              c = cost(cx, cy, w, h) + rad * 0.01;
             if (!best || c < best.c) best = { c, cx, cy };
             if (c < 0.05) break;
           }
@@ -18378,7 +18705,17 @@ function kdOf(st) {
       } // structure deleted: keep the text as plain text
       const atoms = [...frs].flat();
       t.ana.atoms = atoms.map(a => a.id);
-      const s = anaTextOf(atoms, t.ana.keys, t.ana.dec);
+      let s = anaTextOf(atoms, t.ana.keys, t.ana.dec);
+      /* written under the compound's number, in the same text: the number as it is, bold, then these lines plain */
+      if (t.ana.inNum && s) {
+        let own = cnumOwn(t);
+        if (t.bold) {
+          own = boldLines(own);
+          t.bold = false;
+        }
+        t.ana.prev = s;
+        s = own + '\n' + s;
+      }
       if (s && s !== t.text) {
         const cx = t.x + textW(t) / 2;
         t.text = s;
@@ -18402,6 +18739,16 @@ function kdOf(st) {
     for (const fr of targets) {
       const xs = fr.map(a => a.x),
         ys = fr.map(a => a.y);
+      /* a numbered structure: the lines go into its number's text, under the number, as one block */
+      {
+        const ids = new Set(fr.map(a => a.id)),
+          nt = mol.texts.find(t => t.cnum && t.cnum.atoms.some(i => ids.has(i)));
+        if (nt) {
+          nt.ana = { atoms: fr.map(a => a.id), keys: o.keys, dec: o.dec, inNum: true, prev: nt.ana && nt.ana.inNum ? nt.ana.prev : null };
+          if (!nt.align) nt.align = 'center';
+          continue;
+        }
+      }
       const t = {
         id: mol.next++,
         x: 0,
@@ -18558,6 +18905,22 @@ function kdOf(st) {
     }
     return s;
   }
+  /* bold, line by line (markup does not run over a line break) */
+  const boldLines = t =>
+    String(t)
+      .split('\n')
+      .map(l => (l ? '\\b{' + l + '}' : l))
+      .join('\n');
+  /* a number text with the analysis lines written under it (Paste on a numbered structure): its own part, the number */
+  function cnumOwn(t) {
+    const p = t.ana && t.ana.inNum && t.ana.prev != null ? '\n' + t.ana.prev : null;
+    return p && t.text.endsWith(p) ? t.text.slice(0, -p.length) : t.text;
+  }
+  /* the same as the numbering writes it (bold by markup only because the lines under it are plain) */
+  function cnumOwnCmp(t) {
+    const o = cnumOwn(t);
+    return t.ana && t.ana.inNum && t.cnum && !t.cnum.tail ? o.replace(/\\b\{([^}]*)\}/g, '$1') : o;
+  }
   function cnumText(tpl, k) {
     let t = String(tpl || '{n}');
     if (!/\{n\}|\{a\}/.test(t)) t += '{n}';
@@ -18593,9 +18956,10 @@ function kdOf(st) {
     return rows.flatMap(r => r.g.sort((a, b) => a.x0 + a.x1 - (b.x0 + b.x1)));
   }
   function cnumApply() {
-    const tpl = $('cnumTpl').value.trim() || '{n}',
+    /* \n in either box starts a new line (the number, then the yield or the analysis under it) */
+    const tpl = ($('cnumTpl').value.trim() || '{n}').replace(/\\n/g, '\n'),
       st = String($('cnumStart').value).trim(),
-      suf = $('cnumSuf').value.replace(/\s+$/, '');
+      suf = $('cnumSuf').value.replace(/\s+$/, '').replace(/\\n/g, '\n');
     let k = /^[a-z]$/i.test(st) ? st.toLowerCase().charCodeAt(0) - 96 : parseInt(st, 10);
     if (!isFinite(k)) k = 1;
     try {
@@ -18614,7 +18978,7 @@ function kdOf(st) {
     for (const g of gs) {
       const ids = new Set(g.at.map(a => a.id)),
         num = cnumText(tpl, k++),
-        txt = tail ? '\\b{' + num + '}' + tail : num;
+        txt = tail ? boldLines(num) + tail : num;
       last = num;
       let t = mol.texts.find(t => t.cnum && t.cnum.atoms.some(i => ids.has(i)));
       const cn = { atoms: [...ids], auto: 1, tpl, st: k0, sub: '', tail, gen: txt };
@@ -18646,7 +19010,7 @@ function kdOf(st) {
         .filter(t => t.cnum && t.cnum.auto)
         .map(t => t.cnum.gen)
         .pop() || last;
-    toast(gs.length + ' compound' + (gs.length > 1 ? 's' : '') + ' numbered, up to ' + last);
+    toast(gs.length + ' compound' + (gs.length > 1 ? 's' : '') + ' numbered, up to ' + String(last).replace(/\\b\{([^}]*)\}/g, '$1').replace(/\n/g, ' '));
   }
   {
     try {
@@ -18671,9 +19035,10 @@ function kdOf(st) {
     groups.forEach(g => g.fr.forEach(a => grpOf.set(a.id, g)));
     const items = [];
     for (const t of ts) {
-      const c = t.cnum;
-      if (t.text !== c.gen) {
-        const m = /^(\\b\{)?(\d+)([a-z]{0,2})(\})?(.*)$/.exec(t.text);
+      const c = t.cnum,
+        own = cnumOwnCmp(t);
+      if (own !== c.gen) {
+        const m = /^(\\b\{)?(\d+)([a-z]{0,2})(\})?(.*)$/s.exec(own);
         if (!m || !/^\{n\}$/.test(c.tpl)) {
           delete c.auto;
           continue;
@@ -18729,8 +19094,8 @@ function kdOf(st) {
         c.num = n;
         delete c.old;
         const num = cnumText(c.tpl, n) + (c.sub || ''),
-          txt = c.tail ? '\\b{' + num + '}' + c.tail : num;
-        if (txt !== t.text) {
+          txt = c.tail ? boldLines(num) + c.tail : num;
+        if (txt !== cnumOwnCmp(t)) {
           const cx = t.x + textW(t) / 2;
           t.text = txt;
           t.bold = !c.tail;
@@ -20308,7 +20673,87 @@ function kdOf(st) {
       r.ga = { x1: r.x1, y1: r.y1, x2: r.x2, y2: r.y2 };
     }
   }
+  /* atoms and bonds added in one step to a structure made larger or smaller (its atoms' size a.ss) come at its size:
+     bonds as long and as thick as its own, labels at its letter size (a key, a group, a ring, a label typed or contracted),
+     not at the document's */
+  function sizeNewParts() {
+    if (SNAP_NEXT == null) return;
+    const fresh = a => a.id >= SNAP_NEXT && a.ss == null;
+    if (!mol.atoms.some(fresh) && !mol.atoms.some(a => a.ss && Math.abs(a.ss - 1) > 0.01 && a.fs == null && labeled(a))) return;
+    const med = v => {
+      const w = v.slice().sort((p, q) => p - q);
+      return w.length ? w[w.length >> 1] : null;
+    };
+    const byId = new Map(mol.atoms.map(a => [a.id, a])),
+      adj = new Map(mol.atoms.map(a => [a.id, []]));
+    for (const b of mol.bonds) if (adj.has(b.a) && adj.has(b.b)) (adj.get(b.a).push(b.b), adj.get(b.b).push(b.a));
+    const seen = new Set();
+    for (const a0 of mol.atoms) {
+      if (seen.has(a0.id)) continue;
+      const f = [],
+        st = [a0.id];
+      seen.add(a0.id);
+      while (st.length) {
+        const id = st.pop();
+        f.push(byId.get(id));
+        for (const n of adj.get(id)) if (!seen.has(n)) (seen.add(n), st.push(n));
+      }
+      const old = f.filter(a => !fresh(a) && a.ss != null && !a.multi),
+        nw = f.filter(fresh);
+      if (!old.length) continue;
+      const k = med(old.map(a => a.ss));
+      if (!k || Math.abs(k - 1) < 0.02) continue;
+      const nwSet = new Set(nw.map(a => a.id));
+      /* each new piece: moved out from where it hangs on, when it was laid at the document's bond length */
+      const done = new Set();
+      for (const a of nw) {
+        if (done.has(a.id)) continue;
+        const comp = [],
+          q = [a.id];
+        done.add(a.id);
+        while (q.length) {
+          const id = q.pop();
+          comp.push(byId.get(id));
+          for (const n of adj.get(id)) if (nwSet.has(n) && !done.has(n)) (done.add(n), q.push(n));
+        }
+        const cs = new Set(comp.map(x => x.id)),
+          att = [...new Set(comp.flatMap(x => adj.get(x.id).filter(n => !cs.has(n))))].map(id => byId.get(id)).filter(Boolean),
+          lens = mol.bonds
+            .filter(b => cs.has(b.a) || cs.has(b.b))
+            .map(b => {
+              const p = byId.get(b.a),
+                r = byId.get(b.b);
+              return p && r ? Math.hypot(p.x - r.x, p.y - r.y) : 0;
+            })
+            .filter(d => d > 1);
+        const ml = med(lens);
+        if (att.length && ml && Math.abs(ml / L - 1) < Math.abs(ml / (L * k) - 1)) {
+          const cx = att.reduce((t, x) => t + x.x, 0) / att.length,
+            cy = att.reduce((t, x) => t + x.y, 0) / att.length;
+          for (const x of comp) {
+            x.x = cx + (x.x - cx) * k;
+            x.y = cy + (x.y - cy) * k;
+          }
+        }
+        for (const x of comp) x.ss = k;
+      }
+      /* bonds as thick as the structure's own */
+      const ids = new Set(f.map(a => a.id)),
+        fb = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
+        ow = fb.filter(b => b.id < SNAP_NEXT && b.w != null).map(b => b.w),
+        w = med(ow);
+      if (w != null && ow.length * 2 >= fb.filter(b => b.id < SNAP_NEXT).length)
+        for (const b of fb) if (b.id >= SNAP_NEXT && b.w == null) b.w = w;
+      /* letters at the structure's size */
+      for (const a of f) labelAtSize(a);
+    }
+  }
   function commit(keepErr) {
+    try {
+      sizeNewParts();
+    } catch (e) {
+      console.warn('sizeNewParts', e);
+    }
     try {
       arrowGlue();
     } catch (e) {
@@ -21755,7 +22200,114 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     q.ldir = now ? 'keep' : 'rev';
     return q.ldir;
   }
+  /* labels kept off each other: a group label that runs into a neighbouring label is written the other way round (OMe as
+     MeO), else an H that does goes to another side clear of the bonds (HO as OH), when that halves the overlap or better.
+     Turning a structure so that two labels meet does the same. LABOR: atom id → {r: label turned, h: side of H, x, y} */
+  let LABOR = new Map();
+  function labelLayout(only) {
+    /* every label with its choices: a group label written either way, an H on any side clear enough of the bonds */
+    const items = [];
+    for (const a of mol.atoms) {
+      if (!labeled(a) || a.multi || a.lsplit) continue;
+      let K;
+      try {
+        K = labK(a);
+      } catch (e) {
+        continue;
+      }
+      const nb = neighbors(a);
+      if (a.label) {
+        const base = labRightOf0(a, nb),
+          w = (a.label.length * 8.6 + 6) * K,
+          box = r => {
+            const x0 = r ? a.x + 6 - w : a.x - 6;
+            return [[x0, a.y - 9 * K, x0 + w, a.y + 6 * K]];
+          },
+          opts = !a.ldir && revLabel(a.label) !== a.label ? [base, !base] : [base];
+        items.push({ a, lab: true, opts, box, pick: 0 });
+        continue;
+      }
+      const half = a.el.length * 4.7 * K,
+        el = [a.x - half - 1, a.y - 9 * K, a.x + half + 1, a.y + 6 * K];
+      let h = 0;
+      try {
+        h = implicitH(a);
+      } catch (e) {}
+      if (!h) {
+        items.push({ a, opts: [null], box: () => [el], pick: 0 });
+        continue;
+      }
+      const hw = (h > 1 ? 16 : 10) * K,
+        hbox = sd =>
+          sd === 'r'
+            ? [a.x + half, a.y - 9 * K, a.x + half + hw, a.y + 6 * K]
+            : sd === 'l'
+              ? [a.x - half - hw, a.y - 9 * K, a.x - half, a.y + 6 * K]
+              : sd === 'u'
+                ? [a.x - 5 * K, a.y - 23.5 * K, a.x + 5 * K, a.y - 8.5 * K]
+                : [a.x - 5 * K, a.y + 5.5 * K, a.x + 5 * K, a.y + 20.5 * K];
+      /* only to the other side of the letters (HO as OH): an H over or under its O reads badly among crowded labels */
+      const sides = hSides(a, nb, 45),
+        opts = [sides[0], ...sides.slice(1).filter(k => (k === 'l' || k === 'r') && (sides[0] === 'l' || sides[0] === 'r'))];
+      items.push({ a, opts, box: sd => [el, hbox(sd)], pick: 0 });
+    }
+    if (items.length < 2) {
+      const m = new Map(items.filter(t => t.opts[0] != null).map(t => [t.a.id, t.lab ? { r: t.opts[0], x: t.a.x, y: t.a.y } : { h: t.opts[0], x: t.a.x, y: t.a.y }]));
+      m.over = 0;
+      return m;
+    }
+    const over = (B, P) => {
+      const w = Math.min(B[2], P[2]) - Math.max(B[0], P[0]),
+        h = Math.min(B[3], P[3]) - Math.max(B[1], P[1]);
+      return w > 0 && h > 0 ? w * h : 0;
+    };
+    const near = items.map(t => items.filter(u => u !== t && Math.abs(u.a.x - t.a.x) < L * 4 && Math.abs(u.a.y - t.a.y) < L * 2));
+    const hitOf = (k, o) => {
+      const t = items[k],
+        bx = t.box(t.opts[o]);
+      let s = 0;
+      for (const u of near[k]) for (const P of u.box(u.opts[u.pick])) for (const B of bx) s += over(B, P);
+      return s;
+    };
+    /* group labels turn first (OMe as MeO), then the H move; twice round, so a change settles */
+    const order = items.map((t, k) => k).sort((p, q) => (items[q].lab ? 1 : 0) - (items[p].lab ? 1 : 0));
+    for (let round = 0; round < 2; round++)
+      for (const k of order) {
+        const t = items[k];
+        if (t.opts.length < 2) continue;
+        const now = hitOf(k, t.pick);
+        if (!now) continue;
+        let best = t.pick,
+          bh = now;
+        for (let o = 0; o < t.opts.length; o++) {
+          if (o === t.pick) continue;
+          const h = hitOf(k, o);
+          if (h < bh * 0.5 && h < bh) ((best = o), (bh = h));
+        }
+        t.pick = best;
+      }
+    const out = new Map();
+    for (const t of items) {
+      const v = t.opts[t.pick];
+      if (v == null) continue;
+      out.set(t.a.id, t.lab ? { r: v, x: t.a.x, y: t.a.y } : { h: v, x: t.a.x, y: t.a.y });
+    }
+    /* what still overlaps (for Clean Up, which then turns the structure): of the atoms in only, or all */
+    out.over = 0;
+    items.forEach((t, k) => {
+      if (!only || only.has(t.a.id)) out.over += hitOf(k, t.pick);
+    });
+    return out;
+  }
+  /* which way a label runs, with what the label layout chose to keep it off its neighbours' labels (labelLayout) */
   function labRightOf(a, nb, x, y) {
+    if (x == null && y == null && !a.ldir) {
+      const o = LABOR.get(a.id);
+      if (o && o.r != null && o.x === a.x && o.y === a.y) return o.r;
+    }
+    return labRightOf0(a, nb, x, y);
+  }
+  function labRightOf0(a, nb, x, y) {
     x = x ?? a.x;
     y = y ?? a.y;
     if (!nb || !nb.length) return false;
@@ -23940,7 +24492,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (b.stereo || b.order !== o) {
             b.order = o;
             b.stereo = null;
-          } else b.order = (b.order % 3) + 1;
+          } else if (o === 2) dblCycle(b);
+          else b.order = (b.order % 3) + 1;
         }
         dativeLengthen(b);
         commit();
@@ -24489,6 +25042,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['act:filePop', 'File menu (copy, settings, insert picture)', ''],
       ['act:fOpen', 'Open a file', 'Ctrl+KeyO'],
       ['act:fExport', 'Export menu', ''],
+      ['act:fPrint', 'Print', 'Ctrl+KeyP'],
       ['cmd:undo', 'Undo', 'Ctrl+KeyZ'],
       ['cmd:redo', 'Redo', 'Ctrl+KeyY'],
       ['cmd:redo2', 'Redo, second key', 'Ctrl+Shift+KeyZ'],
@@ -24953,6 +25507,37 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* where an atom's hydrogens go (NH, OH, BH…): to the right, else to the left, else below, else above — the first side with no bond
    close to it (an NH at the bottom of a ring, between two bonds going up, gets its H underneath); otherwise the freest side */
   function hSide(a, nb) {
+    if (!a.hPos) {
+      const o = LABOR.get(a.id);
+      if (o && o.h && o.x === a.x && o.y === a.y) return o.h;
+    }
+    return hSide0(a, nb);
+  }
+  /* the sides an H may go to, the best first: those minDeg (55°) or more clear of the bonds */
+  function hSides(a, nb, minDeg) {
+    if (a.hPos && 'rldu'.includes(a.hPos)) return [a.hPos];
+    const first = hSide0(a, nb);
+    if (!nb.length) return [first];
+    const angs = nb.map(o => Math.atan2(o.y - a.y, o.x - a.x)),
+      clear = t =>
+        Math.min(
+          ...angs.map(g => {
+            let d = Math.abs(g - t) % (2 * Math.PI);
+            return d > Math.PI ? 2 * Math.PI - d : d;
+          })
+        );
+    const rest = [
+      ['r', 0],
+      ['l', Math.PI],
+      ['d', Math.PI / 2],
+      ['u', -Math.PI / 2]
+    ]
+      .filter(([k, t]) => k !== first && clear(t) >= (Math.PI * (minDeg || 55)) / 180)
+      .sort((p, q) => clear(q[1]) - clear(p[1]))
+      .map(x => x[0]);
+    return [first, ...rest];
+  }
+  function hSide0(a, nb) {
     /* a side set from the API (hSide): the H of NH written left, right, above or below */
     if (a.hPos && 'rldu'.includes(a.hPos)) return a.hPos;
     if (!nb.length) return 'r';
@@ -25279,10 +25864,29 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return undefined;
   }
+  /* a double bond given a double bond again (the key 2, the double bond tool): its second line steps round, one side →
+     centred → the other side → … (where it is drawn now first) */
+  function dblCycle(b) {
+    const A = atomById(b.a),
+      B = atomById(b.b);
+    let now = b.side;
+    if (!now && A && B) {
+      const l = Math.hypot(B.x - A.x, B.y - A.y) || 1,
+        nx = -(B.y - A.y) / l,
+        ny = (B.x - A.x) / l,
+        rc = ringCenterOf(b);
+      now = rc ? ((rc.x - (A.x + B.x) / 2) * nx + (rc.y - (A.y + B.y) / 2) * ny > 0 ? 'l' : 'r') : 'c';
+    }
+    b.side = { l: 'c', c: 'r', r: 'l' }[now] || 'c';
+  }
   function bondKey(b, e) {
     const c = e.code,
       sh = e.shiftKey;
     const ord = { Digit1: 1, Digit2: 2, Digit3: 3, Numpad1: 1, Numpad2: 2, Numpad3: 3 }[c];
+    if (ord === 2 && b.order === 2 && !b.stereo) {
+      dblCycle(b);
+      return true;
+    }
     if (ord) {
       b.order = ord;
       b.stereo = null;
@@ -28526,6 +29130,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     if (copies)
       setTimeout(() => toast('Crystal structure kept as measured; the clean up is on a copy beside it'), 50);
+    /* laid flat before plain H are folded: a 3D shape's centres are read from all its atoms (cholesterol's C3 kept) */
+    if (flat) t.forEach(flatten3D);
     t = foldPlainH(t);
     if (typeof freeBond !== 'undefined' && freeBond) {
       t.forEach(cleanKeepLengths);
@@ -28574,7 +29180,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let nVar = 0,
       later = null;
     try {
-      if (flat) t.forEach(flatten3D);
       frontLater = [];
       cleanFragments(t);
       nVar = cleanVariantN;
@@ -28606,6 +29211,48 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (a.z !== undefined) a.z *= k;
       }
     }
+    /* labels that still run into each other after the layout (and after a label written the other way round, which the
+       drawing does by itself): the structure is turned, in 15° steps, to where they overlap least */
+    if (!flat)
+      for (const f0 of t) {
+        const live = f0.filter(a => atomById(a.id));
+        if (live.length < 3 || live.some(a => a.xray || a.z !== undefined)) continue;
+        const ids = new Set(live.map(a => a.id)),
+          over = () => {
+            try {
+              return labelLayout(ids).over;
+            } catch (e) {
+              return 0;
+            }
+          },
+          o0 = over();
+        if (!(o0 > 1)) continue;
+        const P = live.map(a => [a.x, a.y]),
+          bx = fragBox(live),
+          cx = (bx.x0 + bx.x1) / 2,
+          cy = (bx.y0 + bx.y1) / 2,
+          put = deg => {
+            const c = Math.cos((deg * Math.PI) / 180),
+              sn = Math.sin((deg * Math.PI) / 180);
+            live.forEach((a, i) => {
+              const x = P[i][0] - cx,
+                y = P[i][1] - cy;
+              a.x = cx + x * c - y * sn;
+              a.y = cy + x * sn + y * c;
+            });
+          };
+        let best = 0,
+          bo = o0;
+        for (let k = 1; k <= 12; k++)
+          for (const sg of [1, -1]) {
+            const deg = sg * k * 15;
+            if (deg === -180) continue;
+            put(deg);
+            const o = over();
+            if (o < bo * 0.5 - 1 && o < bo) ((best = deg), (bo = o));
+          }
+        put(best);
+      }
     const skipped = cleanSkipped;
     doClean.last = skipped ? { key, at: Date.now() } : null;
     /* only structures that grew into something get moved */
@@ -29638,6 +30285,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     else if (a === 'fit') fitAll();
     else if (a === 'copyPic') copyPicture();
     else if (a === 'copyPicBg') copyPicture(true);
+    else if (a === 'fPrint') printDrawing();
     else if (a === 'rotL') rotateSel(-90);
     else if (a === 'rotR') rotateSel(90);
     else if (a === 'rot180') rotateSel(180);
@@ -32962,7 +33610,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return pick
       .filter(f => f.length > 1 || f[0].el !== 'C' || !f[0].label)
       .map(f => {
-        const mb = molBlock(f, fragBonds(m, f), '').replace(CHIRAL_RX, CHIRAL_ON);
+        const mb = (is3D(f) ? molBlock3D(f, fragBonds(m, f), '') : molBlock(f, fragBonds(m, f), '')).replace(CHIRAL_RX, CHIRAL_ON);
         /* chiral flag: wedges mean this enantiomer */ try {
           const om = O.Molecule.fromMolfile(mb);
           /* a crossed double bond: E or Z not known, so none is written (the bonds in the file's order, dative ones left out) */
@@ -34659,6 +35307,61 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     return out;
   }
+  /* atom numbers by hand: each atom clicked gets the next number (1, 2, 3…); clicked again it loses it; Done or Esc ends */
+  let ANUM = null;
+  function anumStart() {
+    if (ANUM) return anumEnd();
+    snap();
+    let next = 1;
+    for (const a of mol.atoms) if (a.anum && /^\d+$/.test(String(a.anum.t))) next = Math.max(next, +a.anum.t + 1);
+    ANUM = { next, bar: document.createElement('div') };
+    const b = ANUM.bar;
+    b.className = 'askbox xyzbox';
+    b.setAttribute('role', 'status');
+    b.innerHTML =
+      '<div class="card"><b>Atom numbers</b><div class="tx">Click the atoms in turn: 1, 2, 3… A numbered atom clicked again loses its number. Molfiles, SDF and XYZ files list the atoms in this order.</div><div class="row"><button type="button" data-k="clear">Clear all</button><button type="button" class="pri" data-k="done">Done</button></div></div>';
+    document.body.appendChild(b);
+    b.querySelector('[data-k=done]').onclick = () => anumEnd();
+    b.querySelector('[data-k=clear]').onclick = () => {
+      for (const a of mol.atoms) delete a.anum;
+      ANUM.next = 1;
+      commit();
+    };
+    ANUM.key = e => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        anumEnd();
+      }
+    };
+    document.addEventListener('keydown', ANUM.key, true);
+    $('numHand').setAttribute('aria-pressed', 'true');
+  }
+  function anumEnd() {
+    if (!ANUM) return;
+    ANUM.bar.remove();
+    document.removeEventListener('keydown', ANUM.key, true);
+    ANUM = null;
+    $('numHand').removeAttribute('aria-pressed');
+    commit();
+  }
+  $('mol').addEventListener(
+    'pointerdown',
+    e => {
+      if (!ANUM || e.button !== 0) return;
+      const a = findAtom(pt(e), 12);
+      e.preventDefault();
+      e.stopPropagation();
+      if (!a) return;
+      if (a.anum && a.anum.t != null && !a.anum.iu) {
+        const n = +a.anum.t;
+        delete a.anum;
+        if (n === ANUM.next - 1) ANUM.next--;
+      } else a.anum = { t: String(ANUM.next++) };
+      commit();
+    },
+    true
+  );
+  $('numHand').onclick = () => anumStart();
   $('numIupac').onclick = () => {
     const t = analysisTarget();
     if (!t || !t.atoms || !t.atoms.length) {
@@ -34933,6 +35636,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   const CHIRAL_RX = /  0  0  0  0  0  0  0  0999 V2000|M  V30 COUNTS (\d+) (\d+) (\d+) (\d+) 0/,
     CHIRAL_ON = (m, a, b, c, d) => (a ? `M  V30 COUNTS ${a} ${b} ${c} ${d} 1` : '  0  0  1  0  0  0  0  0999 V2000');
+  /* a structure with its 3D shape (3D shape, a crystal structure): its configuration is read from the 3D places, not from
+     the wedges drawn on its projection (a centre turned edge-on read wrongly from them: cholesterol's C3) */
+  var MB3D = false;
+  function is3D(f) {
+    return f.length > 2 && f.every(a => a.z !== undefined) && f.some(a => Math.abs(a.z) > 1e-3);
+  }
+  function molBlock3D(f, bonds, title) {
+    MB3D = true;
+    try {
+      return molBlock(f, bonds.map(b => (b.stereo === 'wedge' || b.stereo === 'hash' ? { ...b, stereo: null } : b)), title);
+    } finally {
+      MB3D = false;
+    }
+  }
   function molBlock(atoms, bonds, title) {
     /* a dative bond is left out (MDL files have none: the donor and acceptor keep their own hydrogens); a quadruple bond goes
        out as a single one (there is no such order); a crossed double bond as a double one with E/Z not known (3) */
@@ -34943,12 +35660,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const L = [];
     const pad = (v, n) => String(v).padStart(n),
       f = v => v.toFixed(4).padStart(10);
-    L.push(title || '', `  Reactio   2D`, '');
+    /* a structure with its 3D shape (3D shape, a crystal structure, a 3D file) goes out in 3D, its configuration in its
+       3D places and not in the wedges of its projection, which can turn a centre seen edge-on over: everything that reads
+       a structure through a Molfile (SMILES, InChI, R/S, names, files) reads it from 3D */
+    const d3 = MB3D || is3D(atoms);
+    L.push(title || '', d3 ? `  Reactio   3D` : `  Reactio   2D`, '');
     L.push(pad(atoms.length, 3) + pad(bonds.length, 3) + '  0  0  0  0  0  0  0  0999 V2000');
     for (const a of atoms) {
       const el = a.label && !a.grp ? 'R' : a.el === 'D' ? 'D' : a.el;
       L.push(
-        f(a.x * ANG) + f(-a.y * ANG) + f(0) + ' ' + el.padEnd(3) + ' 0  0  0  0  0  0  0  0  0  0  0  0'
+        f(a.x * ANG) + f(-a.y * ANG) + f(d3 && a.z !== undefined ? a.z * ANG : 0) + ' ' + el.padEnd(3) + ' 0  0  0  0  0  0  0  0  0  0  0  0'
       );
     }
     for (const b of bonds) {
@@ -34956,6 +35677,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         b.order === 2 && b.dx
           ? 3
           : b.order > 1 && b.stereo !== 'deloc'
+          ? 0
+          : d3 && (b.stereo === 'wedge' || b.stereo === 'hash')
           ? 0
           : b.stereo === 'wedge'
             ? 1
@@ -35021,6 +35744,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ids = new Set(fr.map(a => a.id));
     return m.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
   }
+  /* atoms numbered by hand (or by Numbering) go into files in their numbers' order: 1, 2, 3… first, the rest after them
+     as drawn, so the atom numbers of a Molfile, an SDF or an XYZ are the numbers on the drawing */
+  function numOrder(arr) {
+    const nOf = a => (a.anum && /^\d+$/.test(String(a.anum.t).trim()) ? +String(a.anum.t).trim() : null);
+    if (!arr.some(a => nOf(a) != null)) return arr;
+    return arr
+      .map((a, i) => [a, nOf(a), i])
+      .sort((p, q) => (p[1] == null) - (q[1] == null) || (p[1] != null ? p[1] - q[1] : 0) || p[2] - q[2])
+      .map(x => x[0]);
+  }
   function exportFormats() {
     const saved = mol;
     const m = expandedCopy();
@@ -35029,10 +35762,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       const sch = schemeOrder();
       const groups = sch.list.filter(x => x.fr);
-      const all = molBlockE(m.atoms, m.bonds, 'Reactio Draw drawing');
+      const all = molBlockE(numOrder(m.atoms), m.bonds, 'Reactio Draw drawing');
       const sdf =
         groups
-          .map((x, i) => molBlockE(x.fr, fragBonds(m, x.fr), 'compound ' + (i + 1)) + '\n$$$$')
+          .map((x, i) => molBlockE(numOrder(x.fr), fragBonds(m, x.fr), 'compound ' + (i + 1)) + '\n$$$$')
           .join('\n') + '\n';
       let rxn = null;
       if (sch.ar) {
@@ -35043,7 +35776,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           String(R.length).padStart(3) +
           String(P.length).padStart(3) +
           '\n' +
-          [...R, ...P].map(x => '$MOL\n' + molBlock(x.fr, fragBonds(m, x.fr), '')).join('\n') +
+          [...R, ...P].map(x => '$MOL\n' + molBlock(numOrder(x.fr), fragBonds(m, x.fr), '')).join('\n') +
           '\n';
       }
       const ks = [...sel];
@@ -35778,7 +36511,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fragIds.push([fr, fid]);
       let s = `<fragment id="${fid}">`;
       const nodeX = (a, i, inner) =>
-        `<n id="${i}" p="${P(a.x, a.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(a.x, a.y)} ${(a.d3 * k).toFixed(2)}"` : ''}${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : ''}>${inner}</n>`;
+        `<n id="${i}" p="${P(a.x, a.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(a.x, a.y)} ${(a.d3 * k).toFixed(2)}"` : ''}${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : ''}${a.anum && a.anum.t != null && a.anum.t !== '' ? ` AtomNumber="${xmlEsc(String(a.anum.t))}" ShowAtomNumber="yes"` : ''}>${inner}</n>`;
       const bondX = (b, B, E) => {
         const d =
           b.stereo === 'wedge'
@@ -36219,6 +36952,50 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* a picture leaving the program (copy, export, Word) has none of the on-screen warnings: red valence circles, unknown-label boxes, free-charge boxes */
   let renderPlain = false;
+  /* Print: the drawing alone (no toolbars), as large as it is drawn and never wider than the page, through the
+     browser's or the system's print dialog (Save as PDF there too) */
+  function printDrawing() {
+    if (!mol.atoms.length && !mol.texts.length && !mol.arrows.length) {
+      toast('Nothing to print yet', true);
+      return;
+    }
+    /* the Mac app's web view has no print dialog of its own */
+    if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rd && !window.__rdWin) {
+      toast('Printing is not available in the Mac app yet: File → Export as → Vector image (.pdf), then print the PDF', true, 8000);
+      return;
+    }
+    let svgT;
+    try {
+      svgT = svgOf(false);
+    } catch (e) {
+      toast('Could not print: ' + ((e && e.message) || e), true);
+      return;
+    }
+    const fr = document.createElement('iframe');
+    fr.setAttribute('aria-hidden', 'true');
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+    document.body.appendChild(fr);
+    const d = fr.contentDocument;
+    d.open();
+    d.write(
+      '<!doctype html><html><head><meta charset="utf-8"><title>' +
+        esc(docName()) +
+        '</title><style>@page{margin:15mm}html,body{margin:0;background:#fff}svg{display:block;max-width:100%;height:auto;margin:0 auto}</style></head><body>' +
+        svgT +
+        '</body></html>'
+    );
+    d.close();
+    const go = () => {
+      try {
+        fr.contentWindow.focus();
+        fr.contentWindow.print();
+      } catch (e) {
+        toast('Could not open the print dialog: File → Export as → Vector image (.pdf), then print the PDF', true, 8000);
+      }
+      setTimeout(() => fr.remove(), 60000);
+    };
+    setTimeout(go, 150);
+  }
   function svgOf(noBg) {
     const keep = [[...sel], [...selArr], [...selTxt]];
     clearSel();
@@ -44615,15 +45392,112 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     return E;
   }
-  function importXyz(text, name) {
+  /* the energy written in a frame's comment line (xtb "energy: -12.3", ORCA "E -123.4", or the line a number alone) */
+  function xyzEnergy(t) {
+    const m = /(?:energy|\bE)\s*[:=]?\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)/i.exec(t || '') || /^\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)\s*$/.exec(t || '');
+    return m ? +m[1] : null;
+  }
+  /* a file with several geometries (an optimisation, a scan, a trajectory, conformers): which to open. pick(k) with a
+     frame number from 1, 'all' or null (cancelled) */
+  function xyzChoose(frames, name, pick) {
+    const n = frames.length,
+      E = frames.map(f => xyzEnergy(f.title)),
+      hasE = E.filter(v => v != null).length >= 2,
+      lo = hasE ? E.reduce((b, v, i) => (v != null && (b < 0 || v < E[b]) ? i : b), -1) : -1;
+    const box = document.createElement('div');
+    box.className = 'askbox xyzpick';
+    let spark = '',
+      X = null;
+    if (hasE) {
+      const vs = E.filter(v => v != null),
+        mn = Math.min(...vs),
+        mx = Math.max(...vs),
+        W = 340,
+        H = 70,
+        Y = v => H - 6 - ((v - mn) / (mx - mn || 1)) * (H - 12);
+      X = i => 4 + (i / Math.max(1, n - 1)) * (W - 8);
+      spark = `<svg class="xyzspark" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;margin:8px 0 2px;cursor:pointer"><title>Energy of each geometry: click to pick one</title><polyline fill="none" style="stroke:var(--accent)" stroke-width="1.5" points="${E.map((v, i) => (v == null ? '' : X(i).toFixed(1) + ',' + Y(v).toFixed(1))).filter(Boolean).join(' ')}"/><line class="cur" x1="0" x2="0" y1="0" y2="${H}" style="stroke:var(--warn)" stroke-width="1"/></svg>`;
+    }
+    box.innerHTML = `<div class="card" style="max-width:400px"><b>${esc(name)}: ${n} geometries</b><div class="note">Which to open? An optimisation or a scan ends with its final geometry.</div>${spark}
+      <div class="row" style="justify-content:flex-start;gap:6px;margin-top:6px"><input type="range" min="1" max="${n}" value="${n}" style="flex:1;padding:0"><input type="number" min="1" max="${n}" value="${n}" style="width:72px"></div>
+      <div class="note xyzt" style="margin-top:4px;min-height:2.6em;word-break:break-all"></div>
+      <div class="row" style="justify-content:flex-start;margin-top:6px"><button type="button" data-g="1">First</button>${lo >= 0 ? `<button type="button" data-g="${lo + 1}">Lowest energy</button>` : ''}<button type="button" data-g="${n}">Last</button></div>
+      <div class="row"><button type="button" data-x="cancel">Cancel</button><button type="button" data-x="all"${n > 50 ? ' disabled title="More than 50: open them one at a time"' : ''}>Open all ${n}</button><button type="button" class="pri" data-x="one">Open this geometry</button></div></div>`;
+    document.body.appendChild(box);
+    const rng = box.querySelector('input[type=range]'),
+      num = box.querySelector('input[type=number]'),
+      tx = box.querySelector('.xyzt'),
+      cur = box.querySelector('.xyzspark .cur');
+    const show = k => {
+      k = Math.max(1, Math.min(n, Math.round(+k) || n));
+      rng.value = num.value = k;
+      const f = frames[k - 1];
+      tx.textContent =
+        'Geometry ' + k + ' of ' + n + ': ' + f.nodes.length + ' atoms' + (E[k - 1] != null ? ', E = ' + E[k - 1] : '') + (f.title && E[k - 1] == null ? ' — ' + f.title.slice(0, 120) : '');
+      if (cur && X) {
+        const x = X(k - 1).toFixed(1);
+        cur.setAttribute('x1', x);
+        cur.setAttribute('x2', x);
+      }
+    };
+    show(n);
+    rng.oninput = () => show(rng.value);
+    num.oninput = () => show(num.value);
+    const sp = box.querySelector('.xyzspark');
+    if (sp)
+      sp.onclick = e => {
+        const r = sp.getBoundingClientRect();
+        show(1 + ((e.clientX - r.left) / r.width) * (n - 1));
+      };
+    const key = e => {
+      if (e.key === 'Escape') (e.preventDefault(), done(null));
+      else if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') (e.preventDefault(), done(+num.value));
+    };
+    const done = v => {
+      box.remove();
+      document.removeEventListener('keydown', key, true);
+      pick(v);
+    };
+    document.addEventListener('keydown', key, true);
+    box.addEventListener('click', e => {
+      const g = e.target.closest('[data-g]'),
+        x = e.target.closest('[data-x]');
+      if (g) show(g.dataset.g);
+      else if (x) done(x.dataset.x === 'one' ? +num.value : x.dataset.x === 'all' ? 'all' : null);
+      else if (e.target === box) done(null);
+    });
+  }
+  /* opt.frame: which geometry of a file with several (from 1; 'last', 'all'); left out, the page asks (the API keeps the
+     old way: up to 10 all, more the last) */
+  function importXyz(text, name, opt) {
     let frames = xyzFrames(text);
     if (!frames.length) {
       toast('No coordinates found in that XYZ file', true);
       return;
     }
-    /* a trajectory (an optimisation, a scan): its last frame, the final geometry */
-    const traj = frames.length > 10;
-    if (traj) frames = [frames[frames.length - 1]];
+    const fr = opt && opt.frame;
+    if (frames.length > 1 && fr == null && !(opt && opt.api)) {
+      xyzChoose(frames, name || 'XYZ', k => {
+        if (k != null) importXyz(text, name, { frame: k });
+      });
+      return;
+    }
+    let traj = false,
+      which = 0;
+    if (fr === 'all') {
+      /* every geometry, side by side */
+    } else if (fr === 'last') {
+      which = frames.length;
+      frames = [frames[frames.length - 1]];
+    } else if (fr != null && frames.length > 1) {
+      which = Math.max(1, Math.min(frames.length, Math.round(+fr) || frames.length));
+      frames = [frames[which - 1]];
+    } else {
+      /* a trajectory (an optimisation, a scan): its last frame, the final geometry */
+      traj = frames.length > 10;
+      if (traj) frames = [frames[frames.length - 1]];
+    }
+
     const base = String(name || 'XYZ').replace(/\.[^.]*$/, '');
     place3D(
       frames.map((f, k) => ({
@@ -44646,7 +45520,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
                 (made > 1 ? 's' : '') +
                 ' from ' +
                 name +
-                (traj ? ' (the last frame of ' + xyzFrames(text).length + ')' : '') +
+                (traj ? ' (the last frame of ' + xyzFrames(text).length + ')' : which ? ' (geometry ' + which + ' of ' + xyzFrames(text).length + ')' : '') +
                 '; bonds and bond orders come from the distances and valences, so check them'
             : 'No structure could be read from that XYZ file',
           !made,
@@ -45037,6 +45911,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const f2 = frs.filter(f => f.some(q => sel.has(q.id)));
         if (f2.length) frs = f2;
       }
+      frs = frs.map(numOrder);
       frs.forEach((fr, i) => {
         const lab = fr.find(q => q.label && !q.grp),
           j = {
@@ -45604,6 +46479,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           h = offWhite(colOf(n.getAttribute('highlightColor')) || '', HL_A) || null;
         if (c) a.col = c;
         if (h) a.hl = h;
+      }
+      /* an atom number shown in the file (ShowAtomNumber): the atom's number here */
+      {
+        const an = n.getAttribute('AtomNumber');
+        if (an && n.getAttribute('ShowAtomNumber') === 'yes') a.anum = { t: an.trim() };
       }
       const rad = n.getAttribute('Radical');
       if (rad === 'Doublet') a.rad = 1;
@@ -46518,7 +47398,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* a file opened from outside gets its own tab (whole Reactio Draw documents make one themselves) */
       const whole = f.text && (/\.(json|reactio)$/i.test(f.name) || CMTRX.test(f.text));
       if (!whole && (mol.atoms.length || mol.texts.length)) {
+        const t0 = startTab();
         newTab(null, f.name.replace(/\.[^.]+$/, ''));
+        dropStartTab(t0);
       } else if (!whole) {
         const t = TABS.list.find(t => t.id === TABS.cur);
         if (t && /^Document \d+$/.test(t.name)) {
@@ -46658,8 +47540,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } catch (e) {}
     }
     const whole = !!cdxDoc || (text != null && (/\.(json|reactio)$/i.test(name) || CMTRX.test(text)));
-    if (!whole && (mol.atoms.length || mol.texts.length || mol.arrows.length))
+    if (!whole && (mol.atoms.length || mol.texts.length || mol.arrows.length)) {
+      const t0 = startTab();
       newTab(null, name.replace(/\.[^.]+$/, ''));
+      dropStartTab(t0);
+    }
     else if (!whole) {
       const t = TABS.list.find(t => t.id === TABS.cur);
       if (t && /^Document \d+$/.test(t.name)) {
@@ -64599,7 +65484,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!String(a.text || '').trim()) throw new Error('import needs text: the content to add (SMILES, Molfile, SDF, RXN, CDXML, CIF…)');
       const fmt = String(a.format || 'smiles').toLowerCase(),
         name = 'api.' + (fmt === 'smiles' ? 'smi' : fmt);
-      importText(name, String(a.text || ''));
+      if (fmt === 'xyz') importXyz(String(a.text || ''), name, { api: true, frame: a.frame });
+      else importText(name, String(a.text || ''));
       return { structures: fragments().length };
     },
     /* a structure (index, or the id of any of its atoms), an arrow or a text (id), or several (ids) */
@@ -68352,7 +69238,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       addRadar: { d: 'a sensitivity screen (radar chart)', open: true, a: { axes: '[{label, value}]', x: '', y: '', size: '', shape: '', zones: '', fill: '', color: '', textSize: '', min: '', max: '', step: '' } },
       enumerate: { d: 'draw every compound of a Markush structure', a: { index: IX } },
       decompose: { d: 'write the R-group lists of a series', a: { scaffold: 'index of the structure with R1, X…', compounds: 'indices of the compounds (all others if left out)' } },
-      import: { d: 'add a file\'s content to the sheet', a: { text: 'the content', format: 'smiles, mol, sdf, rxn, cdxml, cif…' } },
+      import: { d: 'add a file\'s content to the sheet', a: { text: 'the content', format: 'smiles, mol, sdf, rxn, cdxml, cif…', frame: 'xyz with several geometries: which (from 1), "last" or "all" (left out: all up to 10, else the last)' } },
       set: { d: 'replace the whole sheet', a: { text: 'SMILES, Molfile, SDF, RXN, CDXML, CIF or a Reactio Draw document (required)', format: 'found from the text if left out' } },
       delete: { d: 'delete a structure, an arrow or a text', a: { index: IX, id: 'or its id (a structure drawn in parts goes whole)', ids: 'several ids', part: 'true: only the connected piece holding that atom id (a stray fragment of a group)' } },
       clear: { d: 'empty the sheet', a: { keepReference: 'true: the figure laid last stays (or give its id); any other picture goes', resetIds: 'true: the ids start again at 1 (a figure kept becomes 1), as on a new sheet' } },
@@ -71268,9 +72154,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return id;
   }
+  /* the untouched Document 1 the program started with (empty, or its first example): it goes when a file opens in a tab
+     of its own */
+  function startTab() {
+    const t0 = curTab();
+    return t0 &&
+      /^Document \d+$/.test(t0.name) &&
+      !t0.file &&
+      !t0.dirty &&
+      ((!mol.atoms.length && !mol.texts.length && !mol.arrows.length && !(mol.fills && mol.fills.length)) ||
+        (t0.clean != null && t0.clean === contentKey())) &&
+      !(window.__rdWin && window.__rdWin.embed)
+      ? t0
+      : null;
+  }
+  function dropStartTab(t0) {
+    if (t0 && TABS.list.length > 1 && t0.id !== TABS.cur && TABS.list.includes(t0)) closeTab(t0.id);
+  }
   function openInTab(state, name) {
     cleanState(state);
+    const t0 = startTab();
     newTab(state, String(name || '').replace(EXTRX, ''));
+    dropStartTab(t0);
   }
   /* Ctrl+W closes the current document; the last ten closed ones can come back with Ctrl+Shift+T */
   function closeDoc() {
@@ -72993,6 +73898,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   window.__rd = {
     animPlan,
+    labelLayout,
     animPlaces,
     animFrames,
     animGif,
@@ -73161,7 +74067,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     parseSmiles,
     placeGraph,
     graft,
-    fragments,
     fragSmiles,
     countsOf,
     formulaText,

@@ -1,0 +1,22 @@
+name: Suggestion
+description: Something Reactio Draw could do, or do better
+title: "[Suggestion]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like
+      description: What you want to draw or do, and how you do it now.
+    validations:
+      required: true
+  - type: textarea
+    id: example
+    attributes:
+      label: An example
+      description: A picture of how it should look (from a paper, for example), a file or a SMILES.
+  - type: input
+    id: version
+    attributes:
+      label: Version you use
+      placeholder: "1.11"

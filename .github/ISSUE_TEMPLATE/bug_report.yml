@@ -1,0 +1,53 @@
+name: Bug report
+description: Something works wrongly or not at all
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thank you for the report. A file or a SMILES we can open makes a bug quick to find.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you saw, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Draw or open …
+        2. Select …
+        3. Press …
+    validations:
+      required: true
+  - type: textarea
+    id: files
+    attributes:
+      label: Structure, file or screenshot
+      description: A SMILES, a small .cdxml / .reactio file (drag it here), or a screenshot.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Info tab → version (for example 1.11).
+      placeholder: "1.11"
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Where
+      multiple: true
+      options:
+        - Windows app
+        - Mac app
+        - Linux app
+        - Browser
+        - Word add-in
+        - Excel add-in
+        - Local API / MCP / command line
+    validations:
+      required: true

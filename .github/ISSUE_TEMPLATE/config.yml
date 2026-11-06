@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Questions and news on X (Twitter)
+    url: https://x.com/Paivelpas
+    about: Questions, ideas and news about Reactio Draw.
+  - name: Questions and news on Telegram
+    url: https://t.me/reactiodraw
+    about: The same in the Telegram channel.
