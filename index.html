@@ -3071,6 +3071,7 @@ html {
         <button class="tb" data-chg="dm" title="Partial charge δ−: click an atom; click again to remove (drawing only, not counted)"><svg viewBox="0 0 22 22"><text x="2.5" y="16" font-size="13" font-style="italic" fill="currentColor" font-family="serif">δ</text><path d="M13 7h7" stroke="currentColor" stroke-width="1.5"/></svg></button>
         <button class="tb" data-chg="up" title="Electron with its spin ↿: in an orbital's lobe it stands along the lobe and stays in it (an electron there counts on a carbon); on the sheet a free one. Shift+click: ⇂"><svg viewBox="0 0 22 22"><path d="M11 19V3l-4 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         <button class="tb" data-chg="ud" title="Paired electrons ↿⇂: in an orbital's lobe along the lobe (a pair there counts on a carbon: a carbene), or on the sheet"><svg viewBox="0 0 22 22"><path d="M8 19V3l-3.5 4.5M14 3v16l3.5-4.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <button class="tb" data-chg="eq" title="Equivalence sign ≡: click the sheet between two drawings of one molecule; an animation turns one into the other in 3D"><svg viewBox="0 0 22 22"><path d="M5 7h12M5 11h12M5 15h12" stroke="currentColor" stroke-width="1.8"/></svg></button>
       </div>
       <span class="tlabel">Rings</span>
       <div class="tgroup">
@@ -23508,7 +23509,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (tool === 'chg') {
-      if (h && h.atom && (chgMode === 'up' || chgMode === 'ud')) {
+      if (chgMode === 'eq') {
+        /* the equivalence sign: a text ≡ centred where the sheet was clicked (an animation reads it as a 3D turn) */
+        snap();
+        const t = { id: mol.next++, x: 0, y: 0, text: '≡', nochem: true };
+        mol.texts.push(t);
+        t.x = p.x - textW(t) / 2;
+        t.y = p.y + tSize(t) * 0.35;
+        commit();
+      } else if (h && h.atom && (chgMode === 'up' || chgMode === 'ud')) {
         /* electrons with their spin go into an orbital's lobe or stand on the sheet, not on an atom */
         toast('Put it in a lobe of an orbital, or on the sheet beside it', true);
       } else if (h && h.atom) {
