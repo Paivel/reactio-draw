@@ -20,7 +20,7 @@ It includes or uses the components below; each keeps its own license. Full texts
 | golang.org/x/sys (Windows app) | Windows system calls | BSD-3-Clause | © 2009 The Go Authors | https://go.googlesource.com/sys |
 | Microsoft WebView2Loader.dll (beside the Windows app as WebView2Loader-x64.dll or WebView2Loader-arm64.dll, unchanged and Microsoft-signed) | starting Edge WebView2 | BSD-3-Clause | © Microsoft Corporation | [WebView2 SDK](https://www.nuget.org/packages/Microsoft.Web.WebView2) |
 | purego 0.8.4 (Linux app) | loading GTK and WebKitGTK at start | Apache-2.0 | © 2022 The Ebitengine Authors | https://github.com/ebitengine/purego |
-| cdxmorph 1.49.0 (Python), its way of pairing two drawings atom by atom (place, label and bonds, Hungarian assignment, growing a pairing along the bonds) and of moving the atoms between them, rewritten in JavaScript in the page (`animMatch…`, `animPlaces`) | File → Export as → Animation | MIT (`LICENSES/cdxmorph-MIT.txt`) | © 2026 Ryan Shenvi | https://github.com/rshenvi/cdxmorph |
+| cdxmorph 1.49.0 (Python), its way of pairing two drawings atom by atom (place, label and bonds, Hungarian assignment, growing a pairing along the bonds) and of moving the atoms between them, rewritten in JavaScript in the page (`animMatch…`, `animPlaces`); its example drawing, saved again by Reactio Draw as `examples/Animation - 3D turns and a reaction.cdxml` | File → Export as → Animation; the example to try it | MIT (`LICENSES/cdxmorph-MIT.txt`) | © 2026 Ryan Shenvi | https://github.com/rshenvi/cdxmorph |
 
 ## Data included in the program
 

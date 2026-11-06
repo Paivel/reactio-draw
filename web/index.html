@@ -20776,6 +20776,11 @@ function kdOf(st) {
       else if (t.plus) delete t.plus;
     }
     ionLabels();
+    try {
+      iupacRenumber();
+    } catch (e) {
+      console.warn('iupacRenumber', e);
+    }
     refreshAna();
     render();
     fitView();
@@ -35317,6 +35322,55 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     return out;
   }
+  /* IUPAC numbers follow the structure: when a numbered structure changes (an atom, a bond, a label, a charge; not a move),
+     it is numbered again, so a methyl added next to the spiro atom gets 1, not the number its carbon had before. A
+     structure the namer cannot number any more loses its IUPAC numbers. The first look at a structure (a file just opened)
+     only notes it. */
+  const IU_SIG = new Map();
+  function iupacSig(f) {
+    const ids = new Set(f.map(a => a.id));
+    return (
+      f.map(a => [a.id, a.el, a.label || '', a.chg || 0, a.iso || '', a.hcount == null ? '' : a.hcount].join(':')).sort().join(' ') +
+      '|' +
+      mol.bonds
+        .filter(b => ids.has(b.a) && ids.has(b.b))
+        .map(b => [Math.min(b.a, b.b), Math.max(b.a, b.b), b.order, b.stereo || '', b.stereo ? b.a : ''].join(':'))
+        .sort()
+        .join(' ')
+    );
+  }
+  function iupacRenumber() {
+    if (!mol.atoms.some(a => a.anum && a.anum.iu)) {
+      IU_SIG.clear();
+      return;
+    }
+    const seen = new Set();
+    for (const f of fragments()) {
+      const nu = f.filter(a => a.anum && a.anum.iu);
+      if (!nu.length) continue;
+      const key = Math.min(...nu.map(a => a.id)),
+        sig = iupacSig(f);
+      seen.add(key);
+      const old = IU_SIG.get(key);
+      IU_SIG.set(key, sig);
+      if (old == null || old === sig) continue;
+      let r = null;
+      try {
+        r = iupacNumbers(f);
+      } catch (e) {}
+      for (const a of f) if (a.anum && a.anum.iu) delete a.anum;
+      if (r && r.size) {
+        for (const a of f) if (r.has(a.id) && !(a.anum && a.anum.t != null)) a.anum = { t: r.get(a.id), iu: 1 };
+        const nu2 = f.filter(a => a.anum && a.anum.iu);
+        if (nu2.length) {
+          const k2 = Math.min(...nu2.map(a => a.id));
+          IU_SIG.set(k2, sig);
+          seen.add(k2);
+        }
+      }
+    }
+    for (const k of [...IU_SIG.keys()]) if (!seen.has(k)) IU_SIG.delete(k);
+  }
   /* atom numbers by hand: each atom clicked gets the next number (1, 2, 3…); clicked again it loses it; Done or Esc ends */
   let ANUM = null;
   function anumStart() {
@@ -36576,7 +36630,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           gRight = labRightOf(g, onb),
           lab =
             g.label; /* a CDXML label is kept in reading order (CO2H, OTBDPS) and shown turned round when it is right-justified (HO2C, TBDPSO) */
-        s += `<n id="${i}" p="${P(g.x, g.y)}" NodeType="${/\d/.test(g.label) || g.label.length > 3 ? 'Fragment' : 'Nickname'}"${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}>${inner}</fragment><t ${labPos(
+        s += `<n id="${i}" p="${P(g.x, g.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(g.x, g.y)} ${(a.d3 * k).toFixed(2)}"` : ''} NodeType="${/\d/.test(g.label) || g.label.length > 3 ? 'Fragment' : 'Nickname'}"${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}>${inner}</fragment><t ${labPos(
           a,
           P,
           g.x,
@@ -49168,6 +49222,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       a.zy = a.y;
     });
   }
+  function zKeep(f) {
+    if (!f.length || !f.every(a => a.z !== undefined && isFinite(a.z))) return false;
+    for (const a of f) {
+      a.zx = a.x;
+      a.zy = a.y;
+    }
+    return true;
+  }
   function has3D(atoms) {
     return atoms.every(a => a.z !== undefined && Math.abs(a.zx - a.x) < 0.01 && Math.abs(a.zy - a.y) < 0.01);
   }
@@ -49179,7 +49241,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     else if (!has3D(atoms)) {
       const frs = fragments().filter(f => f.some(a => atoms.includes(a)));
       for (const f of frs)
-        if (!has3D(f) && !v3Keep(f)) {
+        /* a structure with 3D places keeps them: moved, turned or resized as a whole they follow (v3Follow), and after
+           any other 2D edit its depths still stand; a new shape is computed only where there is none (3D shape does it
+           on purpose) */
+        if (!has3D(f) && !v3Follow(f) && !v3Keep(f) && !poseKeep(f) && !zKeep(f)) {
           if (embedBest(f) === 'none') {
             for (const a of f) a.z = 0;
             setTimeout(
@@ -49219,6 +49284,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       a.z = d.c[2] + z;
       a.zx = a.x;
       a.zy = a.y;
+      if (a.d3 != null) a.d3 = a.z;
     });
     /* wedge = the far end comes toward the viewer */
     for (const b of mol.bonds) {
@@ -53771,6 +53837,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* a structure from a crystal structure keeps its measured geometry: when its stored projection is out of date (an atom
      dragged, one added) the depth it has is kept and brought up to date, and an atom with no depth yet takes its
      neighbours' — it is never rebuilt by a force field */
+  /* a 3D pose read from CDXML (xyz on every atom: the depths are a.d3) turns as it is: its depths become its z, no new
+     shape is computed for it; turned, its depths follow (the animation reads them) */
+  function poseKeep(f) {
+    if (!f.length || !f.every(a => a.d3 != null && isFinite(a.d3))) return false;
+    for (const a of f) {
+      a.z = a.d3;
+      a.zx = a.x;
+      a.zy = a.y;
+    }
+    return true;
+  }
   function v3Keep(f) {
     if (!f.some(a => a.xray)) return false;
     if (v3Follow(f)) return true;
@@ -54207,7 +54284,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
     for (const f of pick) {
-      if (st && !v3Valid(f) && !v3Follow(f) && !v3Keep(f)) {
+      if (st && !v3Valid(f) && !v3Follow(f) && !v3Keep(f) && !poseKeep(f)) {
         if (embedBest(f) === 'none') {
           flat++;
           continue;
