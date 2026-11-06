@@ -16211,10 +16211,10 @@ function kdOf(st) {
           `<line x1="${x1 + nx * o + ux * sh1}" y1="${y1 + ny * o + uy * sh1}" x2="${x2 + nx * o - ux * sh2}" y2="${y2 + ny * o - uy * sh2}" ${ink} stroke-width="${w || bw}" stroke-linecap="round" ${extra || ''}/>`;
         /* the narrow end is as wide as a plain bond, so a bond running into it has no pinch */
         if (b.stereo === 'wedge') {
-          /* one shape whatever stands at its end: the triangle runs to the atom's centre and is cut where the label begins,
-             so a wedge to OH or Br opens at the same angle as one to a CH2 (it was as wide at the label as at a centre) */
+          /* as journals draw it: the wide end is as wide wherever the wedge ends, at a carbon or where a label (OH, Cl)
+             begins; a wedge to a label is shorter, so it opens a little more */
           const h0 = bw / 2,
-            ww = t2 > 0 && l > 0 ? h0 + (st.wedge * wk - h0) * Math.max(0.35, (l - t2) / l) : st.wedge * wk;
+            ww = st.wedge * wk;
           let cP = [x2 + nx * ww, y2 + ny * ww],
             cM = [x2 - nx * ww, y2 - ny * ww];
           /* wedges whose wide ends meet at one atom (the bridge of a norbornane in perspective): their sides run on until they
@@ -16261,22 +16261,32 @@ function kdOf(st) {
         /* hashes as journals draw them: strokes one line width thick, a hash spacing plus a line width apart, the last one just short of the far
        end, each as wide as the wedge would be there (1.5 bold widths at the end) */
         if (b.stereo === 'hash' || b.stereo === 'hashplain') {
-          /* at least four strokes, kept apart: on a short bond they get thinner rather than run together into a wedge */
-          /* laid on the part of the bond that is drawn, each as wide as the wedge's triangle (narrow at the first atom's
-             centre, full at the second's) is there: a hash to OH or Br keeps the angle of one to a CH2 */
-          const lt = Math.hypot(x2 - x1, y2 - y1) || 1,
-            k = Math.max(4, Math.round(lt / ((st.hash + st.lw) * wk))),
-            last = lt - bw * 1.3,
-            sp = last / (k - 0.07),
-            hw = Math.min(bw, sp * 0.5);
-          for (let i = 0; i < k; i++) {
-            const d = last - (k - 1 - i) * sp,
-              cx = x1 + ux * d,
-              cy = y1 + uy * d,
-              t = Math.min(1, (t1 + d) / (l || 1)),
-              w = b.stereo === 'hash' ? st.wedge * wk * t : (st.bold || st.wedge) * wk * 0.35;
-            s += `<line x1="${cx + nx * w}" y1="${cy + ny * w}" x2="${cx - nx * w}" y2="${cy - ny * w}" ${ink} stroke-width="${hw}"/>`;
+          /* strokes one hash spacing apart, at least four on a whole bond (on a short bond they get thinner rather than run
+             together). A label at an end (Cl, OH) only makes the hash shorter, as journals draw it: the strokes keep their
+             spacing, so there are fewer of them, and they run from the first stroke's width to the full width of the wide
+             end at the last one, by the label */
+          const kF = Math.max(4, Math.round(l / ((st.hash + st.lw) * wk))),
+            lastF = l - bw * 1.3,
+            sp = lastF / (kF - 0.07),
+            hw = Math.min(bw, sp * 0.5),
+            firstF = lastF - (kF - 1) * sp,
+            wOf = d => (b.stereo === 'hash' ? st.wedge * wk * (d / l) : (st.bold || st.wedge) * wk * 0.35),
+            wFirst = wOf(firstF),
+            wLast = wOf(lastF);
+          let D = [];
+          if (!t1 && !t2) for (let i = 0; i < kF; i++) D.push(firstF + i * sp);
+          else {
+            const end = t2 ? l - t2 - bw * 0.6 : lastF,
+              start = Math.max(firstF * 0.85, t1 ? t1 + bw * 0.5 : 0),
+              n = Math.max(1, Math.floor((end - start) / sp + 1e-6) + 1);
+            for (let i = 0; i < n; i++) D.push(end - (n - 1 - i) * sp);
           }
+          D.forEach((d, i) => {
+            const w = D.length < 2 ? wLast : wFirst + ((wLast - wFirst) * i) / (D.length - 1),
+              cx = A.x + ux * d,
+              cy = A.y + uy * d;
+            s += `<line x1="${cx + nx * w}" y1="${cy + ny * w}" x2="${cx - nx * w}" y2="${cy - ny * w}" ${ink} stroke-width="${hw}"/>`;
+          });
           continue;
         }
         if (b.stereo === 'deloc') {
