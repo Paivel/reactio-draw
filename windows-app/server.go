@@ -51,9 +51,12 @@ func putPtr(pp, v uintptr) {
 	}
 }
 
+// the server: registered with Windows at once; w is nil until the drawing needs a window of its own (attachServer)
 func initServer(w webview2.WebView) {
-	srv.w = w
-	srv.hwnd = webview2.HWND(w)
+	if w != nil {
+		srv.w = w
+		srv.hwnd = webview2.HWND(w)
+	}
 	pCreateOleAdviseHolder.Call(uintptr(unsafe.Pointer(&srv.oleHolder)))
 	pCreateDataAdviseHolder.Call(uintptr(unsafe.Pointer(&srv.dataHolder)))
 
@@ -102,10 +105,10 @@ func initServer(w webview2.WebView) {
 		if srv.refs <= 0 {
 			srv.refs = 0
 			// nobody holds the object and its window is not open: done
-			srv.w.Dispatch(func() {
+			srvDispatch(func() {
 				if srv.refs == 0 && !srv.shown && !srv.closing {
 					srv.closing = true
-					pDestroyWindow.Call(srv.hwnd)
+					srvQuit()
 				}
 			})
 		}
@@ -162,7 +165,11 @@ func initServer(w webview2.WebView) {
 				t += " - Drawing in " + a
 			}
 			srv.title = t
-			srv.w.Dispatch(func() { srv.w.SetTitle(t) })
+			srvDispatch(func() {
+				if srv.w != nil {
+					srv.w.SetTitle(t)
+				}
+			})
 			return S_OK
 		}),
 		windows.NewCallback(func(this, opt uintptr) uintptr { // Close
@@ -179,7 +186,9 @@ func initServer(w webview2.WebView) {
 				if tab.on || tab.pending {
 					return S_OK
 				}
-				pShowWindow.Call(srv.hwnd, 0)
+				if srv.hwnd != 0 {
+					pShowWindow.Call(srv.hwnd, 0)
+				}
 				srv.shown = false
 				return S_OK
 			}
@@ -309,10 +318,10 @@ func initServer(w webview2.WebView) {
 
 	// started by hand with -Embedding, or the container gave up: do not linger
 	time.AfterFunc(90*time.Second, func() {
-		srv.w.Dispatch(func() {
+		srvDispatch(func() {
 			if !srv.created && !srv.closing {
 				srv.closing = true
-				pDestroyWindow.Call(srv.hwnd)
+				srvQuit()
 			}
 		})
 	})
@@ -427,7 +436,63 @@ func writeNative(stg uintptr, full bool) bool {
 	if len(srv.emf) > 0 {
 		writeStream(stg, "RDEmf", srv.emf)
 	}
+	if full {
+		/* the picture as OLE's own presentation cache: Word shows a pasted object from it at once, without starting
+		   Reactio Draw to ask for its picture (which it did three times for every paste) */
+		if pres := presStream(srv.emf, srv.png, srv.wHi, srv.hHi); pres != nil {
+			writeStream(stg, "\x02OlePres000", pres)
+		}
+	}
 	return ok
+}
+
+var (
+	pGetWinMetaFileBits = gdi32.NewProc("GetWinMetaFileBits")
+	pDeleteEnhMetaFile  = gdi32.NewProc("DeleteEnhMetaFile")
+)
+
+// an OLE presentation stream (MS-OLEDS 2.3.4: clipboard format, no target device, content aspect, extents in HIMETRIC,
+// the data): the EMF kept as OLE keeps one, as the Windows metafile GetWinMetaFileBits makes (the EMF rides inside it);
+// without an EMF the picture as a DIB
+func presStream(emf, png []byte, wHi, hHi int32) []byte {
+	var cf uint32
+	var data []byte
+	if len(emf) > 0 {
+		h, _, _ := pSetEnhMetaFileBits.Call(uintptr(len(emf)), uintptr(unsafe.Pointer(&emf[0])))
+		if h != 0 {
+			dc, _, _ := pGetDC.Call(0)
+			n, _, _ := pGetWinMetaFileBits.Call(h, 0, 0, 8, dc) // MM_ANISOTROPIC
+			if n > 0 {
+				buf := make([]byte, n)
+				if m, _, _ := pGetWinMetaFileBits.Call(h, n, uintptr(unsafe.Pointer(&buf[0])), 8, dc); m > 0 {
+					cf, data = CF_ENHMETAFILE, buf[:m]
+				}
+			}
+			pReleaseDC.Call(0, dc)
+			pDeleteEnhMetaFile.Call(h)
+		}
+	}
+	if data == nil && len(png) > 0 {
+		if p := pictureOf(png, wHi, hHi); p != nil && len(p.dib) > 40 {
+			cf, data = CF_DIB, p.dib
+		}
+	}
+	if data == nil {
+		return nil
+	}
+	b := make([]byte, 40, 40+len(data))
+	le := binary.LittleEndian
+	le.PutUint32(b[0:], 0xFFFFFFFF) // a standard clipboard format follows
+	le.PutUint32(b[4:], cf)
+	le.PutUint32(b[8:], 4) // target device: none
+	le.PutUint32(b[12:], 1) // DVASPECT_CONTENT
+	le.PutUint32(b[16:], 0xFFFFFFFF) // lindex
+	le.PutUint32(b[20:], 0)          // advf
+	le.PutUint32(b[24:], 0)          // reserved
+	le.PutUint32(b[28:], uint32(wHi))
+	le.PutUint32(b[32:], uint32(hHi))
+	le.PutUint32(b[36:], uint32(len(data)))
+	return append(b, data...)
 }
 
 // ---------- editor window ----------
@@ -452,7 +517,7 @@ func showEditor() {
 		}
 		go func() {
 			ok := reachMain()
-			srv.w.Dispatch(func() {
+			srvDispatch(func() {
 				tab.pending = false
 				if srv.closing {
 					return
@@ -468,7 +533,19 @@ func showEditor() {
 	showOwnWindow()
 }
 
+// the server's window: made when first needed (the loop in serverPump ends, main makes the window and calls attachServer)
+func attachServer(w webview2.WebView) {
+	srv.w = w
+	srv.hwnd = webview2.HWND(w)
+	pumpDrain()
+}
+
 func showOwnWindow() {
+	if srv.w == nil {
+		pump.wantWindow = true
+		pumpWake()
+		return
+	}
 	startPage()
 	pShowWindow.Call(srv.hwnd, 3) // SW_MAXIMIZE
 	if ch := webview2.ChromiumOf(srv.w); ch != nil {
@@ -533,7 +610,7 @@ func finishClose() {
 	}
 	comCall(srv.oleHolder, 8) // SendOnClose
 	srv.shown = false
-	pDestroyWindow.Call(srv.hwnd)
+	srvQuit()
 }
 
 // Word closes the object (the document closes, or it wants the object back)
@@ -551,8 +628,10 @@ func closeFromContainer(save bool) {
 	}
 	comCall(srv.oleHolder, 8)
 	srv.shown = false
-	pShowWindow.Call(srv.hwnd, 0)
-	srv.w.Dispatch(func() { pDestroyWindow.Call(srv.hwnd) })
+	if srv.hwnd != 0 {
+		pShowWindow.Call(srv.hwnd, 0)
+	}
+	srvDispatch(srvQuit)
 }
 
 // close button of an embedded window: let the page send its last version first
@@ -565,7 +644,7 @@ func embedCloseRequested() bool {
 		return false
 	}
 	srv.w.Eval("window.__rdFlush?window.__rdFlush():window.__rdPost(JSON.stringify({id:'x',cmd:'embedClose'}))")
-	time.AfterFunc(5*time.Second, func() { srv.w.Dispatch(finishClose) })
+	time.AfterFunc(5*time.Second, func() { srvDispatch(finishClose) })
 	return false
 }
 

@@ -196,10 +196,10 @@ func watchTab(id string) {
 				png, _ := base64.StdEncoding.DecodeString(m.PNG)
 				emf, _ := base64.StdEncoding.DecodeString(m.EMF)
 				done := make(chan bool)
-				srv.w.Dispatch(func() { embedUpdate([]byte(m.KD), png, emf, m.W, m.H, m.Final); close(done) })
+				srvDispatch(func() { embedUpdate([]byte(m.KD), png, emf, m.W, m.H, m.Final); close(done) })
 				<-done
 			case "close":
-				srv.w.Dispatch(tabClosed)
+				srvDispatch(tabClosed)
 				return
 			}
 		}
@@ -209,7 +209,7 @@ func watchTab(id string) {
 		if alive {
 			gone = 0
 		} else if gone++; gone > 10 {
-			srv.w.Dispatch(tabClosed)
+			srvDispatch(tabClosed)
 			return
 		}
 	}

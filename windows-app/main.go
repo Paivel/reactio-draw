@@ -126,6 +126,22 @@ func main() {
 
 	// WebView2Loader.dll (Microsoft-signed) is a file beside the program; nothing is unpacked from the exe
 
+	/* started by Word for an object: Word is answered at once (serverpump.go); WebView2 only for a window of its own */
+	if app.embedding {
+		pumpInit()
+		initServer(nil)
+		serverPump()
+		if !pump.wantWindow {
+			logf("server done")
+			stopServer()
+			opsinStop()
+			namerStop()
+			pOleUninitialize.Call()
+			os.Exit(0)
+		}
+		logf("the drawing gets a window of its own")
+	}
+
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		Debug:     true, // F12 and Inspect for now, while the Windows version is being tested
 		AutoFocus: true,
@@ -211,8 +227,9 @@ func main() {
   document.addEventListener('DOMContentLoaded',()=>L('page ready: '+location.href+', '+document.body.children.length+' elements'));})();`)
 
 	if app.embedding {
-		initServer(w)
+		attachServer(w)
 		webview2.SetCloseHandler(w, embedCloseRequested)
+		showOwnWindow()
 	} else {
 		if mapped {
 			w.Navigate(pageURL)
