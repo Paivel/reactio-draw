@@ -3249,7 +3249,7 @@ html {
           <button class="tb" data-act="style3D" title="3D style: draw the selected 3D structures (or all) as ball and stick, tubes or spheres, shaded and fading with depth; Lines draws them as before. A structure that is still flat gets its 3D shape first"><svg viewBox="0 0 22 22"><line x1="6" y1="15" x2="15" y2="7" stroke="currentColor" stroke-width="2"/><circle cx="6" cy="15" r="3.6" fill="currentColor" opacity=".55"/><circle cx="15.5" cy="6.5" r="4.2" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="14.2" cy="5.2" r="1.2" fill="currentColor"/></svg></button>
         </div>
         <div class="tbg" aria-label="Text style">
-          <select id="docStyle" title="Drawing style: the selection, or what you draw next" aria-label="Drawing style"><option value="journal">ACS</option><option value="screen">Large (screen)</option><option value="nature">Nature</option><option value="rsc">RSC</option><option value="angew">Angewandte</option><option value="synth">Synthesis / Synlett</option><option value="custom">Custom…</option></select><button class="tb" data-act="styleEd" title="Edit the drawing style: font, sizes and widths in pt or mm"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 2v3M11 17v3M2 11h3M17 11h3M4.6 4.6l2.1 2.1M15.3 15.3l2.1 2.1M4.6 17.4l2.1-2.1M15.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="1.5"/></svg></button><select id="docTheme" title="Color theme for the drawing" aria-label="Color theme"><option value="">Reactio colors</option><option value="publication">Publication</option><option value="presentation">Presentation</option><option value="pastel">Pastel</option><option value="jmol">Jmol</option></select><button class="tb" data-act="paper" title="Paper color: white, grey, dark grey, night blue, black or blueprint" aria-pressed="false"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 4a7 7 0 010 14z" fill="currentColor"/></svg></button>
+          <select id="docStyle" title="Drawing style: the selection, or what you draw next" aria-label="Drawing style"><option value="journal">ACS</option><option value="screen">Large (screen)</option><option value="nature">Nature</option><option value="rsc">RSC</option><option value="angew">Angewandte</option><option value="synth">Synthesis / Synlett</option><option value="acsslides">ACS for slides</option><option value="custom">Custom…</option></select><button class="tb" data-act="styleEd" title="Edit the drawing style: font, sizes and widths in pt or mm"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 2v3M11 17v3M2 11h3M17 11h3M4.6 4.6l2.1 2.1M15.3 15.3l2.1 2.1M4.6 17.4l2.1-2.1M15.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="1.5"/></svg></button><select id="docTheme" title="Color theme for the drawing" aria-label="Color theme"><option value="">Reactio colors</option><option value="publication">Publication</option><option value="presentation">Presentation</option><option value="pastel">Pastel</option><option value="jmol">Jmol</option></select><button class="tb" data-act="paper" title="Paper color: white, grey, dark grey, night blue, black or blueprint" aria-pressed="false"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M11 4a7 7 0 010 14z" fill="currentColor"/></svg></button>
           <select id="tSize" title="Font size of text, atom labels and their charge/radical symbols: the selection, or what you draw next" aria-label="Font size"><option>8</option><option>9</option><option>10</option><option>11</option><option>12</option><option selected>13</option><option>14</option><option>15</option><option>16</option><option>18</option><option>20</option><option>24</option><option>28</option><option>36</option><option value="custom">Custom…</option></select><select id="tFont" title="Font of text and atom labels: the selection, or what you draw next. Custom… lets you type any installed font" aria-label="Font"><option value="">Style font</option><option>Arial</option><option>Helvetica</option><option>Times New Roman</option><option>Calibri</option><option>Cambria</option><option>Georgia</option><option>Verdana</option><option>Courier New</option><option value="custom">Custom…</option></select>
         </div>
         <div class="tbg" aria-label="Text">
@@ -12875,6 +12875,19 @@ function kdOf(st) {
       bold: 1.388976377952756,
       margin: 0.9070866141732284,
       hash: 1.75748031496063,
+      sp: 0.18
+    },
+    /* ACS for slides: the ACS drawing twice as large (bond 28.8 pt, letters 20 pt), so a structure reads from the back of a
+       room on a 16:9 or 4:3 slide at its true size */
+    acsslides: {
+      name: 'ACS for slides',
+      font: 'Arial',
+      fs: 20,
+      bond: 28.8,
+      line: 1.2,
+      bold: 4,
+      margin: 3.2,
+      hash: 5,
       sp: 0.18
     }
   };
@@ -37155,7 +37168,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* the document's pages with their margins, when it uses them */
   const docPageDims = pg => pg && pageDims(pg.size, pg.orient, pg.margins ? pg.mg || PAGE_MARGIN : null, pg.cu);
   const docPage = () => (S && S.doc && S.doc.page && PAGE_KINDS[S.doc.page.size] ? S.doc.page : null);
-  let PAGES_KEY = '';
+  let PAGES_KEY = null;
   function drawPages() {
     const g = $('pages');
     if (!g) return;
@@ -37313,7 +37326,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       C.show(sz.value === 'custom');
       M.enable(!!sz.value);
       M.orient(or.value);
-      PAGES_KEY = '';
+      PAGES_KEY = null;
       drawPages();
       save();
     };
@@ -52232,9 +52245,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const sz = { x: r.x1 + ux * L * k, y: r.y1 + uy * L * k };
     return r.orb === 's' ? { sz } : { sz, rot: { x: sz.x + ux * 16, y: sz.y + uy * 16 } };
   }
+  /* the handles of an arrow keep their size on the screen: zoomed in they do not grow over the arrow (k: sheet units per
+     handle unit at this zoom, 1 at 100%) */
+  function handleK() {
+    const z = (svg.clientWidth || BW) / view.w / PX1;
+    return z > 0 ? Math.min(1.6, 1 / z) : 1;
+  }
+  /* the head's own handles only where the head is big enough on the screen to take them without hiding it */
+  const headRoomy = HH => HH && HH.hw / handleK() >= 7.5;
   function handlesSVG() {
     const r = soloArrow();
     if (!r || !isSelTool() || r.kind === 'tbl' || r.kind === 'grid') return '';
+    const K = handleK(),
+      q = v => +(v * K).toFixed(3);
     if (r.kind === 'orb') {
       const H = orbHandles(r);
       let s = '';
@@ -52246,15 +52269,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const H = arrowHandles(r);
     let s = '';
     for (const k of ['e1', 'e2'])
-      s += `<circle cx="${H[k].x}" cy="${H[k].y}" r="5" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.6"><title>Drag to lengthen, shorten or turn the arrow. On a curved arrow the end slides along its circle or oval (up to a full ring); hold Alt to move it freely</title></circle>`;
+      s += `<circle cx="${H[k].x}" cy="${H[k].y}" r="${q(5)}" style="fill:var(--panel);stroke:var(--accent)" stroke-width="${q(1.6)}"><title>Drag to lengthen, shorten or turn the arrow. On a curved arrow the end slides along its circle or oval (up to a full ring); hold Alt to move it freely</title></circle>`;
     if (bendable(r))
-      s += `<rect x="${H.m.x - 4.5}" y="${H.m.y - 4.5}" width="9" height="9" transform="rotate(45 ${H.m.x} ${H.m.y})" style="fill:var(--accent);stroke:var(--panel)" stroke-width="1.2"><title>Drag sideways to bend the arrow; drag back onto the line to straighten it</title></rect>`;
+      s += `<rect x="${H.m.x - q(4.5)}" y="${H.m.y - q(4.5)}" width="${q(9)}" height="${q(9)}" transform="rotate(45 ${H.m.x} ${H.m.y})" style="fill:var(--accent);stroke:var(--panel)" stroke-width="${q(1.2)}"><title>Drag sideways to bend the arrow; drag back onto the line to straighten it</title></rect>`;
     const HH = headHandles(r);
-    if (HH) {
+    if (headRoomy(HH)) {
       for (const k of ['c1', 'c2'])
-        s += `<circle cx="${HH[k].x}" cy="${HH[k].y}" r="3.2" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.3"><title>Drag to make the head longer or shorter, wider or narrower (both corners together)</title></circle>`;
-      s += `<circle cx="${HH.nt.x}" cy="${HH.nt.y}" r="3.2" style="fill:var(--accent);stroke:var(--panel)" stroke-width="1"><title>Drag along the arrow: how deep the notch at the back of the head is</title></circle>`;
-      s += `<circle cx="${HH.sd.x}" cy="${HH.sd.y}" r="2.6" style="fill:var(--panel);stroke:var(--accent)" stroke-width="1.1"><title>Drag inward to hollow the sides of the head, out to straighten them</title></circle>`;
+        s += `<circle cx="${HH[k].x}" cy="${HH[k].y}" r="${q(3.2)}" style="fill:var(--panel);stroke:var(--accent)" stroke-width="${q(1.3)}"><title>Drag to make the head longer or shorter, wider or narrower (both corners together)</title></circle>`;
+      s += `<circle cx="${HH.nt.x}" cy="${HH.nt.y}" r="${q(3.2)}" style="fill:var(--accent);stroke:var(--panel)" stroke-width="${q(1)}"><title>Drag along the arrow: how deep the notch at the back of the head is</title></circle>`;
+      s += `<circle cx="${HH.sd.x}" cy="${HH.sd.y}" r="${q(2.6)}" style="fill:var(--panel);stroke:var(--accent)" stroke-width="${q(1.1)}"><title>Drag inward to hollow the sides of the head, out to straighten them</title></circle>`;
     }
     return s;
   }
@@ -52268,10 +52291,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return null;
     }
     const H = arrowHandles(r),
-      HH = headHandles(r);
-    if (HH) for (const k of ['nt', 'sd', 'c1', 'c2']) if (Math.hypot(p.x - HH[k].x, p.y - HH[k].y) < 5) return { r, k: 'h' + k };
-    if (bendable(r) && Math.hypot(p.x - H.m.x, p.y - H.m.y) < 8) return { r, k: 'm' };
-    for (const k of ['e1', 'e2']) if (Math.hypot(p.x - H[k].x, p.y - H[k].y) < 8) return { r, k };
+      HH = headHandles(r),
+      K = handleK();
+    if (headRoomy(HH)) for (const k of ['nt', 'sd', 'c1', 'c2']) if (Math.hypot(p.x - HH[k].x, p.y - HH[k].y) < 5 * K) return { r, k: 'h' + k };
+    if (bendable(r) && Math.hypot(p.x - H.m.x, p.y - H.m.y) < 8 * K) return { r, k: 'm' };
+    for (const k of ['e1', 'e2']) if (Math.hypot(p.x - H[k].x, p.y - H[k].y) < 8 * K) return { r, k };
     return null;
   }
   function dragHandle(d, p, shift, alt) {
@@ -69811,7 +69835,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       nmr: { d: 'predicted NMR shifts: per signal shift, typicalError, atoms (how many) and atomNumbers (which, numbered as atoms gives them), hydrogens, sphere (how many bonds round the atom matched the database: 1 to 5, more is surer) and references (how many measured shifts it is the median of)', a: { nucleus: '1H, 13C (default), 19F or 31P', index: IX, smiles: 'or a SMILES' } },
       calc: { d: 'formula, charge, MW, exact mass, [M+H]+ of a SMILES (nothing drawn)', a: { smiles: 'the SMILES (required)' } },
       prefixStyle: { d: 't, i, s, n of tBu, iPr… plain, italic or italic superscript', a: { mode: 'plain, italic or sup', index: IX } },
-      setStyle: { d: 'the drawing style (help {"op": "setStyle"} lists each style\'s font and line width against its bond, to match a figure)', a: { preset: 'the same as style', existing: 'true: what is drawn takes it too (otherwise it is for what is drawn next)', labelsOnly: 'true: only the atom labels of what is drawn take it (texts keep their size)', style: 'journal (ACS), nature, rsc, angew, synth…', theme: 'a colour theme', atomColors: 'false: every atom black', fontPerBond: 'letter size against the bond, as measured on a figure (e.g. 0.635); atom labels, and texts unless textFontPerBond', labelFontPerBond: 'the same as fontPerBond', textFontPerBond: 'texts apart from atom labels (fromReference measures both: labels are letters alone or in short groups by a bond, texts rows of letters)', linePerBond: 'line width against the bond (e.g. 0.042)', labelGap: 'room between an atom label and its bonds against the letter size (e.g. 0.15)', orbitalGap: 'the hair between an atom\'s letters and its orbitals\' lobes, against the letter height (0.05)', chargeStyle: 'plain (+), circled (⊕) or auto: how charges are drawn where an atom does not say', symbolSize: 'charges, radical dots, lone pairs and δ of every atom this many times their usual size (1.6: ⊖ as tall as a capital); an atom\'s own setAtom symbolSize wins', hashSpacing: 'room between the strokes of a hashed bond against the bond (e.g. 0.06)', fromReference: 'a figure\'s id (true: the last one): its own letter size and line width, measured on it (its bond known: calibrated or laid with bond)' } },
+      setStyle: { d: 'the drawing style (help {"op": "setStyle"} lists each style\'s font and line width against its bond, to match a figure)', a: { preset: 'the same as style', existing: 'true: what is drawn takes it too (otherwise it is for what is drawn next)', labelsOnly: 'true: only the atom labels of what is drawn take it (texts keep their size)', style: 'journal (ACS), nature, rsc, angew, synth, acsslides (ACS twice as large, for slides)…', theme: 'a colour theme', atomColors: 'false: every atom black', fontPerBond: 'letter size against the bond, as measured on a figure (e.g. 0.635); atom labels, and texts unless textFontPerBond', labelFontPerBond: 'the same as fontPerBond', textFontPerBond: 'texts apart from atom labels (fromReference measures both: labels are letters alone or in short groups by a bond, texts rows of letters)', linePerBond: 'line width against the bond (e.g. 0.042)', labelGap: 'room between an atom label and its bonds against the letter size (e.g. 0.15)', orbitalGap: 'the hair between an atom\'s letters and its orbitals\' lobes, against the letter height (0.05)', chargeStyle: 'plain (+), circled (⊕) or auto: how charges are drawn where an atom does not say', symbolSize: 'charges, radical dots, lone pairs and δ of every atom this many times their usual size (1.6: ⊖ as tall as a capital); an atom\'s own setAtom symbolSize wins', hashSpacing: 'room between the strokes of a hashed bond against the bond (e.g. 0.06)', fromReference: 'a figure\'s id (true: the last one): its own letter size and line width, measured on it (its bond known: calibrated or laid with bond)' } },
       setRole: { d: 'the role of a compound in the reagent table (id, name or formula with kind); or of a structure on the sheet (index or the id of one of its atoms, with role) as list tells it', a: { id: 'its table id, or the id of an atom of a structure on the sheet', name: 'or its name', formula: 'or its formula', kind: 'reactant, reagent, catalyst, solvent, product…', index: IX, role: 'a structure on the sheet: reactant, product, reagent, intermediate, or "auto" (by the arrows again)' } },
       setAmount: { d: 'an amount in the reagent table', a: { id: 'its table id', name: 'or its name', formula: 'or its formula', field: 'eq, mass, mmol, volume…', value: 'the value', limiting: 'true: the limiting reagent' } },
       readOnly: { d: 'view only', a: { on: 'true or false' } },
