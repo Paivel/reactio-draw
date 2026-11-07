@@ -28,7 +28,7 @@ fi
 w="$(mktemp -d)"; b="$w/Reactio Draw.app/Contents"
 mkdir -p "$b/MacOS" "$b/Resources"
 echo "Building Reactio Draw..."
-xcrun swiftc -O "$d/main.swift" -o "$b/MacOS/ReactioDraw" -framework Cocoa -framework WebKit -framework Vision
+xcrun swiftc -O "$d/main.swift" -o "$b/MacOS/ReactioDraw" -framework Cocoa -framework WebKit -framework Vision -framework PDFKit
 cp "$d/index.html" "$b/Resources/index.html"
 # the command line (reactio --help): a small script in the app that runs it without a window
 cat > "$b/MacOS/reactio" <<'SH'

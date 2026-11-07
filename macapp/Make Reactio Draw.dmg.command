@@ -5,8 +5,8 @@ d="$(cd "$(dirname "$0")" && pwd)"
 if ! xcrun -f swiftc >/dev/null 2>&1; then echo "Needs Apple's Command Line Tools: run  xcode-select --install  and try again."; exit 1; fi
 w="$(mktemp -d)"; b="$w/stage/Reactio Draw.app/Contents"; mkdir -p "$b/MacOS" "$b/Resources"
 echo "Building for Apple Silicon and Intel..."
-xcrun swiftc -O -target arm64-apple-macos11 "$d/main.swift" -o "$w/k-arm" -framework Cocoa -framework WebKit -framework Vision
-xcrun swiftc -O -target x86_64-apple-macos11 "$d/main.swift" -o "$w/k-x86" -framework Cocoa -framework WebKit -framework Vision
+xcrun swiftc -O -target arm64-apple-macos11 "$d/main.swift" -o "$w/k-arm" -framework Cocoa -framework WebKit -framework Vision -framework PDFKit
+xcrun swiftc -O -target x86_64-apple-macos11 "$d/main.swift" -o "$w/k-x86" -framework Cocoa -framework WebKit -framework Vision -framework PDFKit
 lipo -create "$w/k-arm" "$w/k-x86" -output "$b/MacOS/ReactioDraw"
 # the command line (reactio --help): a small script in the app that runs it without a window
 cat > "$b/MacOS/reactio" <<'SH'

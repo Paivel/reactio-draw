@@ -2,6 +2,7 @@
 // and the clipboard for Word. Built on the Mac by "Install Reactio Draw.command" (swiftc from the Command Line Tools).
 import Cocoa
 import WebKit
+import PDFKit
 import Network
 import Vision
 import ImageIO
@@ -268,6 +269,17 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             if let s = m["url"] as? String, let u = URL(string: s), ["http", "https"].contains(u.scheme?.lowercased() ?? "") {
                 NSWorkspace.shared.open(u); reply(id, ["ok": true])
             } else { reply(id, ["ok": false]) }
+        case "print":
+            // Print: the page sends the drawing as a PDF; it goes to the Mac's own print dialog, no wider than the page
+            // (the dialog's PDF menu saves it as a file too)
+            guard let data = Data(base64Encoded: m["b64"] as? String ?? ""), let doc = PDFDocument(data: data) else { reply(id, ["ok": false]); return }
+            let pi = (NSPrintInfo.shared.copy() as? NSPrintInfo) ?? NSPrintInfo.shared
+            pi.isHorizontallyCentered = true; pi.isVerticallyCentered = false
+            guard let op = doc.printOperation(for: pi, scalingMode: .pageScaleDownToFit, autoRotate: true) else { reply(id, ["ok": false]); return }
+            op.jobTitle = m["name"] as? String ?? "Reactio Draw"
+            op.showsPrintPanel = true; op.showsProgressPanel = true
+            reply(id, ["ok": true])
+            if let w = web?.window { op.runModal(for: w, delegate: nil, didRun: nil, contextInfo: nil) } else { op.run() }
         case "quit":
             reply(id, ["ok": true]); Bridge.quitOK = true; NSApp.terminate(nil)
         case "wordReturn":

@@ -1181,6 +1181,78 @@ input.tgl:focus-visible {
   font-size: 15px;
   margin-bottom: 6px;
 }
+.pagebox label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.pagebox select {
+  min-width: 170px;
+}
+.pagebox label[hidden] {
+  display: none;
+}
+.pagebox .cust input {
+  width: 70px;
+  text-align: center;
+}
+.pagebox .mgon {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+.pagebox .mgon > label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  margin: 0;
+}
+.pagebox .mgs {
+  display: grid;
+  grid-template-columns: 60px 54px 60px;
+  grid-template-rows: auto 54px auto;
+  grid-template-areas: '. t .' 'l s r' '. b .';
+  gap: 4px;
+  align-items: center;
+  justify-items: center;
+}
+.pagebox .mgs input {
+  width: 56px;
+  text-align: center;
+}
+.pagebox .mg-t {
+  grid-area: t;
+}
+.pagebox .mg-b {
+  grid-area: b;
+}
+.pagebox .mg-l {
+  grid-area: l;
+}
+.pagebox .mg-r {
+  grid-area: r;
+}
+.pagebox .mg-sheet {
+  grid-area: s;
+  width: 38px;
+  height: 50px;
+  border: 1.5px solid var(--muted);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 6px var(--panel), inset 0 0 0 7px var(--line);
+}
+.pagebox .mg-sheet.land {
+  width: 50px;
+  height: 38px;
+}
+.pagebox .tx {
+  margin-top: 8px;
+  color: var(--muted);
+}
 .askbox .row {
   display: flex;
   gap: 8px;
@@ -3125,6 +3197,7 @@ html {
           <button class="tb" data-act="copyPic" title="Copy as a picture for Word / PowerPoint (Ctrl+Shift+C): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-1.5 2 3" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
+          <button class="tb" data-act="pageSet" title="Pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across; Print can print on them"><svg viewBox="0 0 22 22"><rect x="5.5" y="2.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8 20.5h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -3203,6 +3276,7 @@ html {
           </pattern>
         </defs>
         <rect id="gridr" x="0" y="0" width="900" height="440" fill="url(#g)"/>
+        <g id="pages" style="pointer-events:none"></g>
         <g id="under"></g>
         <circle id="hov" r="11" style="fill:var(--accent-soft);stroke:var(--accent)" stroke-width="1" stroke-opacity=".5" visibility="hidden"/>
         <circle id="prevt" r="11" style="fill:var(--accent-soft);stroke:var(--accent)" stroke-width="1" stroke-opacity=".5" visibility="hidden"/>
@@ -14970,6 +15044,9 @@ function kdOf(st) {
     try {
       scrollBars();
     } catch (e) {}
+    try {
+      drawPages();
+    } catch (e) {}
   }
   /* scroll bars at the right and bottom edges of the sheet: where the view is in all that is drawn (and a little round
      it); drag a bar or click beside it to move the view. Hidden while everything is in view */
@@ -25069,6 +25146,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['act:fOpen', 'Open a file', 'Ctrl+KeyO'],
       ['act:fExport', 'Export menu', ''],
       ['act:fPrint', 'Print', 'Ctrl+KeyP'],
+      ['act:pageSet', 'Pages on the sheet (A4, A5, slides)', ''],
       ['cmd:undo', 'Undo', 'Ctrl+KeyZ'],
       ['cmd:redo', 'Redo', 'Ctrl+KeyY'],
       ['cmd:redo2', 'Redo, second key', 'Ctrl+Shift+KeyZ'],
@@ -30311,7 +30389,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     else if (a === 'fit') fitAll();
     else if (a === 'copyPic') copyPicture();
     else if (a === 'copyPicBg') copyPicture(true);
-    else if (a === 'fPrint') printDrawing();
+    else if (a === 'fPrint') printBox();
+    else if (a === 'pageSet') pagesBox();
     else if (a === 'rotL') rotateSel(-90);
     else if (a === 'rotR') rotateSel(90);
     else if (a === 'rot180') rotateSel(180);
@@ -37030,14 +37109,362 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   let renderPlain = false;
   /* Print: the drawing alone (no toolbars), as large as it is drawn and never wider than the page, through the
      browser's or the system's print dialog (Save as PDF there too) */
-  function printDrawing() {
+  /* ===== pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across, shown as
+     dashed outlines from the sheet's corner (0, 0) on, at the drawing's true size (the style's bond length in pt). Print
+     can print on them: a page for each one with something drawn on it, in rows from the top left ===== */
+  const PAGE_KINDS = {
+    a4: { name: 'A4', w: 595.28, h: 841.89 },
+    a5: { name: 'A5', w: 419.53, h: 595.28 },
+    s43: { name: 'Slide 4:3', w: 720, h: 540 },
+    s169: { name: 'Slide 16:9', w: 960, h: 540 },
+    a3: { name: 'A3', w: 841.89, h: 1190.55 },
+    letter: { name: 'US Letter', w: 612, h: 792 },
+    /* graphics for a journal's table of contents, at their published size */
+    acstoc: { name: 'ACS TOC graphic (8.25 × 4.45 cm)', w: 234, h: 126 },
+    rsctoc: { name: 'RSC TOC graphic (8 × 4 cm)', w: 226.77, h: 113.39 },
+    custom: { name: 'Custom size', w: 0, h: 0 }
+  };
+  /* landscape at first: slides and the graphics for a table of contents */
+  const PAGE_ACROSS = /^(s43|s169|acstoc|rsctoc)$/;
+  /* a kind upright (portrait) or across (landscape): the paper in pt, and the part drawn on — the whole sheet, or inside
+     its margins (mm: top, bottom, left, right) — in pt and on the sheet (w, h), with where it starts on the paper */
+  const MM = 72 / 25.4,
+    PAGE_MARGIN = { t: 15, b: 15, l: 15, r: 15 };
+  function pageDims(size, orient, mg, cu) {
+    const k = PAGE_KINDS[size];
+    if (!k) return null;
+    /* a custom size: width and height in mm as typed, the orientation is in them */
+    const custom = size === 'custom',
+      cw0 = custom ? Math.max(10, Math.min(3000, +((cu && cu.w) || 100))) * MM : 0,
+      ch0 = custom ? Math.max(10, Math.min(3000, +((cu && cu.h) || 100))) * MM : 0,
+      a = Math.min(k.w, k.h),
+      b = Math.max(k.w, k.h),
+      land = orient === 'landscape',
+      f = printPtPx(),
+      wpt = custom ? cw0 : land ? b : a,
+      hpt = custom ? ch0 : land ? a : b,
+      m = mg ? { ...PAGE_MARGIN, ...mg } : { t: 0, b: 0, l: 0, r: 0 },
+      cl = Math.max(0, +m.l || 0) * MM,
+      cr = Math.max(0, +m.r || 0) * MM,
+      ct = Math.max(0, +m.t || 0) * MM,
+      cb = Math.max(0, +m.b || 0) * MM,
+      cw = Math.max(36, wpt - cl - cr),
+      ch = Math.max(36, hpt - ct - cb);
+    return { wpt, hpt, cw, ch, left: cl, top: ct, bottom: cb, w: cw * f, h: ch * f };
+  }
+  /* the document's pages with their margins, when it uses them */
+  const docPageDims = pg => pg && pageDims(pg.size, pg.orient, pg.margins ? pg.mg || PAGE_MARGIN : null, pg.cu);
+  const docPage = () => (S && S.doc && S.doc.page && PAGE_KINDS[S.doc.page.size] ? S.doc.page : null);
+  let PAGES_KEY = '';
+  function drawPages() {
+    const g = $('pages');
+    if (!g) return;
+    const pg = docPage(),
+      d = pg && docPageDims(pg),
+      key = d ? [view.x, view.y, view.w, view.h, d.w, d.h].map(v => Math.round(v)).join() : '';
+    if (key === PAGES_KEY) return;
+    PAGES_KEY = key;
+    if (!d) {
+      g.innerHTML = '';
+      return;
+    }
+    const i0 = Math.floor(view.x / d.w),
+      i1 = Math.floor((view.x + view.w) / d.w),
+      j0 = Math.floor(view.y / d.h),
+      j1 = Math.floor((view.y + view.h) / d.h);
+    let o = '';
+    if ((i1 - i0 + 1) * (j1 - j0 + 1) <= 600)
+      for (let i = i0; i <= i1; i++)
+        for (let j = j0; j <= j1; j++)
+          o += `<rect x="${i * d.w}" y="${j * d.h}" width="${d.w}" height="${d.h}" fill="none" style="stroke:var(--muted)" stroke-opacity=".6" stroke-width="1" stroke-dasharray="7 5" vector-effect="non-scaling-stroke"/>`;
+    g.innerHTML = o;
+  }
+  /* the pages a drawing covers: each one something drawn falls on (by the boxes of the drawn parts), in rows from the
+     top left; with the drawing as an SVG to cut them from */
+  function pageTiles(d) {
+    const s = svgOf();
+    const host = document.createElement('div');
+    host.style.cssText = 'position:fixed;left:-100000px;top:0;visibility:hidden;pointer-events:none';
+    host.innerHTML = s;
+    document.body.appendChild(host);
+    const used = new Map();
+    try {
+      const root = host.firstElementChild,
+        vb = root.viewBox.baseVal,
+        rr = root.getBoundingClientRect(),
+        sx = vb.width / (rr.width || 1),
+        sy = vb.height / (rr.height || 1),
+        bg = root.firstElementChild && root.firstElementChild.tagName === 'rect' ? root.firstElementChild : null;
+      for (const el of root.querySelectorAll('path,line,polyline,polygon,rect,circle,ellipse,text,image')) {
+        if (el === bg) continue;
+        const r = el.getBoundingClientRect();
+        if (!r.width && !r.height) continue;
+        const x0 = vb.x + (r.left - rr.left) * sx,
+          x1 = vb.x + (r.right - rr.left) * sx,
+          y0 = vb.y + (r.top - rr.top) * sy,
+          y1 = vb.y + (r.bottom - rr.top) * sy;
+        for (let i = Math.floor(x0 / d.w); i <= Math.floor((x1 - 0.01) / d.w); i++)
+          for (let j = Math.floor(y0 / d.h); j <= Math.floor((y1 - 0.01) / d.h); j++) used.set(i + ',' + j, [i, j]);
+      }
+    } finally {
+      host.remove();
+    }
+    const tiles = [...used.values()].sort((a, b) => a[1] - b[1] || a[0] - b[0]);
+    return {
+      tiles,
+      /* each page: its part of the drawing, and where that part sits on the paper (pt, from the bottom left in PDF) */
+      svgs: tiles.map(([i, j]) => ({
+        svg: s.replace(
+          /viewBox="[^"]*" width="[^"]*" height="[^"]*"/,
+          `viewBox="${i * d.w} ${j * d.h} ${d.w} ${d.h}" width="${Math.round(d.w)}" height="${Math.round(d.h)}"`
+        ),
+        pw: d.wpt,
+        ph: d.hpt,
+        dx: d.left,
+        dy: d.bottom
+      }))
+    };
+  }
+  function pageOptions(sel, withFit) {
+    return (
+      (withFit ? '<option value="fit">Fit to one page</option>' : '<option value="">None</option>') +
+      Object.entries(PAGE_KINDS)
+        .map(([k, v]) => `<option value="${k}"${k === sel ? ' selected' : ''}>${v.name}</option>`)
+        .join('')
+    );
+  }
+  /* margins: a tick to draw inside them, and how wide each is (mm); the part drawn on gets smaller by them */
+  const MARGIN_HTML =
+    '<div class="mgon"><label><input type="checkbox" data-k="mgon"> Margins, mm</label><span class="mgs">' +
+    /* each where it is on the paper: top above, bottom below, left and right at the sides of a little sheet */
+    [['t', 'Top'], ['l', 'Left'], ['r', 'Right'], ['b', 'Bottom']]
+      .map(([k, n]) => `<span class="mg-${k}" title="${n} margin, mm"><input type="number" min="0" max="80" step="1" data-mg="${k}" aria-label="${n} margin, mm"></span>`)
+      .join('') +
+    '<span class="mg-sheet" aria-hidden="true"></span></span></div>';
+  const CUSTOM_HTML =
+    '<label class="cust" hidden>Size, mm <span><input type="number" min="10" max="3000" step="1" data-cu="w" aria-label="Width, mm"> × <input type="number" min="10" max="3000" step="1" data-cu="h" aria-label="Height, mm"></span></label>';
+  function customInputs(b, pg) {
+    const row = b.querySelector('.cust'),
+      w = b.querySelector('[data-cu=w]'),
+      h = b.querySelector('[data-cu=h]'),
+      cu = (pg && pg.cu) || { w: 100, h: 100 };
+    w.value = cu.w;
+    h.value = cu.h;
+    return {
+      get: () => ({ w: Math.max(10, Math.min(3000, +w.value || 100)), h: Math.max(10, Math.min(3000, +h.value || 100)) }),
+      show: v => (row.hidden = !v),
+      onchange: f => [w, h].forEach(i => i.addEventListener('input', f))
+    };
+  }
+  function marginInputs(b, pg) {
+    const on = b.querySelector('[data-k=mgon]'),
+      ins = [...b.querySelectorAll('[data-mg]')],
+      mg = { ...PAGE_MARGIN, ...((pg && pg.mg) || {}) };
+    on.checked = !!(pg && pg.margins);
+    ins.forEach(i => (i.value = mg[i.dataset.mg]));
+    const sync = () => ins.forEach(i => (i.disabled = on.disabled || !on.checked));
+    sync();
+    return {
+      get: () => ({
+        margins: on.checked,
+        mg: Object.fromEntries(ins.map(i => [i.dataset.mg, Math.max(0, Math.min(80, +i.value || 0))]))
+      }),
+      enable: v => {
+        on.disabled = !v;
+        sync();
+      },
+      /* the little sheet turns with the orientation */
+      orient: o => {
+        const sh = b.querySelector('.mg-sheet');
+        if (sh) sh.classList.toggle('land', o === 'landscape');
+      },
+      onchange: f => {
+        on.addEventListener('change', () => {
+          sync();
+          f();
+        });
+        ins.forEach(i => i.addEventListener('input', f));
+      }
+    };
+  }
+  /* Pages (the button after Print): the kind of sheet shown on the sheet and its orientation, kept with the document */
+  function pagesBox() {
+    const pg = docPage() || {},
+      b = document.createElement('div');
+    b.className = 'askbox pagebox';
+    b.innerHTML =
+      '<div class="card"><b>Pages on the sheet</b><div class="tx">Dashed outlines show where the sheets of paper or slides fall, at the drawing’s true size; with margins, the part inside them. Print can print on them, a page for each one with something on it.</div>' +
+      '<label>Paper <select data-k="size">' + pageOptions(pg.size || '', false) + '</select></label>' +
+      CUSTOM_HTML +
+      '<label>Orientation <select data-k="or"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>' +
+      MARGIN_HTML +
+      '<div class="row"><button class="pri" data-k="done">Done</button></div></div>';
+    document.body.appendChild(b);
+    const sz = b.querySelector('[data-k=size]'),
+      or = b.querySelector('[data-k=or]'),
+      M = marginInputs(b, pg),
+      C = customInputs(b, pg);
+    or.value = pg.orient || 'portrait';
+    const apply = () => {
+      if (!S.doc) S.doc = {};
+      if (!sz.value) delete S.doc.page;
+      else S.doc.page = { size: sz.value, orient: or.value, ...M.get(), ...(sz.value === 'custom' ? { cu: C.get() } : {}) };
+      or.disabled = !sz.value || sz.value === 'custom';
+      C.show(sz.value === 'custom');
+      M.enable(!!sz.value);
+      M.orient(or.value);
+      PAGES_KEY = '';
+      drawPages();
+      save();
+    };
+    sz.onchange = () => {
+      /* a slide is across, a sheet of paper upright, unless set otherwise before */
+      if (sz.value && !(docPage() && docPage().orient)) or.value = PAGE_ACROSS.test(sz.value) ? 'landscape' : 'portrait';
+      apply();
+    };
+    or.onchange = apply;
+    M.onchange(apply);
+    C.onchange(apply);
+    C.show(sz.value === 'custom');
+    or.disabled = !sz.value || sz.value === 'custom';
+    M.enable(!!sz.value);
+    M.orient(or.value);
+    const close = () => {
+      b.remove();
+      document.removeEventListener('keydown', key, true);
+    };
+    const key = e => {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        e.preventDefault();
+        close();
+      }
+    };
+    document.addEventListener('keydown', key, true);
+    b.querySelector('[data-k=done]').onclick = close;
+    b.addEventListener('pointerdown', e => {
+      if (e.target === b) close();
+    });
+  }
+  /* Print (the button, Ctrl+P): the paper first — the drawing fitted to one page, or on sheets of A4, A5 or slides at its
+     true size, as many pages as it covers; the document's pages are the first choice */
+  function printBox() {
     if (!mol.atoms.length && !mol.texts.length && !mol.arrows.length) {
       toast('Nothing to print yet', true);
       return;
     }
-    /* the Mac app's web view has no print dialog of its own */
+    const pg = docPage() || {},
+      b = document.createElement('div');
+    b.className = 'askbox pagebox';
+    b.innerHTML =
+      '<div class="card"><b>Print</b>' +
+      '<label>Paper <select data-k="size">' + pageOptions(pg.size || 'fit', true) + '</select></label>' +
+      CUSTOM_HTML +
+      '<label>Orientation <select data-k="or"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>' +
+      MARGIN_HTML +
+      '<div class="tx" data-k="n"></div>' +
+      '<div class="row"><button data-k="no">Cancel</button><button class="pri" data-k="go">Print</button></div></div>';
+    document.body.appendChild(b);
+    const sz = b.querySelector('[data-k=size]'),
+      or = b.querySelector('[data-k=or]'),
+      nEl = b.querySelector('[data-k=n]'),
+      M = marginInputs(b, pg),
+      C = customInputs(b, pg);
+    if (pg.size) sz.value = pg.size;
+    or.value = pg.orient || 'portrait';
+    const dimsNow = () => {
+      const m = M.get();
+      return pageDims(sz.value, or.value, m.margins ? m.mg : null, C.get());
+    };
+    const count = () => {
+      or.disabled = sz.value === 'fit' || sz.value === 'custom';
+      C.show(sz.value === 'custom');
+      M.enable(sz.value !== 'fit');
+      M.orient(or.value);
+      if (sz.value === 'fit') {
+        nEl.textContent = 'One page, the drawing no wider than the paper.';
+        return;
+      }
+      const n = pageTiles(dimsNow()).tiles.length;
+      nEl.textContent = n + (n === 1 ? ' page' : ' pages') + ' at the drawing’s true size.';
+    };
+    sz.onchange = () => {
+      if (sz.value !== 'fit' && !pg.size) or.value = PAGE_ACROSS.test(sz.value) ? 'landscape' : 'portrait';
+      count();
+    };
+    or.onchange = count;
+    M.onchange(count);
+    C.onchange(count);
+    count();
+    const close = () => {
+      b.remove();
+      document.removeEventListener('keydown', key, true);
+    };
+    const go = () => {
+      const c = { size: sz.value, orient: or.value, d: sz.value === 'fit' ? null : dimsNow() };
+      close();
+      printDrawing(c);
+    };
+    const key = e => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        close();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        go();
+      }
+    };
+    document.addEventListener('keydown', key, true);
+    b.querySelector('[data-k=no]').onclick = close;
+    b.querySelector('[data-k=go]').onclick = go;
+    b.addEventListener('pointerdown', e => {
+      if (e.target === b) close();
+    });
+    setTimeout(() => b.querySelector('[data-k=go]').focus(), 0);
+  }
+  function printDrawing(choice) {
+    if (!mol.atoms.length && !mol.texts.length && !mol.arrows.length) {
+      toast('Nothing to print yet', true);
+      return;
+    }
+    /* on sheets: the pages the drawing covers, each its own SVG; fitted: none (one page) */
+    const pd = choice && choice.size && choice.size !== 'fit' ? choice.d || pageDims(choice.size, choice.orient) : null,
+      PT = pd ? pageTiles(pd) : null,
+      svgs = PT && PT.svgs.length ? PT.svgs : null;
+    /* the Mac app: its web view prints nothing by itself, so the drawing goes to the app as a PDF and the app opens the
+       Mac's own print dialog (Save as PDF is there too); an app built before this answers no, and then the PDF way is told */
     if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rd && !window.__rdWin) {
-      toast('Printing is not available in the Mac app yet: File → Export as → Vector image (.pdf), then print the PDF', true, 8000);
+      const old = () =>
+        toast('This Reactio Draw app cannot print yet (install the new version): File → Export as → Vector image (.pdf), then print the PDF', true, 8000);
+      if (!window.rdNative) return old();
+      pdfOf(svgs)
+        .then(body => window.rdNative.call('print', { name: docName(), b64: window.rdNative.b64(body) }))
+        .then(r => {
+          if (!r || !r.ok) old();
+        })
+        .catch(e => toast('Could not print: ' + ((e && e.message) || e), true));
+      return;
+    }
+    /* a page shown inside another one without the right to open dialogs (a preview in a chat, some embeddings): the
+       browser ignores print() without a word, so the drawing comes as a PDF to print instead */
+    const embedded = (() => {
+      try {
+        return window.top !== window.self;
+      } catch (e) {
+        return true;
+      }
+    })();
+    const asPdf = async why => {
+      try {
+        const body = await pdfOf(svgs),
+          name = docName() + '.pdf';
+        offerFile(name, body);
+        toast(why + ': here is the drawing as a PDF to print', false, 8000);
+      } catch (e) {
+        toast('Could not print: ' + ((e && e.message) || e), true);
+      }
+    };
+    if (window.claude && embedded && !window.rdDesktop) {
+      asPdf('This page may not open a print dialog here');
       return;
     }
     let svgT;
@@ -37054,17 +37481,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const d = fr.contentDocument;
     d.open();
     d.write(
-      '<!doctype html><html><head><meta charset="utf-8"><title>' +
-        esc(docName()) +
-        '</title><style>@page{margin:15mm}html,body{margin:0;background:#fff}svg{display:block;max-width:100%;height:auto;margin:0 auto}</style></head><body>' +
-        svgT +
-        '</body></html>'
+      svgs
+        ? /* on sheets: one page each, the paper's own size, no margin of the printer's own */
+          '<!doctype html><html><head><meta charset="utf-8"><title>' +
+            esc(docName()) +
+            `</title><style>@page{size:${pd.wpt}pt ${pd.hpt}pt;margin:0}html,body{margin:0;background:#fff}.pg{box-sizing:border-box;width:${pd.wpt}pt;height:${pd.hpt}pt;padding:${pd.top}pt 0 0 ${pd.left}pt;overflow:hidden;break-after:page;page-break-after:always}.pg:last-child{break-after:auto;page-break-after:auto}.pg svg{display:block;width:${pd.cw}pt;height:${pd.ch}pt}</style></head><body>` +
+            svgs.map(v => '<div class="pg">' + v.svg.replace(/ width="\d+" height="\d+"/, ' width="100%" height="100%"') + '</div>').join('') +
+            '</body></html>'
+        : '<!doctype html><html><head><meta charset="utf-8"><title>' +
+            esc(docName()) +
+            '</title><style>@page{margin:15mm}html,body{margin:0;background:#fff}svg{display:block;max-width:100%;height:auto;margin:0 auto}</style></head><body>' +
+            svgT +
+            '</body></html>'
     );
     d.close();
     const go = () => {
       try {
         fr.contentWindow.focus();
+        const t0 = performance.now();
         fr.contentWindow.print();
+        /* a print dialog holds the page until it closes; back at once inside another page means it was not allowed */
+        if (embedded && performance.now() - t0 < 40) asPdf('The print dialog could not open here');
       } catch (e) {
         toast('Could not open the print dialog: File → Export as → Vector image (.pdf), then print the PDF', true, 8000);
       }
@@ -37615,8 +38052,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (cur) lines.push(cur);
     return { w, h, hex: lines.join('\n') };
   }
-  async function epsOf() {
-    const s = svgOf();
+  async function epsOf(svgIn) {
+    const s = svgIn || svgOf();
     const k = 1 / printPtPx();
     const vb = /viewBox="([^"]+)"/.exec(s)[1].split(/\s+/).map(Number),
       [X0, Y0, VW, VH] = vb,
@@ -38031,15 +38468,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* PDF for LaTeX (pdflatex takes it as it is) and journals: the EPS drawn again as PDF, the same vector drawing, the
      same fonts (the standard PDF fonts, Helvetica, Times, Symbol), pictures as images. The EPS commands are read one by one
      and written as their PDF equivalents */
-  async function pdfOf() {
-    const eps = await epsOf(),
-      bb = /%%HiResBoundingBox: 0 0 ([\d.]+) ([\d.]+)/.exec(eps),
-      W = +bb[1],
-      H = +bb[2],
-      i0 = eps.indexOf('\n10 setmiterlimit\n'),
-      i1 = eps.lastIndexOf('\nrestore\nshowpage');
-    const src = eps.slice(i0 + 18, i1);
-    let p = 0;
+  async function pdfOf(svgs) {
+    /* svgs: pages, each an SVG of the drawing with its own view (printing on sheets of paper); none: the whole drawing on one */
+    const list = svgs && svgs.length ? svgs : [null],
+      pages = [];
+    let W = 0,
+      H = 0,
+      src = '',
+      p = 0;
     const isWs = c => c === ' ' || c === '\n' || c === '\r' || c === '\t';
     /* the next token: a number, /name, (string), [ or ], or an operator */
     const next = () => {
@@ -38073,11 +38509,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (/^-?[\d.]+(e-?\d+)?$/i.test(w)) return { n: +w };
       return { op: w };
     };
-    const out = [],
-      st = [],
-      fonts = new Map(),
+    const fonts = new Map(),
       images = [];
-    let g = { col: '0 0 0', path: '', cx: 0, cy: 0, font: null },
+    let out = [],
+      st = [],
+      g = { col: '0 0 0', path: '', cx: 0, cy: 0, font: null },
       stack = [];
     const fontRef = nm => {
       if (!fonts.has(nm)) fonts.set(nm, 'F' + (fonts.size + 1));
@@ -38091,6 +38527,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         'BT /' + fontRef(g.font.name) + ' ' + num(g.font.size) + ' Tf ' + mode + ' Tr ' + num(g.cx) + ' ' + num(g.cy) + ' Td ' + str + ' Tj ET'
       );
     };
+    for (const pv of list) {
+    const sv = pv && typeof pv === 'object' ? pv.svg : pv;
+    const eps = await epsOf(sv),
+      bb = /%%HiResBoundingBox: 0 0 ([\d.]+) ([\d.]+)/.exec(eps),
+      i0 = eps.indexOf('\n10 setmiterlimit\n'),
+      i1 = eps.lastIndexOf('\nrestore\nshowpage');
+    W = +bb[1];
+    H = +bb[2];
+    src = eps.slice(i0 + 18, i1);
+    p = 0;
+    out = [];
+    st = [];
+    g = { col: '0 0 0', path: '', cx: 0, cy: 0, font: null };
+    stack = [];
     for (let t = next(); t; t = next()) {
       if (t.n != null || t.name != null || t.s != null) {
         stack.push(t);
@@ -38212,18 +38662,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           break;
       }
     }
-    /* the file: catalog, pages, the page, its drawing, fonts and images; the byte offsets in the table at the end */
+    /* on a sheet of paper: the part drawn on, moved in by the margins, on a page of the paper's size */
+    if (pv && typeof pv === 'object')
+      pages.push({ contents: 'q 1 0 0 1 ' + num(pv.dx || 0) + ' ' + num(pv.dy || 0) + ' cm\n' + out.join('\n') + '\nQ\n', W: pv.pw, H: pv.ph });
+    else pages.push({ contents: out.join('\n') + '\n', W, H });
+    }
+    /* the file: catalog, pages, each page and its drawing, fonts and images; the byte offsets in the table at the end */
     const objs = [];
     const add = s => (objs.push(s), objs.length);
-    const contents = out.join('\n') + '\n';
     const enc =
       '<< /Type /Encoding /BaseEncoding /WinAnsiEncoding /Differences [39 /quotesingle 96 /grave 128 ' +
       EPS_EXTRA.map(n => '/' + n).join(' ') +
       '] >>';
     add('<< /Type /Catalog /Pages 2 0 R >>');
     add('');
-    add('');
-    const cIx = add('<< /Length ' + contents.length + ' >>\nstream\n' + contents + 'endstream');
+    const pgIx = pages.map(() => add('')),
+      cIx = pages.map(pg => add('<< /Length ' + pg.contents.length + ' >>\nstream\n' + pg.contents + 'endstream'));
     const encIx = add(enc);
     const fontIx = [...fonts].map(([nm, ref]) => {
       const base = nm.replace(/-RD$/, '');
@@ -38236,12 +38690,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         add('<< /Type /XObject /Subtype /Image /Width ' + im.w + ' /Height ' + im.h + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /ASCIIHexDecode /Length ' + data.length + ' >>\nstream\n' + data + '\nendstream')
       ];
     });
-    objs[1] = '<< /Type /Pages /Kids [3 0 R] /Count 1 >>';
-    objs[2] =
-      '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + num(W) + ' ' + num(H) + '] /Contents ' + cIx + ' 0 R /Resources << /ProcSet [/PDF /Text /ImageC]' +
-      (fontIx.length ? ' /Font << ' + fontIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
-      (imIx.length ? ' /XObject << ' + imIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
-      ' >> >>';
+    objs[1] = '<< /Type /Pages /Kids [' + pgIx.map(i => i + ' 0 R').join(' ') + '] /Count ' + pages.length + ' >>';
+    pages.forEach((pg, k) => {
+      objs[pgIx[k] - 1] =
+        '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + num(pg.W) + ' ' + num(pg.H) + '] /Contents ' + cIx[k] + ' 0 R /Resources << /ProcSet [/PDF /Text /ImageC]' +
+        (fontIx.length ? ' /Font << ' + fontIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
+        (imIx.length ? ' /XObject << ' + imIx.map(([r, i]) => '/' + r + ' ' + i + ' 0 R').join(' ') + ' >>' : '') +
+        ' >> >>';
+    });
     const info = add('<< /Producer (Reactio Draw) /Title (' + docName().replace(/[()\\\\]/g, '') + ') >>');
     let pdf = '%PDF-1.4\n%\xe2\xe3\xcf\xd3\n';
     const off = [];
@@ -73996,6 +74452,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    pageTiles,
+    pageDims,
     animPlan,
     labelLayout,
     animPlaces,
