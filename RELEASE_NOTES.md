@@ -1,3 +1,9 @@
+# Reactio Draw 1.12.1
+
+## Changed
+
+- **Reactio objects in Word and PowerPoint on Windows come at once.** Pasting a drawing, opening a document with drawings in it and editing one no longer starts the whole app behind the scenes for every step Word asks for: Reactio Draw answers Word straight away (before, it could take seconds per drawing, and on some computers half a minute per try, ending with a plain picture). The object also keeps its picture inside the document, so Word shows it without asking Reactio Draw.
+
 # Reactio Draw 1.12
 
 ## New
