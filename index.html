@@ -39403,6 +39403,53 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .replace(/[\\{}#$%&_~^− ]/g, c => TEX_ESC[c])
       .replace(/[₀-₉]+/g, d => '\\textsubscript{' + [...d].map(c => c.charCodeAt(0) - 0x2080).join('') + '}')
       .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, d => '\\textsuperscript{' + [...d].map(c => SUPDIG[c]).join('') + '}');
+  /* what a figure's marks need in the preamble: \rcmpd takes what is inside [[ ]] (chemnum for numbers, a counter per series) */
+  const RCMPD_PREAMBLE = [
+    String.raw`% Compound marks from drawings: \rcmpd{what is inside [[ ]]}, added for editable figures`,
+    String.raw`\makeatletter`,
+    String.raw`\providecommand\rcmpd@series[2]{%`,
+    String.raw`  \@ifundefined{cmpdser@#1@#2}{%`,
+    String.raw`    \@ifundefined{c@cmpdser#1}{\newcounter{cmpdser#1}}{}%`,
+    String.raw`    \stepcounter{cmpdser#1}%`,
+    String.raw`    \expandafter\xdef\csname cmpdser@#1@#2\endcsname{\csname rcmpd@style@#1\endcsname{\value{cmpdser#1}}}%`,
+    String.raw`    \immediate\write\@auxout{\string\cmpdser@aux{#1}{#2}{\csname cmpdser@#1@#2\endcsname}}%`,
+    String.raw`  }{}%`,
+    String.raw`  \textbf{\csname cmpdser@#1@#2\endcsname}%`,
+    String.raw`}`,
+    String.raw`\providecommand\cmpdser@aux[3]{}`,
+    String.raw`\providecommand\rcmpd@style@A[1]{\@Alph{#1}}`,
+    String.raw`\providecommand\rcmpd@style@a[1]{\@alph{#1}}`,
+    String.raw`\providecommand\rcmpd@style@I[1]{\@Roman{#1}}`,
+    String.raw`\providecommand\rcmpd@style@i[1]{\@roman{#1}}`,
+    String.raw`\makeatother`,
+    String.raw`\ExplSyntaxOn`,
+    String.raw`\DeclareRobustCommand \rcmpd [1]`,
+    String.raw`  {`,
+    String.raw`    \regex_match:nnTF { \A [A-Za-z0-9_-] } {#1} { \rcmpd_mark:n {#1} } { \textbf { ?? } }`,
+    String.raw`  }`,
+    String.raw`\cs_new_protected:Npn \rcmpd_mark:n #1`,
+    String.raw`  {`,
+    String.raw`    \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq`,
+    String.raw`      { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }`,
+    String.raw`      {`,
+    String.raw`        \regex_extract_once:nnNTF { \A (.*) \. (num|dash) \Z } {#1} \l_tmpa_seq`,
+    String.raw`          {`,
+    String.raw`            \use:e`,
+    String.raw`              {`,
+    String.raw`                \exp_not:N \cmpd`,
+    String.raw`                [ post-main-label-code = \str_if_eq:eeTF { \seq_item:Nn \l_tmpa_seq { 3 } } { num } { . } { - } , sub-counter-format = arabic ]`,
+    String.raw`                { \seq_item:Nn \l_tmpa_seq { 2 } }`,
+    String.raw`              }`,
+    String.raw`          }`,
+    String.raw`          {`,
+    String.raw`            \regex_extract_once:nnNTF { \A (.*) \. letter \Z } {#1} \l_tmpa_seq`,
+    String.raw`              { \use:e { \exp_not:N \cmpd { \seq_item:Nn \l_tmpa_seq { 2 } } } }`,
+    String.raw`              { \cmpd {#1} }`,
+    String.raw`          }`,
+    String.raw`      }`,
+    String.raw`  }`,
+    String.raw`\ExplSyntaxOff`
+  ];
   /* one line of a text with marks as LaTeX: the marks as \cmpd, sub- and superscripts, bold and italic kept */
   function texLine(s, N) {
     const RX =
@@ -39414,13 +39461,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       last = m.index + m[0].length;
       if (m[1]) {
         const key = m[1],
-          sub = m[2] || '',
-          fmt = m[3] || (sub ? 'letter' : '');
-        /* a series of its own ([[A:cat]]) is not chemnum's: written as this drawing numbers it, bold as chemnum's */
-        if (/^[AaIi]:/.test(key)) out += '\\textbf{' + texEsc(N.text(key, '', '')) + '}';
-        else if (!sub) out += '\\cmpd{' + key + '}';
-        else if (fmt === 'letter') out += '\\cmpd{' + key + '.' + sub + '}';
-        else out += '\\cmpd[post-main-label-code=' + (fmt === 'dash' ? '-' : '.') + ',sub-counter-format=arabic]{' + key + '.' + sub + '}';
+          sub = m[2] || '';
+        /* the mark's own text: the drawing and the document write the same thing */
+        out += '\\rcmpd{' + key + (sub ? '.' + sub : '') + (m[3] ? '.' + m[3] : '') + '}';
       } else if (m[4]) {
         const inner = texLine(m[5], N),
           op = m[4];
@@ -39493,7 +39536,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
       nodes.join('\n') +
       '\n  \\end{scope}\n\\end{tikzpicture}%\n';
-    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'] };
+    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
   }
   /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
      figure a LaTeX editor pastes, without changing Ctrl+C. The clipboard gets HTML holding the editable-figure manifest (a
@@ -39527,7 +39570,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
       out.push({ path });
     }
-    return { stem, out, packages: f.packages };
+    return { stem, out, packages: f.packages, preamble: f.preamble };
   }
   /* after a Save: a figure made from this file (the .tex next to it says so on its first line) follows the drawing */
   async function refreshLatexFigure() {
@@ -39552,8 +39595,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
       if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
       const t = curTab();
-      const { stem, out, packages } = await writeFigureBeside(t);
-      man = { version: 1, name: stem, source: { path: t.file.path }, outputs: out, entry: stem + '.tex', packages };
+      /* another file of that name, not this drawing's figure, is left alone */
+      const head = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' });
+      const first = String((head && head.line) || '').trim();
+      if (first && first !== '% editable-figure source: ' + t.file.name)
+        throw new Error(texStem(t.file.name) + '.tex already exists next to the drawing and is not its figure');
+      const { stem, out, packages, preamble } = await writeFigureBeside(t);
+      man = { version: 1, name: stem, source: { path: t.file.path }, outputs: out, entry: stem + '.tex', packages, ...(preamble ? { preamble } : {}) };
     } else {
       const t = curTab(),
         stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
@@ -39567,7 +39615,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           { name: stem + '.tex', data: b64of(f.tex) }
         ],
         entry: stem + '.tex',
-        packages: f.packages
+        packages: f.packages,
+        ...(f.preamble ? { preamble: f.preamble } : {})
       };
     }
     const text = `\\begin{figure}\n  \\centering\n  \\input{figures/${man.entry.replace(/\.tex$/, '')}}\n  \\caption{}\n  \\label{fig:}\n\\end{figure}`;

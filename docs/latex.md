@@ -9,14 +9,13 @@ in the Mac app) turns the drawing into a LaTeX figure whose compound numbers mat
 For a drawing saved as `scheme.reactio` it writes, next to it:
 
 - `scheme.pdf`: the drawing, without the texts that carry `[[key]]` compound marks;
-- `scheme.tex`: a `tikzpicture` that places that PDF and sets those texts over it, each mark as chemnum's
-  `\cmpd{key}`. The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
+- `scheme.tex`: a `tikzpicture` that places that PDF and sets those texts over it, each mark as
+  `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
   the same on the drawing and in the text.
 
-`[[key]]` becomes `\cmpd{key}`, `[[key.sub]]` and `[[key.sub.letter]]` become `\cmpd{key.sub}` (3a, 3b…).
-`[[key.sub.num]]` and `[[key.sub.dash]]` become `\cmpd{key.sub}` with chemnum's options for 3.1 and 3-1, which
-the text then shares through the same key. A series of its own (`[[A:key]]`…) has no form in chemnum and is
-written as the letter or numeral it gets on this drawing. The number style and chapters of a LaTeX document are
+Each mark becomes `\rcmpd{…}` with the mark's own text: `[[amine.a.num]]` is `\rcmpd{amine.a.num}`, `[[A:cat]]` is
+`\rcmpd{A:cat}`. The text writes the same, in any order. The definition of `\rcmpd` is a short block for the preamble, carried by
+the manifest in `preamble`; a LaTeX editor adds it once. The number style and chapters of a LaTeX document are
 set with `\setchemnum` in its preamble (`[[#format …]]` and `[[#start …]]` apply to Word). A drawing without marks gets a `.tex` that only includes the PDF.
 
 The first line of `scheme.tex` names the drawing it was made from:
@@ -29,6 +28,8 @@ A file name with spaces or other characters LaTeX dislikes is written with `_` i
 (`My scheme.reactio` → `My_scheme.pdf`, `My_scheme.tex`). A drawing not saved yet as a
 .reactio file (and anything copied in the web version, which cannot write files) sends the files inside the
 clipboard instead (below); the LaTeX editor then keeps the copy of the drawing it gets.
+
+Every kind of mark, with what to write and what gets printed: [latex-marks.md](latex-marks.md).
 
 ## Using it without a LaTeX editor that pastes figures
 
@@ -48,7 +49,7 @@ Put `scheme.pdf` and `scheme.tex` in a folder of the project (for example `figur
 \end{figure}
 ```
 
-Refer to the compounds in the text with the same keys: `\cmpd{ketone}`. This works with pdfLaTeX, LuaLaTeX
+Refer to the compounds in the text with the same marks: `\rcmpd{ketone}`. This works with pdfLaTeX, LuaLaTeX
 and XeLaTeX, and on Overleaf.
 
 ## The clipboard (editable-figure manifest, version 1)
@@ -69,4 +70,4 @@ The clipboard gets two kinds of data:
 
 From the desktop apps the source and the outputs are paths of files on disk. From the web version, or for a
 drawing not saved yet, each is `{"name": "scheme.pdf", "data": "<base64>"}` instead. `entry` is the file to include; `packages` are
-the packages it needs.
+the packages it needs. `preamble`, when present, lists whole lines the entry needs before `\begin{document}`.
