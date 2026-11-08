@@ -99,7 +99,23 @@ func allowPath(_ p: String) {
 func pathAllowed(_ p: String) -> Bool {
     let n = normPath(p)
     let list = UserDefaults.standard.stringArray(forKey: "rd.allowedPaths") ?? []
-    return list.contains(n) || list.contains { $0 + ".json" == n || $0 + ".reactio" == n }
+    if list.contains(n) || list.contains(where: { $0 + ".json" == n || $0 + ".reactio" == n }) { return true }
+    /* Copy for LaTeX: the figure's .pdf and .tex beside a .reactio file the user chose, named after it (texStem in the page) */
+    let u = URL(fileURLWithPath: n), ext = u.pathExtension
+    if ext != "pdf" && ext != "tex" { return false }
+    let dir = u.deletingLastPathComponent().path, stem = u.deletingPathExtension().lastPathComponent
+    return list.contains { q in
+        let r = URL(fileURLWithPath: q)
+        return r.pathExtension == "reactio" && r.deletingLastPathComponent().path == dir && texStem(r.lastPathComponent) == stem
+    }
+}
+/* a file name as LaTeX takes it: no extension, characters other than letters, digits . _ - as _, no leading . or _ */
+func texStem(_ name: String) -> String {
+    var s = name
+    if let i = s.lastIndex(of: "."), i != s.startIndex { s = String(s[..<i]) }
+    s = s.replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "_", options: .regularExpression)
+    s = s.replacingOccurrences(of: "^[._]+", with: "", options: .regularExpression)
+    return s.isEmpty ? "figure" : s
 }
 
 /* Update (Info → Check for updates, then Update): only when the person asks. The newest release's Mac archive (and the
@@ -305,6 +321,13 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             let pb = NSPasteboard.general; pb.clearContents()
             let it = NSPasteboardItem(); it.setData(g, forType: GV); it.setData(png, forType: .png)
             // Ctrl+C also carries the CDXML text: chemistry editors and Reactio Draw paste structures from it
+            if let t = m["text"] as? String, !t.isEmpty { it.setString(t, forType: .string) }
+            let ok = pb.writeObjects([it]); lastCC = pb.changeCount; reply(id, ["ok": ok])
+        case "cliphtml":
+            // Copy for LaTeX: HTML holding the editable-figure manifest, and the line that includes the figure as plain text
+            guard let h = m["html"] as? String, !h.isEmpty else { reply(id, ["ok": false]); return }
+            let pb = NSPasteboard.general; pb.clearContents()
+            let it = NSPasteboardItem(); it.setString(h, forType: .html)
             if let t = m["text"] as? String, !t.isEmpty { it.setString(t, forType: .string) }
             let ok = pb.writeObjects([it]); lastCC = pb.changeCount; reply(id, ["ok": ok])
         case "clipown":
@@ -917,6 +940,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         em.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
         em.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
         em.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        em.addItem(.separator())
+        em.addItem(withTitle: "Copy for LaTeX", action: #selector(AppDelegate.copyLatex(_:)), keyEquivalent: "")
         editItem.submenu = em; bar.addItem(editItem)
         let winItem = NSMenuItem(); let wm = NSMenu(title: "Window")
         wm.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
@@ -926,6 +951,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         hm.addItem(withTitle: "Clipboard Report (saved to Downloads)", action: #selector(AppDelegate.clipReport(_:)), keyEquivalent: "")
         helpItem.submenu = hm; bar.addItem(helpItem)
         NSApp.mainMenu = bar
+    }
+
+    @objc func copyLatex(_ sender: Any?) {
+        web?.evaluateJavaScript("window.__rdCopyLatex && window.__rdCopyLatex()", completionHandler: nil)
     }
 
     @objc func clipReport(_ sender: Any?) {

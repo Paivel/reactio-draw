@@ -3184,6 +3184,7 @@ html {
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="pageSet" title="Pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across; Print can print on them"><svg viewBox="0 0 22 22"><rect x="5.5" y="2.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8 20.5h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          <button class="tb" data-act="copyTex" title="Copy for LaTeX: the drawing as an editable figure (PDF and a .tex that sets the [[key]] compound numbers with chemnum) for a LaTeX editor such as Lattice; in the app the files are saved next to the drawing's .reactio file"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -16646,7 +16647,8 @@ function kdOf(st) {
         s += `<line x1="${t.x}" y1="${t.y + 3.5}" x2="${t.x + textW(t)}" y2="${t.y + 3.5}" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="1 2" opacity=".7"><title>${t.smi ? 'Counted as the structure ' + esc(t.smi) + ': included in the stoichiometry grid' : 'Recognized as a compound: included in the stoichiometry grid'}</title></line>`;
     const MS = renderPlain ? null : markShort();
     for (const t of mol.texts)
-      if (t.fchg != null) s += freeChgSVG(t);
+      if (texHide && texHide.has(t.id)) continue;
+      else if (t.fchg != null) s += freeChgSVG(t);
       else if (t.fsym) s += fsymSVG(t);
       else if (MS && MS.has(t.id)) {
         /* a long mark shown as the number it would get, grey, in the middle of where the mark is; the mark on hover */
@@ -25463,6 +25465,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cmd:copyPic', 'Copy as a picture for Word / PowerPoint', 'Ctrl+Shift+KeyC'],
       ['cmd:copyPicBg', 'Copy as a picture with the background', ''],
       ['cmd:copyOle', 'Copy for Word / PowerPoint as an embedded object', 'Ctrl+Shift+KeyD'],
+      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', ''],
       ['cmd:newDoc', 'New document (new tab)', 'Ctrl+KeyN'],
       ['cmd:closeDoc', 'Close document (tab)', 'Ctrl+KeyW'],
       ['cmd:reopenDoc', 'Reopen closed document', 'Ctrl+Shift+KeyT'],
@@ -30696,6 +30699,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     else if (a === 'fit') fitAll();
     else if (a === 'copyPic') copyPicture();
     else if (a === 'copyPicBg') copyPicture(true);
+    else if (a === 'copyTex') copyLatex();
     else if (a === 'fPrint') printBox();
     else if (a === 'pageSet') pagesBox();
     else if (a === 'rotL') rotateSel(-90);
@@ -39375,6 +39379,215 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
   }
+  /* ===== a figure for LaTeX (Copy for LaTeX): the drawing as a PDF without the texts that carry [[key]] marks, and a .tex
+     that sets those texts over it, each mark as chemnum's \cmpd{key}; so the numbers on the drawing and in the text are the
+     same and in the document's own font. The .tex is the file a document includes; its first line names the drawing it was
+     made from (the editable-figure manifest, docs/latex.md) */
+  let texHide = null;
+  const TEX_ESC = {
+    '\\': '\\textbackslash{}',
+    '{': '\\{',
+    '}': '\\}',
+    '#': '\\#',
+    $: '\\$',
+    '%': '\\%',
+    '&': '\\&',
+    _: '\\_',
+    '~': '\\textasciitilde{}',
+    '^': '\\textasciicircum{}',
+    '−': '-',
+    ' ': '~'
+  };
+  const texEsc = s =>
+    String(s)
+      .replace(/[\\{}#$%&_~^− ]/g, c => TEX_ESC[c])
+      .replace(/[₀-₉]+/g, d => '\\textsubscript{' + [...d].map(c => c.charCodeAt(0) - 0x2080).join('') + '}')
+      .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, d => '\\textsuperscript{' + [...d].map(c => SUPDIG[c]).join('') + '}');
+  /* one line of a text with marks as LaTeX: the marks as \cmpd, sub- and superscripts, bold and italic kept */
+  function texLine(s, N) {
+    const RX =
+      /\[\[#[^\]]*\]\]|\[\[((?:[AaIi]:)?[A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num|dash))?)?\]\]|([_^]|\\[biu]|\\f\[[^\]{}]*\]|\\c\[[^\]{}]*\])\{([^{}]*)\}/g;
+    let out = '',
+      last = 0;
+    for (const m of String(s).matchAll(RX)) {
+      out += texEsc(s.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (m[1]) {
+        const key = m[1],
+          sub = m[2] || '',
+          fmt = m[3] || (sub ? 'letter' : '');
+        /* a series of its own ([[A:cat]]) and subs numbered 7.1 or 7-1 are not chemnum's: written as the numbers this drawing gives them, bold as chemnum's */
+        if (/^[AaIi]:/.test(key)) out += '\\textbf{' + texEsc(N.text(key, '', '')) + '}';
+        else if (!sub) out += '\\cmpd{' + key + '}';
+        else if (fmt === 'letter') out += '\\cmpd{' + key + '.' + sub + '}';
+        else out += '\\cmpd{' + key + '}\\textbf{' + texEsc(N.text(key, sub, fmt).slice(N.text(key, '', '').length)) + '}';
+      } else if (m[4]) {
+        const inner = texLine(m[5], N),
+          op = m[4];
+        out +=
+          op === '_'
+            ? '\\textsubscript{' + inner + '}'
+            : op === '^'
+              ? '\\textsuperscript{' + inner + '}'
+              : op === '\\b'
+                ? '\\textbf{' + inner + '}'
+                : op === '\\i'
+                  ? '\\textit{' + inner + '}'
+                  : op === '\\u'
+                    ? '\\underline{' + inner + '}'
+                    : inner;
+      }
+    }
+    return out + texEsc(s.slice(last));
+  }
+  const hasMark = s => /\[\[(?:[AaIi]:)?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+(?:\.(?:letter|num|dash))?)?\]\]/.test(String(s || ''));
+  /* name: the figure's file name without extension (name.pdf, name.tex); src: the drawing's file name for the first line */
+  async function latexFigureOf(name, src) {
+    const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
+    let svg;
+    texHide = new Set(T.map(t => t.id));
+    try {
+      svg = svgOf(true);
+    } finally {
+      texHide = null;
+      render();
+    }
+    const pdf = await pdfOf([svg]);
+    const [X0, Y0, VW, VH] = /viewBox="([^"]+)"/.exec(svg)[1].split(/\s+/).map(Number),
+      k = 1 / printPtPx(),
+      f = v => (Math.round(v * 10000) / 10000).toString(),
+      head = `% editable-figure source: ${src || name + '.reactio'}\n`;
+    if (!T.length)
+      return { pdf, tex: head + `\\includegraphics{${name}.pdf}%\n`, packages: ['graphicx'] };
+    /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
+    const N = cmpdNumberer('{n}', 1);
+    for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
+    const nodes = [];
+    for (const t of T) {
+      const tpl = String(t.ctpl || t.text),
+        lines = tLines({ ...t, text: tpl }),
+        /* where the lines are: as shown on the sheet (numbers, once numbered for Word), else as written */
+        g = t.ctpl && tLines(t).length === lines.length ? t : { ...t, text: tpl },
+        gl = tLines(g),
+        W = textW(g),
+        al = t.align || 'left',
+        fs = Math.round(tSize(t) * k * 2) / 2,
+        font =
+          `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont` +
+          (t.bold ? '\\bfseries' : '') +
+          (t.italic ? '\\itshape' : '') +
+          ' ';
+      lines.forEach((l, i) => {
+        if (!String(l).trim()) return;
+        const lw = lineW(g, gl[i]),
+          x = (al === 'center' ? g.x + (W - lw) / 2 : al === 'right' ? g.x + W - lw : g.x) + lw / 2,
+          y = t.y + i * tLH(t);
+        nodes.push(`    \\node at (${f((x - X0) / VW)},${f((Y0 + VH - y) / VH)}) {${font}${texLine(l, N)}};`);
+      });
+    }
+    const tex =
+      head +
+      `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
+      '\\begin{tikzpicture}\n' +
+      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {\\includegraphics{${name}.pdf}};\n` +
+      '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
+      nodes.join('\n') +
+      '\n  \\end{scope}\n\\end{tikzpicture}%\n';
+    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'] };
+  }
+  /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
+     figure a LaTeX editor pastes, without changing Ctrl+C. The clipboard gets HTML holding the editable-figure manifest (a
+     data-editable-figure attribute: the drawing, the PDF and the .tex, docs/latex.md) and as plain text the line that
+     includes the figure, for other editors. In the apps, for a drawing kept in a .reactio file, the files are written
+     next to it (saved first) and the manifest gives their paths; otherwise (a browser, which cannot write files, or a
+     drawing not saved yet) they go in the manifest itself */
+  const texStem = s => {
+    s = String(s);
+    const i = s.lastIndexOf('.');
+    return (i > 0 ? s.slice(0, i) : s).replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '') || 'figure';
+  };
+  const b64of = u => {
+    u = typeof u === 'string' ? new TextEncoder().encode(u) : u;
+    let s = '';
+    for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192));
+    return btoa(s);
+  };
+  async function latexClip() {
+    if (!mol.atoms.length && !mol.arrows.length && !mol.texts.length) throw new Error('Nothing to copy');
+    let man;
+    const t0 = curTab();
+    /* a drawing kept in a .reactio file: saved, and the figure written next to it; any other (new, unsaved, or kept as
+       CDXML…) goes in the manifest itself, as from a browser, and the LaTeX editor keeps the .reactio it gets */
+    if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
+      if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
+      const t = curTab();
+      const src = t.file.path,
+        dir = src.slice(0, Math.max(src.lastIndexOf('/'), src.lastIndexOf('\\')) + 1),
+        stem = texStem(t.file.name),
+        f = await latexFigureOf(stem, t.file.name),
+        out = [];
+      for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
+        const path = dir + stem + '.' + ext,
+          r = await window.rdNative.call('write', { path, b64: b64of(body) });
+        if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
+        out.push({ path });
+      }
+      man = { version: 1, name: stem, source: { path: src }, outputs: out, entry: stem + '.tex', packages: f.packages };
+    } else {
+      const t = curTab(),
+        stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
+        f = await latexFigureOf(stem, stem + '.reactio');
+      man = {
+        version: 1,
+        name: stem,
+        source: { name: stem + '.reactio', data: b64of(fileBody('reactio')) },
+        outputs: [
+          { name: stem + '.pdf', data: b64of(f.pdf) },
+          { name: stem + '.tex', data: b64of(f.tex) }
+        ],
+        entry: stem + '.tex',
+        packages: f.packages
+      };
+    }
+    const text = `\\import{figures/}{${man.entry}}`;
+    return { man, text, html: `<div data-editable-figure="${esc(JSON.stringify(man))}">${esc(text)}</div>` };
+  }
+  async function copyLatex() {
+    const done = c =>
+      toast(
+        'Copied for LaTeX: paste it into a LaTeX editor that takes editable figures (the drawing, ' +
+          c.man.name +
+          '.pdf and ' +
+          c.man.entry +
+          '); elsewhere it pastes as ' +
+          c.text
+      );
+    try {
+      /* Reactio Draw.app puts it on the clipboard itself */
+      if (window.rdNative && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rd) {
+        const c = await latexClip(),
+          r = await window.rdNative.call('cliphtml', { html: c.html, text: c.text });
+        if (!r || !r.ok) throw new Error('The clipboard could not be written');
+        done(c);
+        return;
+      }
+      if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write)
+        throw new Error('The clipboard cannot be written here');
+      /* the item is handed over at once, its contents when ready: a browser lets a page write the clipboard only right after a click */
+      const pc = latexClip();
+      pc.catch(() => {});
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': pc.then(c => new Blob([c.html], { type: 'text/html' })),
+          'text/plain': pc.then(c => new Blob([c.text], { type: 'text/plain' }))
+        })
+      ]);
+      done(await pc);
+    } catch (e) {
+      toast((e && e.message) || 'Could not copy for LaTeX', true, 8000);
+    }
+  }
+  window.__rdCopyLatex = () => copyLatex();
   /* ===== Embedded object inside Word: binary CDX + OLE compound file + .docx =====
    CDX tag numbers and enumerations: the CDX property table of ReShiki (MIT / Apache-2.0, see the CDX reader below). */
   function cdxOfCdxml(xml) {
@@ -43734,6 +43947,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ],
     ['c-xyz', 'XYZ, 3D coordinates'],
     ['c-sdf3', 'SDF with the 3D shape'],
+    ['c-tex', 'Figure for LaTeX: PDF + .tex with the compound numbers (an editable figure for Lattice)'],
     ['h', 'Settings, labels and templates'],
     ['setx', 'Export hotkeys, button layout, my labels and templates (.json)'],
     ['seti', 'Import hotkeys, button layout, my labels and templates…'],
@@ -44670,6 +44884,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (k === 'c-ole') {
       copyOle();
+      return;
+    }
+    if (k === 'c-tex') {
+      copyLatex();
       return;
     }
     if (k === 'docx') {
@@ -50168,6 +50386,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     'cmd:copyOle': () => {
       copyOle();
+    },
+    'cmd:copyTex': () => {
+      copyLatex();
     },
     'cmd:newDoc': () => {
       newTab();

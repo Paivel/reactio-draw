@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -75,5 +76,31 @@ func pathAllowed(p string) bool {
 			return true
 		}
 	}
+	// Copy for LaTeX: the figure's .pdf and .tex beside a .reactio file the user chose, named after it (texStem in the page)
+	ext := filepath.Ext(n)
+	if ext != ".pdf" && ext != ".tex" {
+		return false
+	}
+	dir, stem := filepath.Dir(n), strings.TrimSuffix(filepath.Base(n), ext)
+	for _, q := range allowList {
+		if filepath.Ext(q) == ".reactio" && filepath.Dir(q) == dir && texStem(filepath.Base(q)) == stem {
+			return true
+		}
+	}
 	return false
+}
+
+var texBad = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
+var texLead = regexp.MustCompile(`^[._]+`)
+
+// a file name as LaTeX takes it: no extension, characters other than letters, digits . _ - as _, no leading . or _
+func texStem(name string) string {
+	if i := strings.LastIndex(name, "."); i > 0 {
+		name = name[:i]
+	}
+	s := texLead.ReplaceAllString(texBad.ReplaceAllString(name, "_"), "")
+	if s == "" {
+		return "figure"
+	}
+	return s
 }
