@@ -39416,11 +39416,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const key = m[1],
           sub = m[2] || '',
           fmt = m[3] || (sub ? 'letter' : '');
-        /* a series of its own ([[A:cat]]) and subs numbered 7.1 or 7-1 are not chemnum's: written as the numbers this drawing gives them, bold as chemnum's */
+        /* a series of its own ([[A:cat]]) is not chemnum's: written as this drawing numbers it, bold as chemnum's */
         if (/^[AaIi]:/.test(key)) out += '\\textbf{' + texEsc(N.text(key, '', '')) + '}';
         else if (!sub) out += '\\cmpd{' + key + '}';
         else if (fmt === 'letter') out += '\\cmpd{' + key + '.' + sub + '}';
-        else out += '\\cmpd{' + key + '}\\textbf{' + texEsc(N.text(key, sub, fmt).slice(N.text(key, '', '').length)) + '}';
+        else out += '\\cmpd[post-main-label-code=' + (fmt === 'dash' ? '-' : '.') + ',sub-counter-format=arabic]{' + key + '.' + sub + '}';
       } else if (m[4]) {
         const inner = texLine(m[5], N),
           op = m[4];
@@ -39512,6 +39512,37 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192));
     return btoa(s);
   };
+  /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
+  const siblingStem = t => {
+    const src = t.file.path;
+    return src.slice(0, Math.max(src.lastIndexOf('/'), src.lastIndexOf('\\')) + 1) + texStem(t.file.name);
+  };
+  async function writeFigureBeside(t) {
+    const stem = texStem(t.file.name),
+      f = await latexFigureOf(stem, t.file.name),
+      out = [];
+    for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
+      const path = siblingStem(t) + '.' + ext,
+        r = await window.rdNative.call('write', { path, b64: b64of(body) });
+      if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
+      out.push({ path });
+    }
+    return { stem, out, packages: f.packages };
+  }
+  /* after a Save: a figure made from this file (the .tex next to it says so on its first line) follows the drawing */
+  async function refreshLatexFigure() {
+    const t = curTab();
+    if (!NATIVE_FILES() || !(t && t.file && /\.reactio$/i.test(t.file.path || ''))) return;
+    try {
+      const h = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' });
+      if (!h || String(h.line || '').trim() !== '% editable-figure source: ' + t.file.name) return;
+      await writeFigureBeside(t);
+      nlog('LaTeX figure updated');
+    } catch (e) {
+      console.error(e);
+      toast('Saved, but the LaTeX figure was not updated: ' + ((e && e.message) || e), true);
+    }
+  }
   async function latexClip() {
     if (!mol.atoms.length && !mol.arrows.length && !mol.texts.length) throw new Error('Nothing to copy');
     let man;
@@ -39521,18 +39552,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
       if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
       const t = curTab();
-      const src = t.file.path,
-        dir = src.slice(0, Math.max(src.lastIndexOf('/'), src.lastIndexOf('\\')) + 1),
-        stem = texStem(t.file.name),
-        f = await latexFigureOf(stem, t.file.name),
-        out = [];
-      for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
-        const path = dir + stem + '.' + ext,
-          r = await window.rdNative.call('write', { path, b64: b64of(body) });
-        if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
-        out.push({ path });
-      }
-      man = { version: 1, name: stem, source: { path: src }, outputs: out, entry: stem + '.tex', packages: f.packages };
+      const { stem, out, packages } = await writeFigureBeside(t);
+      man = { version: 1, name: stem, source: { path: t.file.path }, outputs: out, entry: stem + '.tex', packages };
     } else {
       const t = curTab(),
         stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
@@ -39549,7 +39570,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         packages: f.packages
       };
     }
-    const text = `\\import{figures/}{${man.entry}}`;
+    const text = `\\begin{figure}\n  \\centering\n  \\input{figures/${man.entry.replace(/\.tex$/, '')}}\n  \\caption{}\n  \\label{fig:}\n\\end{figure}`;
     return { man, text, html: `<div data-editable-figure="${esc(JSON.stringify(man))}">${esc(text)}</div>` };
   }
   async function copyLatex() {
@@ -76036,6 +76057,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       const r = await saveDoc0(mode);
       nlog('save ' + mode + (r ? ': done' : ': not saved'));
+      if (r && mode !== 'copy') refreshLatexFigure();
       return r;
     } catch (e) {
       console.error(e);

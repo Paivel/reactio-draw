@@ -14,8 +14,10 @@ For a drawing saved as `scheme.reactio` it writes, next to it:
   the same on the drawing and in the text.
 
 `[[key]]` becomes `\cmpd{key}`, `[[key.sub]]` and `[[key.sub.letter]]` become `\cmpd{key.sub}` (3a, 3b…).
-Marks chemnum has no form for (`[[key.sub.num]]`, `[[key.sub.dash]]`, the series `[[A:key]]`…) are written
-as the numbers they get on this drawing. A drawing without marks gets a `.tex` that only includes the PDF.
+`[[key.sub.num]]` and `[[key.sub.dash]]` become `\cmpd{key.sub}` with chemnum's options for 3.1 and 3-1, which
+the text then shares through the same key. A series of its own (`[[A:key]]`…) has no form in chemnum and is
+written as the letter or numeral it gets on this drawing. The number style and chapters of a LaTeX document are
+set with `\setchemnum` in its preamble (`[[#format …]]` and `[[#start …]]` apply to Word). A drawing without marks gets a `.tex` that only includes the PDF.
 
 The first line of `scheme.tex` names the drawing it was made from:
 
@@ -30,18 +32,18 @@ clipboard instead (below); the LaTeX editor then keeps the copy of the drawing i
 
 ## Using it without a LaTeX editor that pastes figures
 
-Put `scheme.pdf` and `scheme.tex` in a folder of the project (for example `figures/`) and include the `.tex`
-with the `import` package, so the PDF is found next to it:
+Put `scheme.pdf` and `scheme.tex` in a folder of the project (for example `figures/`), name that folder in
+`\graphicspath` so the PDF is found, and include the `.tex`:
 
 ```latex
 \usepackage{graphicx}
 \usepackage{tikz}
 \usepackage{chemnum}
-\usepackage{import}
+\graphicspath{{figures/}}
 ...
 \begin{figure}
   \centering
-  \import{figures/}{scheme.tex}
+  \input{figures/scheme}
   \caption{...}
 \end{figure}
 ```
@@ -53,7 +55,7 @@ and XeLaTeX, and on Overleaf.
 
 The clipboard gets two kinds of data:
 
-- `text/plain`: the line that includes the figure, `\import{figures/}{scheme.tex}`;
+- `text/plain`: a `figure` that includes it with `\input{figures/scheme}`, with an empty `\caption{}` and `\label{fig:}` to fill in;
 - `text/html`: an element whose `data-editable-figure` attribute holds a JSON manifest.
 
 ```json

@@ -82,6 +82,15 @@ func handle(s string) {
 		path := fileDialog(true, r.Name, "drawings")
 		allowPath(path)
 		reply(r.ID, map[string]interface{}{"path": path})
+	case "texHead":
+		// the first line of the .tex next to a chosen .reactio, which says whether it is that drawing's figure
+		line := ""
+		if strings.HasSuffix(strings.ToLower(r.Path), ".tex") && pathAllowed(r.Path) {
+			if data, err := os.ReadFile(r.Path); err == nil {
+				line = strings.TrimRight(strings.SplitN(string(data), "\n", 2)[0], "\r")
+			}
+		}
+		reply(r.ID, map[string]interface{}{"line": line})
 	case "write":
 		if r.Path == "" {
 			reply(r.ID, map[string]interface{}{"ok": false, "err": "no file"})
