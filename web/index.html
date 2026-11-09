@@ -1181,6 +1181,42 @@ input.tgl:focus-visible {
   font-size: 15px;
   margin-bottom: 6px;
 }
+.pagebox .pview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  align-items: flex-start;
+  max-height: 300px;
+  overflow: auto;
+  margin: 8px 0 4px;
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--line);
+}
+.pagebox .pview .pp {
+  position: relative;
+  flex: none;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  overflow: hidden;
+}
+.pagebox .pview .pp > div {
+  position: absolute;
+  outline: 1px dashed rgba(90, 120, 200, 0.45);
+}
+.pagebox .pview .pp svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.pagebox .pview .pn {
+  position: absolute;
+  right: 3px;
+  bottom: 1px;
+  font-size: 9px;
+  color: #8a94a6;
+}
 .pagebox label {
   display: flex;
   justify-content: space-between;
@@ -3198,6 +3234,7 @@ html {
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="pageSet" title="Pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across; Print can print on them"><svg viewBox="0 0 22 22"><rect x="5.5" y="2.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8 20.5h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
+          <button class="tb" data-act="copyTex" title="Copy for LaTeX: paste with files in Lattice; other editors get the \input line"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -3345,6 +3382,9 @@ html {
           <div class="smiles" id="inchi"></div>
           <div class="smiles" id="inchiKey" style="margin-top:3px"></div>
           <div class="note" id="inchiNote" style="margin-top:2px"></div>
+          <div class="row" style="justify-content:space-between;margin:8px 0 4px"><span class="tlabel" title="CAS Registry Number of the structure, found by its InChIKey in the dictionary of names (Wikidata, CC0) here, nothing sent anywhere; for a selected molecule not in it, Search PubChem asks PubChem">CAS</span><span class="row" style="gap:4px"><button class="btn ghost sm" id="copyCas">Copy</button><button class="btn ghost sm" id="pubchemCas" title="Ask PubChem (pubchem.ncbi.nlm.nih.gov) for the CAS number of the selected molecule: only its InChIKey is sent">Search PubChem</button></span></div>
+          <div class="smiles" id="casNo"></div>
+          <div class="note" id="casNote" style="margin-top:2px"></div>
         </div>
         <div>
           <div class="row" style="justify-content:space-between;margin-bottom:4px"><span class="tlabel" title="IUPAC name of the selected structure (or the only one on the sheet), made two ways: Name it uses openclatura (in the Reactio Draw app for Mac, Windows and Linux; needs Python with openclatura); Alternative name uses the namer of Octet Draw, which runs here, in the browser too. Each name is read back with OPSIN and compared with the drawing">Name</span><span class="row" style="gap:4px"><button class="btn sm" id="nameIt" title="openclatura (lamalab-org): in the Reactio Draw app for Mac, Windows and Linux">Name it</button><button class="btn sm" id="nameOctet" title="Made by the namer of Octet Draw (Sam Ellis, Apache-2.0): runs here, in the browser too">Alternative name</button><button class="btn ghost sm" id="copyName">Copy</button><button class="btn ghost sm" id="numIupac" title="Write the IUPAC numbers (locants) beside the atoms of the structure, as its name counts them (the namer of Octet Draw); press again to take them off">Numbering</button><button class="btn ghost sm" id="numHand" title="Number atoms by hand: click them in turn, 1, 2, 3…; a numbered atom clicked again loses its number. Files (Molfile, SDF, XYZ) list the atoms in this order">By hand</button></span></div>
@@ -4377,7 +4417,7 @@ function kdOf(st) {
     BIG_INFO = 800;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.13';
+  const RD_VERSION = '1.14';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -4933,6 +4973,18 @@ function kdOf(st) {
     redoSt.length = 0;
     snapPend = true;
   }
+  function memoOnlyGrew(was, now) {
+    try {
+      const A = JSON.parse(was),
+        B = JSON.parse(now);
+      if (UNDO_TF.some(k => k !== 'memo' && JSON.stringify(A[k]) !== JSON.stringify(B[k]))) return false;
+      const a = A.memo || {},
+        b = B.memo || {};
+      return Object.keys(a).every(k => k in b && JSON.stringify(a[k]) === JSON.stringify(b[k]));
+    } catch (e) {
+      return false;
+    }
+  }
   /* called from save(): a change to the tables alone becomes its own undo step */
   function undoWatch() {
     const t = tblState();
@@ -4941,6 +4993,12 @@ function kdOf(st) {
       undoCur = S.cur;
       undoT = t;
       snapPend = false;
+      return;
+    }
+    /* the table filling in a row for a structure just drawn (its memo gaining an entry, nothing else changed) is part of
+       the drawing's step, not one of its own: else Ctrl+Z after a change took that row back first and seemed to do nothing */
+    if (t !== undoT && memoOnlyGrew(undoT, t)) {
+      undoT = t;
       return;
     }
     /* typing in a cell saves on every key: changes within a moment of each other make one step */
@@ -4978,6 +5036,7 @@ function kdOf(st) {
     commit();
     if (typeof syncTable === 'function') syncTable();
     if (typeof jabEdSync === 'function') jabEdSync();
+    if (typeof eneEdSync === 'function') eneEdSync();
   }
   function redo() {
     if (!redoSt.length) return;
@@ -4988,6 +5047,7 @@ function kdOf(st) {
     commit();
     if (typeof syncTable === 'function') syncTable();
     if (typeof jabEdSync === 'function') jabEdSync();
+    if (typeof eneEdSync === 'function') eneEdSync();
   }
 
   /* ===== chemistry ===== */
@@ -9714,10 +9774,12 @@ function kdOf(st) {
   }
   /* what kind of η-ligand a piece is: 'arene' (one benzene ring of carbons), 'cp' (one five-ring of carbons, a Cp− or Cp*−),
      or null */
-  function hapLigand(comp, adj) {
+  function hapLigand(comp, adj, any) {
     if (comp.some(a => HAP_TM.has(a.el) || STAR_METALS.has(a.el))) return null;
     const R = hapRingOf(comp, adj);
     if (!R || R.some(a => a.el !== 'C')) return null;
+    /* a ring that was on the metal already (Clean Up of a drawn sandwich): taken by its size, whatever its bonds */
+    if (any && (R.length === 5 || R.length === 6)) return { kind: R.length === 6 ? 'arene' : 'cp', R };
     const q = comp.reduce((s, a) => s + (a.chg || 0), 0);
     const ringOrder = R.map((a, i) => {
       const b = bondBetween(a, R[(i + 1) % R.length]);
@@ -9736,7 +9798,7 @@ function kdOf(st) {
     }
     return null;
   }
-  function hapComplex(atoms) {
+  function hapComplex(atoms, any) {
     if (!atoms || atoms.length < 3 || !atoms.some(a => HAP_TM.has(a.el))) return false;
     const ids = new Set(atoms.map(a => a.id)),
       adj = new Map(atoms.map(a => [a.id, []]));
@@ -9771,7 +9833,7 @@ function kdOf(st) {
     if (!metals.length || metalComps.some(c => c.some(a => a.multi))) return false;
     const ligs = comps
       .filter(c => !metalComps.includes(c))
-      .map(c => ({ c, ...(hapLigand(c, adj) || {}) }))
+      .map(c => ({ c, ...(hapLigand(c, adj, any) || {}) }))
       .filter(l => l.kind);
     if (!ligs.length) return false;
     /* one ring to each metal, or two on a lone metal (a sandwich); an arene only on a metal that takes one */
@@ -9812,6 +9874,8 @@ function kdOf(st) {
           c.hUsed = usedVal(c);
         } else if (l.kind === 'cp') {
           const c = l.R.find(a => a.chg === -1);
+          /* a ring that was on the metal already has no charge to give back */
+          if (!c) continue;
           c.chg = 0;
           if ((m.chg || 0) > 0) m.chg -= 1;
           if (c.hExp === undefined) c.hExp = 0;
@@ -10003,7 +10067,10 @@ function kdOf(st) {
                   }
                   if (!R.includes(a)) far += Math.hypot(x - m.x, y - m.y);
                 }
-                const score = clash * 10 - far * 0.05 + Math.abs(tw) * 15 + push * 400;
+                /* the side toward the metal a single bond: the η bond would run through the second line of a double one */
+                const eb = bondBetween(P, Q),
+                  dbl = eb && eb.order === 2 ? 300 : 0;
+                const score = clash * 10 - far * 0.05 + Math.abs(tw) * 15 + push * 400 + dbl;
                 if (!best || score < best.score) best = { score, pts, px, py };
               }
         for (const [a, x, y] of best.pts) {
@@ -10468,6 +10535,80 @@ function kdOf(st) {
   }
   /* sandwich complexes keep their perspective drawing in Clean Up; pressing Clean Up again right away rebuilds them flat anyway */
   const keepShape = fr => fr.some(a => a.hap || a.multi);
+  /* drawn in perspective (the J key's rings are seen tipped, so squashed); a sandwich drawn with flat rings has nothing to keep */
+  const hapPersp = fr =>
+    fr.some(h => {
+      if (!h.multi) return false;
+      const R = h.multi.map(atomById).filter(Boolean);
+      if (R.length < 3) return false;
+      const cx = R.reduce((t, a) => t + a.x, 0) / R.length,
+        cy = R.reduce((t, a) => t + a.y, 0) / R.length,
+        d = R.map(a => Math.hypot(a.x - cx, a.y - cy));
+      return Math.max(...d) > 1.15 * Math.min(...d);
+    });
+  /* a sandwich laid out again: the η bonds taken off, each piece cleaned, then put together as a complex read from SMILES is
+     (the rings up and down, a side to the metal); what cannot be put together so is left as it was */
+  function cleanSandwich(fr) {
+    const H = fr.filter(a => a.multi);
+    if (!H.length) return false;
+    const hset = new Set(H.map(h => h.id)),
+      saved = H.map(h => ({ h, bonds: mol.bonds.filter(b => b.a === h.id || b.b === h.id) })),
+      keep = new Map(fr.map(a => [a.id, [a.x, a.y]]));
+    mol.atoms = mol.atoms.filter(q => !hset.has(q.id));
+    mol.bonds = mol.bonds.filter(b => !hset.has(b.a) && !hset.has(b.b));
+    const rest = fr.filter(a => !hset.has(a.id)),
+      inR = new Set(rest.map(a => a.id)),
+      seen = new Set(),
+      pieces = [];
+    for (const a of rest) {
+      if (seen.has(a.id)) continue;
+      const c = [],
+        st = [a];
+      seen.add(a.id);
+      while (st.length) {
+        const x = st.pop();
+        c.push(x);
+        for (const y of neighbors(x))
+          if (inR.has(y.id) && !seen.has(y.id)) {
+            seen.add(y.id);
+            st.push(y);
+          }
+      }
+      pieces.push(c);
+    }
+    const ringOf = new Set(H.flatMap(h => h.multi));
+    for (const c of pieces) {
+      if (c.length < 2) continue;
+      const sk = cleanSkipped;
+      cleanFragments0([c]);
+      cleanSkipped = sk;
+    }
+    let ok = false;
+    try {
+      ok = hapComplex(rest, true);
+    } catch (e) {
+      ok = false;
+    }
+    if (ok) {
+      for (const a of rest) if (ringOf.has(a.id)) delete a.z;
+      /* the new ring centres take the old ones' place in the selection */
+      if (H.some(h => sel.has(h.id))) {
+        H.forEach(h => sel.delete(h.id));
+        for (const a of mol.atoms) if (a.multi && a.multi.some(id => ringOf.has(id))) sel.add(a.id);
+      }
+      return true;
+    }
+    for (const a of rest) {
+      const p = keep.get(a.id);
+      a.x = p[0];
+      a.y = p[1];
+    }
+    for (const { h, bonds } of saved) {
+      mol.atoms.push(h);
+      mol.bonds.push(...bonds);
+    }
+    return false;
+  }
   let cleanSkipped = 0,
     /* Clean Up pressed again on the same structures, unchanged since: the next of the distinct layouts (0 = the best) */
     cleanVariant = 0,
@@ -12156,9 +12297,19 @@ function kdOf(st) {
     cleanFragments0.turned = false;
     for (const fr of frs) {
       if (fr.length < 2) continue;
-      if (!cleanForce && keepShape(fr)) {
-        cleanSkipped++;
-        continue;
+      if (keepShape(fr)) {
+        if (!cleanForce && hapPersp(fr)) {
+          cleanSkipped++;
+          continue;
+        }
+        if (fr.some(a => a.multi)) {
+          if (!cleanSandwich(fr) && !cleanForce) cleanSkipped++;
+          continue;
+        }
+        if (!cleanForce) {
+          cleanSkipped++;
+          continue;
+        }
       }
       {
         const cl = m2c2Of(fr);
@@ -16619,7 +16770,36 @@ function kdOf(st) {
           }
           /* the double bonds of an allene with its dot: centred, so the dot sits between their lines */
           if (dotGap(A) || dotGap(B)) side = 0;
-          if (side === 0) s += ln(-st.dbl / 2, 0, 0, '', mw) + ln(st.dbl / 2, 0, 0);
+          if (side === 0) {
+            /* a centred double bond: at an atom without a label, each of its two lines runs on to meet the other bond on its
+               side (acetone's C=O: the lines end on the two C–C bonds, with no gap under them and nothing sticking out) */
+            const meet = (X, t, o, sg) => {
+              if (t || dotGap(X)) return 0;
+              const vx = ux * sg,
+                vy = uy * sg;
+              let best = null;
+              for (const c of bondsOf(X)) {
+                if (c === b) continue;
+                const Z = other(c, X),
+                  cl = Math.hypot(Z.x - X.x, Z.y - X.y) || 1,
+                  wx = (Z.x - X.x) / cl,
+                  wy = (Z.y - X.y) / cl,
+                  sd = nx * wx + ny * wy;
+                /* only a bond on this line's side, and not one running nearly along the double bond */
+                if (Math.sign(sd) !== Math.sign(o) || Math.abs(sd) < 0.25) continue;
+                /* X + n·o + v·t on the bond's line X + w·k: t = −o (n × w) / (v × w) */
+                const den = vx * wy - vy * wx;
+                if (Math.abs(den) < 1e-6) continue;
+                const tt = (-o * (nx * wy - ny * wx)) / den;
+                if (Math.abs(tt) > st.dbl * 1.5) continue;
+                if (!best || Math.abs(tt) < Math.abs(best)) best = tt;
+              }
+              return best || 0;
+            };
+            const o1 = -st.dbl / 2,
+              o2 = st.dbl / 2;
+            s += ln(o1, meet(A, t1, o1, 1), meet(B, t2, o1, -1), '', mw) + ln(o2, meet(A, t1, o2, 1), meet(B, t2, o2, -1));
+          }
           else {
             const sh = st.dbl * 0.9;
             s += ln(0, 0, 0, '', mw) + ln(st.dbl * side, t1 ? 1 : sh, t2 ? 1 : sh);
@@ -16660,7 +16840,8 @@ function kdOf(st) {
         s += `<line x1="${t.x}" y1="${t.y + 3.5}" x2="${t.x + textW(t)}" y2="${t.y + 3.5}" style="stroke:var(--accent)" stroke-width="1" stroke-dasharray="1 2" opacity=".7"><title>${t.smi ? 'Counted as the structure ' + esc(t.smi) + ': included in the stoichiometry grid' : 'Recognized as a compound: included in the stoichiometry grid'}</title></line>`;
     const MS = renderPlain ? null : markShort();
     for (const t of mol.texts)
-      if (t.fchg != null) s += freeChgSVG(t);
+      if (texHide && texHide.has(t.id)) continue;
+      else if (t.fchg != null) s += freeChgSVG(t);
       else if (t.fsym) s += fsymSVG(t);
       else if (MS && MS.has(t.id)) {
         /* a long mark shown as the number it would get, grey, in the middle of where the mark is; the mark on hover */
@@ -21144,6 +21325,11 @@ function kdOf(st) {
   }
   function commit(keepErr) {
     try {
+      pastedSel();
+    } catch (e) {
+      console.warn('pastedSel', e);
+    }
+    try {
       sizeNewParts();
     } catch (e) {
       console.warn('sizeNewParts', e);
@@ -21152,6 +21338,11 @@ function kdOf(st) {
       arrowGlue();
     } catch (e) {
       console.warn('arrowGlue', e);
+    }
+    try {
+      if (typeof eneFollow === 'function') eneFollow();
+    } catch (e) {
+      console.warn('eneFollow', e);
     }
     try {
       histLog();
@@ -22384,7 +22575,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     layer.innerHTML = still + '<g id="fastDrag">' + moving + '</g>';
     return layer.querySelector('#fastDrag');
   }
+  /* the energy axis and the levels of a diagram stand for its values: moved without the rest of the diagram they go only
+     sideways (the whole diagram moves freely) */
+  const eneAxisOnly = o => {
+    const all = [...o.arrows.map(x => x[0]), ...o.texts.map(x => x[0])];
+    if (o.atoms.length || !all.length || !all.every(r => r.eg != null) || !all.some(r => /^(ax|tk:|tl:|tt|lv:|dt:)/.test(r.ek || ''))) return false;
+    const n = new Map();
+    for (const r of all) n.set(r.eg, (n.get(r.eg) || 0) + 1);
+    return [...n].some(([g, k]) => k < eneParts(g).length);
+  };
   function applyMove(o, dx, dy) {
+    if (eneAxisOnly(o)) dy = 0;
     for (const [a, x, y] of o.atoms) {
       a.x = x + dx;
       a.y = y + dy;
@@ -24539,6 +24740,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         dx += g.ddx;
         dy += g.ddy;
       }
+      if (eneAxisOnly(drag.orig)) dy = 0;
       /* a big drawing: what moves is drawn once into a layer of its own and that layer is shifted; the whole sheet is
          drawn again when the pointer is let go */
       if (drag.fast === undefined) drag.fast = fastDragStart(drag.orig);
@@ -25141,6 +25343,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
     {
+      const he = findArrow(p);
+      if (he && he.eg != null && !findAtom(p, 10) && eneModel(he.eg)) {
+        openEneEd(he.eg);
+        return;
+      }
+    }
+    {
       const ha = findArrow(p);
       if (ha && !ha.kind && !findAtom(p, 10)) {
         if (isRxnArrow(ha)) {
@@ -25477,6 +25686,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cmd:copyPic', 'Copy as a picture for Word / PowerPoint', 'Ctrl+Shift+KeyC'],
       ['cmd:copyPicBg', 'Copy as a picture with the background', ''],
       ['cmd:copyOle', 'Copy for Word / PowerPoint as an embedded object', 'Ctrl+Shift+KeyD'],
+      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', ''],
       ['cmd:newDoc', 'New document (new tab)', 'Ctrl+KeyN'],
       ['cmd:closeDoc', 'Close document (tab)', 'Ctrl+KeyW'],
       ['cmd:reopenDoc', 'Reopen closed document', 'Ctrl+Shift+KeyT'],
@@ -28879,8 +29089,49 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const f = picIn.files && picIn.files[0];
     if (f) addPicture(f);
   });
+  /* what a paste adds (a structure, a reaction, a scheme from another editor, a file's drawing) ends up selected, so it can
+     be moved at once: the next commit of this sheet selects everything newer than the paste, until the next key or click */
+  let pasteMark = null;
+  function pastedSel() {
+    const P = pasteMark;
+    if (!P) return;
+    if (P.m !== mol || Date.now() - P.t > 20000) return void (pasteMark = null);
+    const A = mol.atoms.filter(a => a.id >= P.n0),
+      R = mol.arrows.filter(r => r.id >= P.n0),
+      T = mol.texts.filter(t => t.id >= P.n0);
+    /* the view stays where it was (an import fits the view to the whole drawing; a paste should not move the sheet) */
+    if (!zoom && P.z0) zoom = { ...P.z0 };
+    if (!A.length && !R.length && !T.length) return;
+    /* once the paste is done: what it added still out of sight (pasted with the pointer off the sheet) is brought into view, the scale kept */
+    clearTimeout(pastedSel.t);
+    pastedSel.t = setTimeout(() => {
+      if (P.m !== mol || !zoom) return;
+      const xs = [],
+        ys = [];
+      for (const a of mol.atoms) if (a.id >= P.n0) xs.push(a.x), ys.push(a.y);
+      for (const r of mol.arrows) if (r.id >= P.n0) xs.push(r.x1, r.x2), ys.push(r.y1, r.y2);
+      for (const t of mol.texts) if (t.id >= P.n0) xs.push(t.x), ys.push(t.y);
+      if (!xs.length) return;
+      const x0 = Math.min(...xs),
+        x1 = Math.max(...xs),
+        y0 = Math.min(...ys),
+        y1 = Math.max(...ys);
+      if (x0 >= view.x && x1 <= view.x + view.w && y0 >= view.y && y1 <= view.y + view.h) return;
+      /* moved over to it, at the same scale */
+      zoom = { ...zoom, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2 };
+      fitView();
+      render();
+    }, 0);
+    clearSel();
+    for (const a of A) sel.add(a.id);
+    for (const r of R) selArr.add(r.id);
+    for (const t of T) selTxt.add(t.id);
+    if (tool !== 'select') setTool('select', true);
+  }
+  for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => (pasteMark = null), true);
   document.addEventListener('paste', e => {
     if (e.target.closest && e.target.closest('input,textarea')) return;
+    pasteMark = { n0: mol.next, m: mol, t: Date.now(), z0: zoom ? { ...zoom } : null };
     /* ReactioDraw.exe for Windows: a Reactio Draw object copied from Word sits on the clipboard as an OLE storage, which only the app can read */
     /* (Reactio Draw.app for Mac does the same: Word on Mac copies the object as com.microsoft.Embedded-Object) */
     if (
@@ -29055,7 +29306,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     /* one SMILES-looking token becomes a structure; any other text becomes a text on the sheet, under the pointer (or mid-view) */
-    if (/^[A-Za-z0-9@+\-\[\]()=#\\\/%.:*>~]+$/.test(t.replace(/\s+\|[^|]*\|\s*$/, '')) && parseSmiles(t)) {
+    /* a reaction SMILES (A>>B, A>C>B) too: each of its parts a SMILES */
+    const core = t.replace(/\s+\|[^|]*\|\s*$/, ''),
+      rxn = /^[^>\s]*>[^>\s]*>[^>\s]+$/.test(core) && core.split('>').filter(Boolean).every(x => x.split('.').every(y => parseSmiles(y)));
+    if (/^[A-Za-z0-9@+\-\[\]()=#\\\/%.:*>~]+$/.test(core) && (rxn || parseSmiles(t))) {
       pasteSmilesNow(t);
       return;
     }
@@ -30710,6 +30964,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     else if (a === 'fit') fitAll();
     else if (a === 'copyPic') copyPicture();
     else if (a === 'copyPicBg') copyPicture(true);
+    else if (a === 'copyTex') copyLatex();
     else if (a === 'fPrint') printBox();
     else if (a === 'pageSet') pagesBox();
     else if (a === 'rotL') rotateSel(-90);
@@ -31476,13 +31731,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           common.set(nreadKey(k), s);
         }
         /* the dictionary: per line SMILES, names (| between; "!" marks a name OPSIN misreads), CAS numbers, InChIKey, names OPSIN reads */
-        const D = { smiles: [], name: new Map(), first: new Map(), cas: new Map(), key: new Map() },
+        const D = { smiles: [], name: new Map(), first: new Map(), cas: new Map(), key: new Map(), casOf: [] },
           lines = new TextDecoder().decode(F['dictionary.tsv.gz']).split('\n');
         for (let i = 0; i < lines.length; i++) {
           if (i % 4000 === 3999) await new Promise(r => setTimeout(r, 0));
           const [s, ns, cs, key] = lines[i].split('\t');
           if (!s || s.length > 4000) continue;
           const n = D.smiles.push(s) - 1;
+          D.casOf[n] = cs || '';
           for (const raw of ns ? ns.split('|') : []) {
             const name = raw.replace(/^!/, ''),
               k = nreadKey(name);
@@ -33967,7 +34223,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       I.appendChild(b);
       return;
     }
-    const k = currentSmiles() + '|' + nameKey();
+    /* (whether something is selected counts too: PubChem is asked only for a selected molecule) */
+    const k = currentSmiles() + '|' + nameKey() + '|' + (sel.size ? 's' : '');
     if (k === inchiFor) return;
     inchiFor = k;
     const I = $('inchi'),
@@ -33975,6 +34232,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       N = $('inchiNote');
     if (!mol.atoms.length) {
       I.textContent = K.textContent = N.textContent = '';
+      casFill(null, k);
       return;
     }
     inchiOf()
@@ -33986,6 +34244,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         I.textContent = r.ok ? r.inchi : '';
         K.textContent = r.ok ? r.key : '';
+        casFill(r.ok ? r : null, k);
         N.textContent = r.ok
           ? r.message
             ? 'Note: ' + r.message
@@ -33999,6 +34258,113 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         N.textContent = e.message;
       });
   }
+  /* the CAS number: from the dictionary of names by the InChIKey (the dictionary is here in the apps; in the web version once
+     it has been downloaded, else on asking); for one selected molecule PubChem can be asked, only on the button */
+  const casOk = c => {
+    const m = /^(\d{2,7})-(\d{2})-(\d)$/.exec(c);
+    if (!m) return false;
+    const d = (m[1] + m[2]).split('').reverse();
+    return d.reduce((t, x, i) => t + (i + 1) * +x, 0) % 10 === +m[3];
+  };
+  let casFor = null;
+  /* the selection is one compound: one molecule, or a salt (charged parts whose charges add up to nothing, as Na⁺ Cl⁻ or
+     a hydrochloride drawn as its ions); two neutral molecules are not one */
+  function casOneCompound() {
+    const ids = new Set([...sel].filter(id => atomById(id))),
+      adj = new Map([...ids].map(id => [id, []]));
+    for (const b of mol.bonds)
+      if (ids.has(b.a) && ids.has(b.b)) {
+        adj.get(b.a).push(b.b);
+        adj.get(b.b).push(b.a);
+      }
+    const seen = new Set(),
+      q = [];
+    for (const id of ids) {
+      if (seen.has(id)) continue;
+      let c = 0;
+      const st = [id];
+      seen.add(id);
+      while (st.length) {
+        const x = st.pop();
+        c += +atomById(x).chg || 0;
+        for (const y of adj.get(x)) if (!seen.has(y)) seen.add(y), st.push(y);
+      }
+      q.push(c);
+    }
+    return q.length === 1 || (q.length > 1 && q.every(c => c !== 0) && q.reduce((a, c) => a + c, 0) === 0);
+  }
+  function casFill(r, k) {
+    const C = $('casNo'),
+      Nt = $('casNote'),
+      Pb = $('pubchemCas');
+    casFor = r ? { key: r.key, k, one: !!sel.size && casOneCompound() } : null;
+    C.textContent = Nt.textContent = '';
+    /* dimmed rather than switched off: a click then says what to select */
+    Pb.classList.toggle('dim', !(casFor && casFor.one));
+    Pb.style.opacity = casFor && casFor.one ? '' : '.5';
+    Pb.title = casFor && casFor.one ? 'Ask PubChem (pubchem.ncbi.nlm.nih.gov) for the CAS number of the selected molecule: only its InChIKey is sent' : 'Select one compound (a molecule or a salt) to ask PubChem for its CAS number';
+    if (!r) return;
+    const show = () => {
+      if (!casFor || casFor.k !== k) return;
+      const D = NREAD.dict,
+        i = D && D.key.get(r.key),
+        cs = i != null ? String(D.casOf[i] || '').split('|').filter(Boolean) : [];
+      C.textContent = cs.join(', ');
+      Nt.textContent = cs.length ? '' : D ? 'Not in the dictionary of names' + (casFor.one ? ': Search PubChem can look it up.' : '.') : '';
+    };
+    if (NREAD.dict) return show();
+    /* the dictionary not read yet: read it if it is here (the apps, or downloaded before); else offer it */
+    namesEnsure(false)
+      .then(ok => {
+        if (ok) return show();
+        if (!casFor || casFor.k !== k) return;
+        Nt.textContent = '';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn ghost sm';
+        b.textContent = 'Look it up in the dictionary of names';
+        b.onclick = () =>
+          namesEnsure(true)
+            .then(ok2 => (ok2 ? show() : null))
+            .catch(e => (Nt.textContent = e.message));
+        C.appendChild(b);
+      })
+      .catch(e => {
+        if (casFor && casFor.k === k) Nt.textContent = e.message;
+      });
+  }
+  $('copyCas').onclick = () => {
+    const t = [...$('casNo').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
+    if (t) copyText(t, 'CAS number copied');
+    else toast($('casNote').textContent || 'No CAS number', true);
+  };
+  $('pubchemCas').onclick = async () => {
+    const F = casFor,
+      Nt = $('casNote');
+    if (!F || !F.one) return toast('Select one compound (a molecule or a salt) to ask PubChem for its CAS number', true);
+    Nt.textContent = 'Asking PubChem…';
+    try {
+      const r = await fetch('https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/' + encodeURIComponent(F.key) + '/synonyms/JSON');
+      if (casFor !== F) return;
+      if (r.status === 404) {
+        Nt.textContent = 'PubChem has no compound with this InChIKey.';
+        return;
+      }
+      if (!r.ok) throw new Error('PubChem answered ' + r.status);
+      const j = await r.json(),
+        syn = ((j.InformationList && j.InformationList.Information) || []).flatMap(x => x.Synonym || []),
+        cs = [...new Set(syn.map(x => String(x).trim()).filter(casOk))];
+      if (casFor !== F) return;
+      if (!cs.length) {
+        Nt.textContent = 'PubChem lists no CAS number for it.';
+        return;
+      }
+      $('casNo').textContent = cs.slice(0, 3).join(', ');
+      Nt.textContent = 'From PubChem' + (cs.length > 3 ? ' (' + cs.length + ' numbers; the first ' + 3 + ' shown)' : '') + '.';
+    } catch (e) {
+      if (casFor === F) Nt.textContent = 'Could not ask PubChem: ' + ((e && e.message) || e);
+    }
+  };
   $('copyInchi').onclick = () => {
     const t = $('inchi').textContent;
     if (t) copyText(t, 'InChI copied');
@@ -36291,6 +36657,202 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .sort((p, q) => (p[1] == null) - (q[1] == null) || (p[1] != null ? p[1] - q[1] : 0) || p[2] - q[2])
       .map(x => x[0]);
   }
+  /* ===== CML (Chemical Markup Language, xml-cml.org): written from the Molfiles of the compounds, read back to them =====
+     A compound: <molecule> with <atomArray> (elementType, x2/y2 in Å, x3/y3/z3 for a 3D one, formalCharge, isotopeNumber)
+     and <bondArray> (atomRefs2, order 1/2/3, bondStereo W or H at the narrow end's atom first); a reaction: <reaction>
+     with its reactants and products */
+  function molParts(block) {
+    const L = String(block).split('\n'),
+      A = [],
+      B = [];
+    if (/V3000/.test(L[3] || '')) {
+      let sec = '';
+      for (const l of L) {
+        if (!l.startsWith('M  V30 ')) continue;
+        const t = l.slice(7).trim();
+        if (/^BEGIN (ATOM|BOND)/.test(t)) sec = t.slice(6);
+        else if (/^END/.test(t)) sec = '';
+        else if (sec === 'ATOM') {
+          const f = t.split(/\s+/),
+            kv = Object.fromEntries(f.slice(6).map(x => x.split('=')));
+          A.push({ el: f[1], x: +f[2], y: +f[3], z: +f[4], chg: +kv.CHG || 0, iso: +kv.MASS || 0 });
+        } else if (sec === 'BOND') {
+          const f = t.split(/\s+/),
+            kv = Object.fromEntries(f.slice(4).map(x => x.split('=')));
+          B.push({ a: +f[2] - 1, b: +f[3] - 1, o: +f[1], st: +kv.CFG === 1 ? 'W' : +kv.CFG === 3 ? 'H' : '' });
+        }
+      }
+      return { A, B };
+    }
+    const na = parseInt((L[3] || '').slice(0, 3)),
+      nb = parseInt((L[3] || '').slice(3, 6));
+    for (let i = 0; i < na; i++) {
+      const l = L[4 + i] || '';
+      A.push({ el: l.slice(31, 34).trim(), x: +l.slice(0, 10), y: +l.slice(10, 20), z: +l.slice(20, 30) || 0, chg: 0, iso: 0 });
+    }
+    for (let i = 0; i < nb; i++) {
+      const l = L[4 + na + i] || '',
+        st = parseInt(l.slice(9, 12)) || 0;
+      B.push({ a: parseInt(l.slice(0, 3)) - 1, b: parseInt(l.slice(3, 6)) - 1, o: parseInt(l.slice(6, 9)), st: st === 1 ? 'W' : st === 6 ? 'H' : '' });
+    }
+    for (let j = 4 + na + nb; j < L.length; j++) {
+      const l = L[j];
+      if (l.startsWith('M  END')) break;
+      if (/^A  \s*\d+/.test(l)) {
+        const ai = parseInt(l.slice(3)) - 1;
+        if (A[ai]) A[ai].alias = (L[j + 1] || '').trim();
+        j++;
+      } else if (/^M  (CHG|ISO)/.test(l)) {
+        const n = parseInt(l.slice(6, 9)),
+          k2 = l.slice(3, 6) === 'CHG' ? 'chg' : 'iso';
+        for (let k = 0; k < n; k++) {
+          const ai = parseInt(l.slice(10 + k * 8, 13 + k * 8)) - 1;
+          if (A[ai]) A[ai][k2] = parseInt(l.slice(14 + k * 8, 17 + k * 8));
+        }
+      }
+    }
+    return { A, B };
+  }
+  function cmlMolecule(block, id, title, ind) {
+    const { A, B } = molParts(block),
+      d3 = A.some(a => Math.abs(a.z) > 1e-4),
+      f = v => (+v).toFixed(4),
+      X = xmlEsc;
+    const at = A.map((a, i) => {
+      const el = a.el === 'R#' ? 'R' : a.el === 'D' ? 'H' : /^[A-Z][a-z]?$/.test(a.el) && a.el in AW ? a.el : a.el === 'H' ? 'H' : 'R';
+      return (
+        `${ind}    <atom id="a${i + 1}" elementType="${el}"` +
+        (d3 ? ` x3="${f(a.x)}" y3="${f(a.y)}" z3="${f(a.z)}"` : ` x2="${f(a.x)}" y2="${f(a.y)}"`) +
+        (a.chg ? ` formalCharge="${a.chg}"` : '') +
+        (a.el === 'D' ? ' isotopeNumber="2"' : a.iso ? ` isotopeNumber="${a.iso}"` : '') +
+        (a.alias || (el === 'R' && a.el !== 'R#') ? ` title="${X(a.alias || a.el)}"` : '') +
+        '/>'
+      );
+    });
+    const bd = B.map(
+      b =>
+        `${ind}    <bond atomRefs2="a${b.a + 1} a${b.b + 1}" order="${b.o === 4 ? 'A' : b.o >= 1 && b.o <= 3 ? b.o : 1}"` +
+        (b.st ? `><bondStereo>${b.st}</bondStereo></bond>` : '/>')
+    );
+    return (
+      `${ind}<molecule id="${id}"${title ? ` title="${X(title)}"` : ''}>\n` +
+      `${ind}  <atomArray>\n${at.join('\n')}\n${ind}  </atomArray>\n` +
+      (bd.length ? `${ind}  <bondArray>\n${bd.join('\n')}\n${ind}  </bondArray>\n` : '') +
+      `${ind}</molecule>`
+    );
+  }
+  /* blocks: [{block, role: 'r' | 'p' | other, title}]; with a reaction its reactants and products go inside <reaction> */
+  function cmlOf(blocks, reaction) {
+    let n = 0;
+    const mol1 = (x, ind) => cmlMolecule(x.block, 'm' + ++n, x.title, ind),
+      R = reaction ? blocks.filter(x => x.role === 'r') : [],
+      P = reaction ? blocks.filter(x => x.role === 'p') : [],
+      rest = blocks.filter(x => !R.includes(x) && !P.includes(x)),
+      out = ['<?xml version="1.0" encoding="UTF-8"?>', '<cml xmlns="http://www.xml-cml.org/schema">'];
+    if (R.length || P.length) {
+      out.push('  <reaction id="r1">');
+      for (const [tag, G] of [
+        ['reactant', R],
+        ['product', P]
+      ])
+        if (G.length) {
+          out.push(`    <${tag}List>`);
+          for (const x of G) out.push(`      <${tag}>`, mol1(x, '        '), `      </${tag}>`);
+          out.push(`    </${tag}List>`);
+        }
+      out.push('  </reaction>');
+    }
+    for (const x of rest) out.push(mol1(x, '  '));
+    out.push('</cml>', '');
+    return out.join('\n');
+  }
+  /* CML read: each <molecule> with atoms as a Molfile (an SDF), a <reaction> with reactants and products as an RXN */
+  function cmlToMdl(text) {
+    const doc = new DOMParser().parseFromString(text, 'application/xml');
+    if (doc.querySelector('parsererror')) throw new Error('not well-formed XML');
+    const kids = (e, n) => [...e.children].filter(c => c.localName === n),
+      all = (e, n) => [...e.getElementsByTagNameNS('*', n)],
+      num = v => (v == null || v === '' ? 0 : +v);
+    const block = m => {
+      const aa = all(m, 'atomArray')[0],
+        ba = all(m, 'bondArray')[0];
+      if (!aa) return null;
+      let atoms = [];
+      const at = all(aa, 'atom');
+      if (at.length)
+        atoms = at.map(a => ({
+          id: a.getAttribute('id'),
+          el: a.getAttribute('elementType') || 'C',
+          x: num(a.getAttribute('x2') ?? a.getAttribute('x3')),
+          y: num(a.getAttribute('y2') ?? a.getAttribute('y3')),
+          z: a.hasAttribute('x2') ? 0 : num(a.getAttribute('z3')),
+          chg: Math.round(num(a.getAttribute('formalCharge'))),
+          iso: Math.round(num(a.getAttribute('isotopeNumber'))),
+          title: a.getAttribute('title') || ''
+        }));
+      else {
+        /* the array form: atomID="a1 a2" elementType="C O" x2="…" y2="…" */
+        const g = n => (aa.getAttribute(n) || '').trim().split(/\s+/).filter(Boolean),
+          ids = g('atomID'),
+          els = g('elementType'),
+          xs = g('x2').length ? g('x2') : g('x3'),
+          ys = g('y2').length ? g('y2') : g('y3'),
+          zs = g('x2').length ? [] : g('z3'),
+          cs = g('formalCharge');
+        atoms = ids.map((id, i) => ({ id, el: els[i] || 'C', x: num(xs[i]), y: num(ys[i]), z: num(zs[i]), chg: Math.round(num(cs[i])), iso: 0, title: '' }));
+      }
+      if (!atoms.length) return null;
+      const ix = new Map(atoms.map((a, i) => [a.id, i + 1]));
+      let bonds = [];
+      if (ba) {
+        const bt = all(ba, 'bond');
+        if (bt.length)
+          bonds = bt.map(b => {
+            const r = (b.getAttribute('atomRefs2') || '').trim().split(/\s+/),
+              st = (all(b, 'bondStereo')[0] || {}).textContent;
+            return { a: ix.get(r[0]), b: ix.get(r[1]), o: b.getAttribute('order') || '1', st: (st || '').trim() };
+          });
+        else {
+          const g = n => (ba.getAttribute(n) || '').trim().split(/\s+/).filter(Boolean),
+            r1 = g('atomRef1'),
+            r2 = g('atomRef2'),
+            os = g('order');
+          bonds = r1.map((x, i) => ({ a: ix.get(x), b: ix.get(r2[i]), o: os[i] || '1', st: '' }));
+        }
+      }
+      bonds = bonds.filter(b => b.a && b.b);
+      /* no coordinates at all: in a row, Reactio Draw cleans the structure up when it comes in */
+      const flat = atoms.every(a => !a.x && !a.y);
+      const pad = (v, n) => String(v).padStart(n),
+        f = v => (+v).toFixed(4).padStart(10),
+        ord = o => ({ 1: 1, S: 1, 2: 2, D: 2, 3: 3, T: 3, A: 4, 1.5: 4 })[String(o).toUpperCase()] || 1,
+        L = [(m.getAttribute('title') || m.getAttribute('id') || '').slice(0, 80), '  Reactio Draw (CML)', '', pad(atoms.length, 3) + pad(bonds.length, 3) + '  0  0  0  0  0  0  0  0999 V2000'];
+      atoms.forEach((a, i) => {
+        const el = a.el === 'R' || a.el === 'Du' || a.el === 'Xx' ? 'R#' : a.el;
+        L.push(f(flat ? i * 1.5 : a.x) + f(a.y) + f(a.z) + ' ' + el.padEnd(3) + ' 0  0  0  0  0  0  0  0  0  0  0  0');
+      });
+      for (const b of bonds) L.push(pad(b.a, 3) + pad(b.b, 3) + pad(ord(b.o), 3) + pad(/^W/i.test(b.st) ? 1 : /^H/i.test(b.st) ? 6 : 0, 3));
+      const ch = atoms.map((a, i) => [i + 1, a.chg]).filter(x => x[1]),
+        is = atoms.map((a, i) => [i + 1, a.iso]).filter(x => x[1]);
+      for (let k = 0; k < ch.length; k += 8) L.push('M  CHG' + pad(ch.slice(k, k + 8).length, 3) + ch.slice(k, k + 8).map(([i, v]) => pad(i, 4) + pad(v, 4)).join(''));
+      for (let k = 0; k < is.length; k += 8) L.push('M  ISO' + pad(is.slice(k, k + 8).length, 3) + is.slice(k, k + 8).map(([i, v]) => pad(i, 4) + pad(v, 4)).join(''));
+      atoms.forEach((a, i) => {
+        if (a.title && (a.el === 'R' || a.el === 'Du')) L.push('A  ' + pad(i + 1, 3), a.title);
+      });
+      L.push('M  END');
+      return L.join('\n');
+    };
+    const rx = all(doc, 'reaction')[0];
+    if (rx) {
+      const R = all(rx, 'reactant').map(x => all(x, 'molecule')[0]).filter(Boolean).map(block).filter(Boolean),
+        P = all(rx, 'product').map(x => all(x, 'molecule')[0]).filter(Boolean).map(block).filter(Boolean);
+      if (R.length || P.length) return { rxn: '$RXN\n\n  Reactio Draw (CML)\n\n' + String(R.length).padStart(3) + String(P.length).padStart(3) + '\n' + [...R, ...P].map(b => '$MOL\n' + b).join('\n') + '\n' };
+    }
+    const M = all(doc, 'molecule').filter(m => !all(m, 'molecule').length || all(m, 'atomArray').length).filter(m => kids(m, 'atomArray').length);
+    const S = M.map(block).filter(Boolean);
+    if (!S.length) throw new Error('no molecule with atoms in it');
+    return { sdf: S.map(b => b + '\n$$$$').join('\n') + '\n' };
+  }
   function exportFormats() {
     const saved = mol;
     const m = expandedCopy();
@@ -36324,7 +36886,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } finally {
         ks.forEach(i => sel.add(i));
       }
-      return { mol: all, sdf, rxn, smi, cdxml: cdxmlOf(withGridsOut(m), sch) };
+      const cml = cmlOf(
+        groups.map((x, i) => ({ block: molBlockE(numOrder(x.fr), fragBonds(m, x.fr), ''), role: x.role, title: 'compound ' + (i + 1) })),
+        !!sch.ar
+      );
+      return { mol: all, sdf, rxn, smi, cml, cdxml: cdxmlOf(withGridsOut(m), sch) };
     } finally {
       mol = saved;
       MOL_SRU = false;
@@ -37744,11 +38310,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '<label>Orientation <select data-k="or"><option value="portrait">Portrait</option><option value="landscape">Landscape</option></select></label>' +
       MARGIN_HTML +
       '<div class="tx" data-k="n"></div>' +
+      '<div class="pview" data-k="pv" title="Print preview: each page as it will print (the dashed line: the margins)"></div>' +
       '<div class="row"><button data-k="no">Cancel</button><button class="pri" data-k="go">Print</button></div></div>';
     document.body.appendChild(b);
     const sz = b.querySelector('[data-k=size]'),
       or = b.querySelector('[data-k=or]'),
       nEl = b.querySelector('[data-k=n]'),
+      pv = b.querySelector('[data-k=pv]'),
       M = marginInputs(b, pg),
       C = customInputs(b, pg);
     if (pg.size) sz.value = pg.size;
@@ -37762,12 +38330,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       C.show(sz.value === 'custom');
       M.enable(sz.value !== 'fit');
       M.orient(or.value);
+      /* the preview: each page to scale, white, the printed part of the drawing on it inside the margins */
+      const H0 = 190;
       if (sz.value === 'fit') {
         nEl.textContent = 'One page, the drawing no wider than the paper.';
+        let svgT = '';
+        try {
+          svgT = svgOf(false);
+        } catch (e) {}
+        /* the printer's own paper (A4 upright here), 15 mm margins, the drawing no wider than the page */
+        const W = (H0 * 210) / 297,
+          m = (H0 * 15) / 297;
+        pv.innerHTML = `<div class="pp" style="width:${W}px;height:${H0}px"><div style="left:${m}px;top:${m}px;width:${W - 2 * m}px;height:${H0 - 2 * m}px;outline:0;display:flex;justify-content:center;align-items:flex-start">${svgT.replace(/ width="[\d.]+" height="[\d.]+"/, ' width="100%" style="height:auto;max-height:100%"')}</div></div>`;
         return;
       }
-      const n = pageTiles(dimsNow()).tiles.length;
+      const d = dimsNow(),
+        T = pageTiles(d),
+        n = T.tiles.length;
       nEl.textContent = n + (n === 1 ? ' page' : ' pages') + ' at the drawing’s true size.';
+      const k = H0 / d.hpt,
+        W = d.wpt * k;
+      pv.innerHTML = (T.svgs || [])
+        .slice(0, 24)
+        .map(
+          (v, i) =>
+            `<div class="pp" style="width:${W}px;height:${H0}px"><div style="position:absolute;left:${d.left * k}px;top:${d.top * k}px;width:${d.cw * k}px;height:${d.ch * k}px${d.left || d.top ? ';outline:1px dashed #a9b7da' : ''}">${v.svg.replace(/ width="[\d.]+" height="[\d.]+"/, ' width="100%" height="100%"')}</div>${n > 1 ? `<span class="pn">${i + 1}</span>` : ''}</div>`
+        )
+        .join('') + (n > 24 ? `<div class="tx">and ${n - 24} more</div>` : '');
     };
     sz.onchange = () => {
       if (sz.value !== 'fit' && !pg.size) or.value = PAGE_ACROSS.test(sz.value) ? 'landscape' : 'portrait';
@@ -39389,6 +39978,336 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
   }
+  /* ===== a figure for LaTeX (Copy for LaTeX): the drawing as a PDF without the texts that carry [[key]] marks, and a .tex
+     that sets those texts over it, each mark as chemnum's \cmpd{key}; so the numbers on the drawing and in the text are the
+     same and in the document's own font. The .tex is the file a document includes; its first line names the drawing it was
+     made from (the editable-figure manifest, docs/latex.md) */
+  let texHide = null;
+  const TEX_ESC = {
+    '\\': '\\textbackslash{}',
+    '{': '\\{',
+    '}': '\\}',
+    '#': '\\#',
+    $: '\\$',
+    '%': '\\%',
+    '&': '\\&',
+    _: '\\_',
+    '~': '\\textasciitilde{}',
+    '^': '\\textasciicircum{}',
+    '−': '-',
+    ' ': '~'
+  };
+  const texEsc = s =>
+    String(s)
+      .replace(/[\\{}#$%&_~^− ]/g, c => TEX_ESC[c])
+      .replace(/[₀-₉]+/g, d => '\\textsubscript{' + [...d].map(c => c.charCodeAt(0) - 0x2080).join('') + '}')
+      .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, d => '\\textsuperscript{' + [...d].map(c => SUPDIG[c]).join('') + '}');
+  /* what a figure's marks need in the preamble: \rcmpd takes what is inside [[ ]] (chemnum for numbers, a counter per series) */
+  const RCMPD_PREAMBLE = [
+    String.raw`% Compound marks from drawings: \rcmpd{what is inside [[ ]]}, added for editable figures`,
+    String.raw`\makeatletter`,
+    String.raw`\providecommand\rcmpd@series[2]{%`,
+    String.raw`  \@ifundefined{cmpdser@#1@#2}{%`,
+    String.raw`    \@ifundefined{c@cmpdser#1}{\newcounter{cmpdser#1}}{}%`,
+    String.raw`    \stepcounter{cmpdser#1}%`,
+    String.raw`    \expandafter\xdef\csname cmpdser@#1@#2\endcsname{\csname rcmpd@style@#1\endcsname{\value{cmpdser#1}}}%`,
+    String.raw`    \immediate\write\@auxout{\string\cmpdser@aux{#1}{#2}{\csname cmpdser@#1@#2\endcsname}}%`,
+    String.raw`  }{}%`,
+    String.raw`  \textbf{\csname cmpdser@#1@#2\endcsname}%`,
+    String.raw`}`,
+    String.raw`\providecommand\cmpdser@aux[3]{}`,
+    String.raw`\providecommand\rcmpd@style@A[1]{\@Alph{#1}}`,
+    String.raw`\providecommand\rcmpd@style@a[1]{\@alph{#1}}`,
+    String.raw`\providecommand\rcmpd@style@I[1]{\@Roman{#1}}`,
+    String.raw`\providecommand\rcmpd@style@i[1]{\@roman{#1}}`,
+    String.raw`\makeatother`,
+    String.raw`\ExplSyntaxOn`,
+    /* one definition, robust, with nothing else at the top level: a LaTeX editor adds that without asking */
+    String.raw`\ProvideDocumentCommand \rcmpd { m }`,
+    String.raw`  {`,
+    String.raw`    \regex_match:nnTF { \A [A-Za-z0-9_-] } {#1}`,
+    String.raw`      {`,
+    String.raw`        \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq`,
+    String.raw`          { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }`,
+    String.raw`          {`,
+    String.raw`            \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. (num|dash) \Z } {#1} \l_tmpa_seq`,
+    String.raw`              {`,
+    String.raw`                \use:e`,
+    String.raw`                  {`,
+    String.raw`                    \exp_not:N \cmpd`,
+    String.raw`                    [ post-main-label-code = \str_if_eq:eeTF { \seq_item:Nn \l_tmpa_seq { 3 } } { num } { . } { - } , sub-counter-format = arabic ]`,
+    String.raw`                    { \seq_item:Nn \l_tmpa_seq { 2 } }`,
+    String.raw`                  }`,
+    String.raw`              }`,
+    String.raw`              {`,
+    String.raw`                \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. letter \Z } {#1} \l_tmpa_seq`,
+    String.raw`                  { \use:e { \exp_not:N \cmpd { \seq_item:Nn \l_tmpa_seq { 2 } } } }`,
+    String.raw`                  { \cmpd {#1} }`,
+    String.raw`              }`,
+    String.raw`          }`,
+    String.raw`      }`,
+    String.raw`      { \textbf { ?? } }`,
+    String.raw`  }`,
+    String.raw`\ExplSyntaxOff`
+  ];
+  /* one line of a text with marks as LaTeX: the marks as \cmpd, sub- and superscripts, bold and italic kept */
+  function texLine(s, N) {
+    const RX =
+      /\[\[#[^\]]*\]\]|\[\[((?:[AaIi]:)?[A-Za-z0-9_-]+)(?:\.([A-Za-z0-9_-]+)(?:\.(letter|num|dash))?)?\]\]|([_^]|\\[biu]|\\f\[[^\]{}]*\]|\\c\[[^\]{}]*\])\{([^{}]*)\}/g;
+    let out = '',
+      last = 0;
+    for (const m of String(s).matchAll(RX)) {
+      out += texEsc(s.slice(last, m.index));
+      last = m.index + m[0].length;
+      if (m[1]) {
+        const key = m[1],
+          sub = m[2] || '';
+        /* the mark's own text: the drawing and the document write the same thing */
+        out += '\\rcmpd{' + key + (sub ? '.' + sub : '') + (m[3] ? '.' + m[3] : '') + '}';
+      } else if (m[4]) {
+        const inner = texLine(m[5], N),
+          op = m[4];
+        out +=
+          op === '_'
+            ? '\\textsubscript{' + inner + '}'
+            : op === '^'
+              ? '\\textsuperscript{' + inner + '}'
+              : op === '\\b'
+                ? '\\textbf{' + inner + '}'
+                : op === '\\i'
+                  ? '\\textit{' + inner + '}'
+                  : op === '\\u'
+                    ? '\\underline{' + inner + '}'
+                    : inner;
+      }
+    }
+    return out + texEsc(s.slice(last));
+  }
+  const hasMark = s => /\[\[(?:[AaIi]:)?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+(?:\.(?:letter|num|dash))?)?\]\]/.test(String(s || ''));
+  /* name: the figure's file name without extension (name.pdf, name.tex); src: the drawing's file name for the first line */
+  async function latexFigureOf(name, src) {
+    const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
+    let svg;
+    texHide = new Set(T.map(t => t.id));
+    try {
+      svg = svgOf(true);
+    } finally {
+      texHide = null;
+      render();
+    }
+    const pdf = await pdfOf([svg]);
+    const [X0, Y0, VW, VH] = /viewBox="([^"]+)"/.exec(svg)[1].split(/\s+/).map(Number),
+      k = 1 / printPtPx(),
+      f = v => (Math.round(v * 10000) / 10000).toString(),
+      head = `% editable-figure source: ${src || name + '.reactio'}\n`;
+    /* at most the line wide and 80% of the text high, as large as drawn otherwise; a figure's own LaTeX, no extra package */
+    const fit =
+      '\\begingroup\n' +
+      `\\sbox0{\\includegraphics{${name}.pdf}}%\n` +
+      '\\edef\\rdw{\\the\\ifdim\\wd0>\\linewidth\\linewidth\\else\\wd0\\fi}%\n' +
+      '\\edef\\rdh{\\the\\ifdim\\ht0>.8\\textheight\\dimexpr.8\\textheight\\relax\\else\\ht0\\fi}%\n',
+      fitted = `\\includegraphics[width=\\rdw,height=\\rdh,keepaspectratio]{${name}.pdf}`;
+    if (!T.length)
+      return { pdf, tex: head + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
+    /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
+    const N = cmpdNumberer('{n}', 1);
+    for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
+    const nodes = [];
+    for (const t of T) {
+      const tpl = String(t.ctpl || t.text),
+        lines = tLines({ ...t, text: tpl }),
+        /* where the lines are: as shown on the sheet (numbers, once numbered for Word), else as written */
+        g = t.ctpl && tLines(t).length === lines.length ? t : { ...t, text: tpl },
+        gl = tLines(g),
+        W = textW(g),
+        al = t.align || 'left',
+        fs = Math.round(tSize(t) * k * 2) / 2,
+        font =
+          `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont` +
+          (t.bold ? '\\bfseries' : '') +
+          (t.italic ? '\\itshape' : '') +
+          ' ';
+      lines.forEach((l, i) => {
+        if (!String(l).trim()) return;
+        const lw = lineW(g, gl[i]),
+          x = (al === 'center' ? g.x + (W - lw) / 2 : al === 'right' ? g.x + W - lw : g.x) + lw / 2,
+          y = t.y + i * tLH(t);
+        nodes.push(`    \\node at (${f((x - X0) / VW)},${f((Y0 + VH - y) / VH)}) {${font}${texLine(l, N)}};`);
+      });
+    }
+    const tex =
+      head +
+      `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
+      fit +
+      '\\begin{tikzpicture}\n' +
+      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${fitted}};\n` +
+      '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
+      nodes.join('\n') +
+      '\n  \\end{scope}\n\\end{tikzpicture}%\n\\endgroup%\n';
+    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
+  }
+  /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
+     figure a LaTeX editor pastes, without changing Ctrl+C. The clipboard gets HTML holding the editable-figure manifest (a
+     data-editable-figure attribute: the drawing, the PDF and the .tex, docs/latex.md) and as plain text the line that
+     includes the figure, for other editors. In the apps, for a drawing kept in a .reactio file, the files are written
+     next to it (saved first) and the manifest gives their paths; otherwise (a browser, which cannot write files, or a
+     drawing not saved yet) they go in the manifest itself */
+  /* Cyrillic in Latin letters, accents dropped: Схема 1 is Skhema_1. The table and the rule are the same in macapp/main.swift and the Go apps */
+  const TEX_LATIN = new Map(
+    'а a б b в v г g ґ g д d е e ё yo є ye ж zh з z и i і i ї yi й y к k л l м m н n о o п p р r с s т t у u ў u ф f х kh ц ts ч ch ш sh щ shch ъ - ы y ь - э e ю yu я ya à a á a â a ã a ä a å a ā a ă a ą a æ ae ç c ć c č c ď d đ d è e é e ê e ë e ē e ė e ę e ě e ğ g ì i í i î i ï i ī i ı i ł l ñ n ń n ň n ò o ó o ô o õ o ö o ø o ō o ő o œ oe ř r ś s š s ş s ß s ť t ù u ú u û u ü u ū u ů u ű u ý y ÿ y ź z ż z ž z'.match(/\S+ \S+/g).map(p => p.split(' '))
+  );
+  const latinName = s =>
+    [...String(s).normalize('NFC')]
+      .map(c => {
+        const t = TEX_LATIN.get(c.toLowerCase());
+        if (t == null) return c;
+        if (t === '-') return '';
+        return c === c.toLowerCase() ? t : t[0].toUpperCase() + t.slice(1);
+      })
+      .join('')
+      .replace(/[\u0300-\u036f]/g, '');
+  /* a name as figures were called before the rule above: an existing figure keeps its files */
+  const plainStem = s => {
+    s = String(s);
+    const i = s.lastIndexOf('.');
+    return (i > 0 ? s.slice(0, i) : s).replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '') || 'figure';
+  };
+  const texStem = s => plainStem(latinName(s));
+  const b64of = u => {
+    u = typeof u === 'string' ? new TextEncoder().encode(u) : u;
+    let s = '';
+    for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192));
+    return btoa(s);
+  };
+  /* may a figure be written beside this drawing: neither file there yet, or the .tex names this drawing */
+  const figureFilesFree = (tex, pdf, name) =>
+    String((tex && tex.line) || '').trim() === '% editable-figure source: ' + name || (!(tex && tex.exists) && !(pdf && pdf.exists));
+  /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
+  const siblingDir = t => t.file.path.slice(0, Math.max(t.file.path.lastIndexOf('/'), t.file.path.lastIndexOf('\\')) + 1);
+  const siblingStem = t => siblingDir(t) + texStem(t.file.name);
+  /* the stem of the figure beside this drawing: an older figure of it keeps its name, so documents that include it go on working */
+  async function besideStem(t) {
+    const now = texStem(t.file.name),
+      old = plainStem(t.file.name);
+    if (old === now) return now;
+    const h = await window.rdNative.call('texHead', { path: siblingDir(t) + old + '.tex' });
+    return h && String(h.line || '').trim() === '% editable-figure source: ' + t.file.name ? old : now;
+  }
+  async function writeFigureBeside(t) {
+    const stem = await besideStem(t),
+      f = await latexFigureOf(stem, t.file.name);
+    for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
+      const path = siblingDir(t) + stem + '.' + ext,
+        r = await window.rdNative.call('write', { path, b64: b64of(body) });
+      if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
+    }
+    return { stem, f };
+  }
+  /* after a Save: a figure made from this file (the .tex next to it says so on its first line) follows the drawing */
+  async function refreshLatexFigure() {
+    const t = curTab();
+    if (!NATIVE_FILES() || !(t && t.file && /\.reactio$/i.test(t.file.path || ''))) return;
+    try {
+      const h = await window.rdNative.call('texHead', { path: siblingDir(t) + (await besideStem(t)) + '.tex' });
+      if (!h || String(h.line || '').trim() !== '% editable-figure source: ' + t.file.name) return;
+      await writeFigureBeside(t);
+      nlog('LaTeX figure updated');
+    } catch (e) {
+      console.error(e);
+      toast('Saved, but the LaTeX figure was not updated: ' + ((e && e.message) || e), true);
+    }
+  }
+  async function latexClip() {
+    if (!mol.atoms.length && !mol.arrows.length && !mol.texts.length) throw new Error('Nothing to copy');
+    let man;
+    const t0 = curTab();
+    /* a drawing kept in a .reactio file: saved, and the figure written next to it; any other (new, unsaved, or kept as
+       CDXML…) goes only in the manifest, and the LaTeX editor keeps the .reactio it gets */
+    if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
+      if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
+      const t = curTab();
+      /* both files are written only if neither exists yet or the .tex says it is this drawing's figure: another file of
+         that name (an exported scheme.pdf, say) is left alone */
+      const beside = siblingDir(t) + (await besideStem(t)),
+        head = await window.rdNative.call('texHead', { path: beside + '.tex' }),
+        pdf = await window.rdNative.call('texHead', { path: beside + '.pdf' }),
+        free = figureFilesFree(head, pdf, t.file.name);
+      if (!free)
+        throw new Error(texStem(t.file.name) + '.tex or .pdf already exists next to the drawing and is not its figure');
+      /* the files themselves, never paths: a LaTeX editor must not read local paths named on a clipboard */
+      const { stem, f } = await writeFigureBeside(t);
+      /* the copy in the LaTeX project goes by a plain name (a file called Схема (1).reactio stays as it is here), and its .tex says so */
+      const name = texStem(t.file.name),
+        source = name + '.reactio',
+        tex = f.tex.replace(/^.*/, () => '% editable-figure source: ' + source).split(stem + '.pdf').join(name + '.pdf');
+      man = {
+        version: 1,
+        name,
+        source: { name: source, data: b64of(fileBody('reactio')) },
+        outputs: [
+          { name: name + '.pdf', data: b64of(f.pdf) },
+          { name: name + '.tex', data: b64of(tex) }
+        ],
+        entry: name + '.tex',
+        packages: f.packages,
+        ...(f.preamble ? { preamble: f.preamble } : {})
+      };
+    } else {
+      const t = curTab(),
+        stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
+        f = await latexFigureOf(stem, stem + '.reactio');
+      man = {
+        version: 1,
+        name: stem,
+        source: { name: stem + '.reactio', data: b64of(fileBody('reactio')) },
+        outputs: [
+          { name: stem + '.pdf', data: b64of(f.pdf) },
+          { name: stem + '.tex', data: b64of(f.tex) }
+        ],
+        entry: stem + '.tex',
+        packages: f.packages,
+        ...(f.preamble ? { preamble: f.preamble } : {})
+      };
+    }
+    const text = `\\begin{figure}\n  \\centering\n  \\input{figures/${man.entry.replace(/\.tex$/, '')}}\n  \\caption{}\n  \\label{fig:}\n\\end{figure}`;
+    return { man, text, html: `<div data-editable-figure="${esc(JSON.stringify(man))}">${esc(text)}</div>` };
+  }
+  async function copyLatex() {
+    const done = c =>
+      toast(
+        'Copied for LaTeX. Pasted into Lattice (github.com/leo1oel/lattice), the figure brings its files: the drawing, ' +
+          c.man.name +
+          '.pdf and ' +
+          c.man.entry +
+          '. In other editors only this is pasted: ' +
+          c.text
+      );
+    try {
+      /* Reactio Draw.app puts it on the clipboard itself */
+      if (window.rdNative && window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.rd) {
+        const c = await latexClip(),
+          r = await window.rdNative.call('cliphtml', { html: c.html, text: c.text });
+        if (!r || !r.ok) throw new Error('The clipboard could not be written');
+        done(c);
+        return;
+      }
+      if (!window.ClipboardItem || !navigator.clipboard || !navigator.clipboard.write)
+        throw new Error('The clipboard cannot be written here');
+      /* the item is handed over at once, its contents when ready: a browser lets a page write the clipboard only right after a click */
+      const pc = latexClip();
+      pc.catch(() => {});
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/html': pc.then(c => new Blob([c.html], { type: 'text/html' })),
+          'text/plain': pc.then(c => new Blob([c.text], { type: 'text/plain' }))
+        })
+      ]);
+      done(await pc);
+    } catch (e) {
+      toast((e && e.message) || 'Could not copy for LaTeX', true, 8000);
+    }
+  }
+  window.__rdCopyLatex = () => copyLatex();
   /* ===== Embedded object inside Word: binary CDX + OLE compound file + .docx =====
    CDX tag numbers and enumerations: the CDX property table of ReShiki (MIT / Apache-2.0, see the CDX reader below). */
   function cdxOfCdxml(xml) {
@@ -43723,6 +44642,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['f-sdf', 'SDF, one record per compound (.sdf, zipped)'],
     ['f-rxn', 'Reaction (.rxn, zipped)'],
     ['f-smi', 'SMILES (.smi, zipped)'],
+    ['f-cml', 'CML, Chemical Markup Language (.cml, zipped)'],
     ['docx', 'Word document with an editable embedded drawing (.docx)'],
     ['ord', 'Open Reaction Database record (.json): one reaction with its table'],
     ['svg', 'Image (.svg)'],
@@ -43748,13 +44668,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ],
     ['c-xyz', 'XYZ, 3D coordinates'],
     ['c-sdf3', 'SDF with the 3D shape'],
+    ['c-tex', 'Figure for LaTeX: PDF + .tex with the compound numbers (an editable figure for Lattice)'],
     ['h', 'Settings, labels and templates'],
     ['setx', 'Export hotkeys, button layout, my labels and templates (.json)'],
     ['seti', 'Import hotkeys, button layout, my labels and templates…'],
     ['h', 'Insert'],
     [
       'open',
-      'Open file… (.reactio, .json, .cdxml, .cdx, .mol, .sdf, .rxn, .smi, .xyz, .cif (test version), or a Reactio Draw .zip)'
+      'Open file… (.reactio, .json, .cdxml, .cdx, .mol, .sdf, .rxn, .smi, .xyz, .cml, .cif (test version), or a Reactio Draw .zip)'
     ],
     ['pic', 'Insert picture… (or paste / drop one onto the sheet)'],
     ['h', 'Word files'],
@@ -43785,7 +44706,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   const fileIn = document.createElement('input');
   fileIn.type = 'file';
-  fileIn.accept = '.reactio,.json,.docx,.zip,.mol,.sdf,.sd,.rxn,.cdxml,.smi,.smiles,.txt,.cdx,.cif,.xyz';
+  fileIn.accept = '.reactio,.json,.docx,.zip,.mol,.sdf,.sd,.rxn,.cdxml,.smi,.smiles,.txt,.cdx,.cif,.xyz,.cml';
   fileIn.hidden = true;
   document.body.appendChild(fileIn);
   const wordIn = document.createElement('input');
@@ -44686,6 +45607,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       copyOle();
       return;
     }
+    if (k === 'c-tex') {
+      copyLatex();
+      return;
+    }
     if (k === 'docx') {
       saveDocx();
       return;
@@ -44766,7 +45691,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           mol: F.mol,
           sdf: F.sdf,
           rxn: F.rxn,
-          smi: F.smi + '\n'
+          smi: F.smi + '\n',
+          cml: F.cml
         }[ext];
       if (!body) {
         toast(ext === 'rxn' ? 'Draw a reaction arrow to get an RXN.' : 'Nothing to save', true);
@@ -46054,6 +46980,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         ev.push(v);
       }
+      /* a view chosen beforehand (the XYZ window as turned there) */
+      if (blk.ev) ev.splice(0, 2, blk.ev[0], blk.ev[1]);
       const n3 = [
         ev[0][1] * ev[1][2] - ev[0][2] * ev[1][1],
         ev[0][2] * ev[1][0] - ev[0][0] * ev[1][2],
@@ -46332,7 +47260,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       X = i => 4 + (i / Math.max(1, n - 1)) * (W - 8);
       spark = `<svg class="xyzspark" viewBox="0 0 ${W} ${H}" width="100%" style="display:block;margin:8px 0 2px;cursor:pointer"><title>Energy of each geometry: click to pick one</title><polyline fill="none" style="stroke:var(--accent)" stroke-width="1.5" points="${E.map((v, i) => (v == null ? '' : X(i).toFixed(1) + ',' + Y(v).toFixed(1))).filter(Boolean).join(' ')}"/><line class="cur" x1="0" x2="0" y1="0" y2="${H}" style="stroke:var(--warn)" stroke-width="1"/></svg>`;
     }
-    box.innerHTML = `<div class="card" style="max-width:400px"><b>${esc(name)}: ${n} geometries</b><div class="note">Which to open? An optimisation or a scan ends with its final geometry.</div>${spark}
+    box.innerHTML = `<div class="card" style="max-width:420px"><b>${esc(name)}: ${n} geometries</b><div class="note">Which to open? An optimisation or a scan ends with its final geometry.</div>
+      <div style="position:relative;margin-top:8px"><canvas class="xyz3d" style="display:block;width:100%;height:240px;border:1px solid var(--line);border-radius:6px;cursor:grab;touch-action:none"><\/canvas>
+      <label class="note" style="position:absolute;right:8px;top:6px;margin:0;display:flex;gap:4px;align-items:center;white-space:nowrap" title="All the hydrogens (left off: those on carbon are hidden, as in the 3D style on the sheet)"><input type="checkbox" class="xyzh" style="margin:0">All H</label>
+      <div class="note" style="position:absolute;left:8px;bottom:4px;margin:0;opacity:.7;pointer-events:none">Drag to rotate, wheel to zoom, double-click to reset; it opens rotated as shown</div></div>${spark}
       <div class="row" style="justify-content:flex-start;gap:6px;margin-top:6px"><input type="range" min="1" max="${n}" value="${n}" style="flex:1;padding:0"><input type="number" min="1" max="${n}" value="${n}" style="width:72px"></div>
       <div class="note xyzt" style="margin-top:4px;min-height:2.6em;word-break:break-all"></div>
       <div class="row" style="justify-content:flex-start;margin-top:6px"><button type="button" data-g="1">First</button>${lo >= 0 ? `<button type="button" data-g="${lo + 1}">Lowest energy</button>` : ''}<button type="button" data-g="${n}">Last</button></div>
@@ -46342,9 +47273,207 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       num = box.querySelector('input[type=number]'),
       tx = box.querySelector('.xyzt'),
       cur = box.querySelector('.xyzspark .cur');
+    /* the geometry in 3D, rotated with the pointer, in the sheet's ball and stick style (xyzrender's default preset: balls
+       lit from the upper left with a black outline, black bonds, colours fading towards the paper with depth); the
+       rotation carries over from one geometry to the next (the frames of one file share their axes) and onto the sheet */
+    const cv = box.querySelector('.xyz3d'),
+      hcb = box.querySelector('.xyzh'),
+      cx = cv.getContext('2d'),
+      col = el => V3COL[el] || '#999999',
+      /* sizes in Å as the sheet's ball and stick: 0.1875 × the van der Waals radius (hydrogens 0.6 of it) */
+      rad = el => (V3R[el] || 1.8) * (el === 'H' ? 0.6 : 1) * 0.1875,
+      bondsOf = new Map(),
+      cenOf = new Map(),
+      mulv = (R, v) => R.map(r => r[0] * v[0] + r[1] * v[1] + r[2] * v[2]),
+      mm = (A, B) => A.map(r => [0, 1, 2].map(j => r[0] * B[0][j] + r[1] * B[1][j] + r[2] * B[2][j]));
+    let Rm = null,
+      zf = 1,
+      curK = n;
+    /* the first view: the longest extent across, the second down (as the sheet places a 3D structure) */
+    const pcaR = f => {
+      const P = f.nodes.filter(a => a.el !== 'H').map(a => a.p);
+      const Q0 = P.length >= 3 ? P : f.nodes.map(a => a.p);
+      const c0 = [0, 1, 2].map(t => Q0.reduce((s, p) => s + p[t], 0) / Q0.length),
+        Q = Q0.map(p => p.map((v, t) => v - c0[t])),
+        M = [0, 1, 2].map(a => [0, 1, 2].map(b => Q.reduce((s, q) => s + q[a] * q[b], 0))),
+        ev = [];
+      for (let e = 0; e < 2; e++) {
+        let v = e ? [0.3, 1, 0.2] : [1, 0.6, 0.3];
+        for (let it = 0; it < 80; it++) {
+          let w = M.map(row => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+          for (const u of ev) {
+            const dd = w[0] * u[0] + w[1] * u[1] + w[2] * u[2];
+            w = w.map((x, t) => x - dd * u[t]);
+          }
+          const l2 = Math.hypot(...w);
+          if (!(l2 > 1e-9)) break;
+          v = w.map(x => x / l2);
+        }
+        if (ev.length && Math.abs(v[0] * ev[0][0] + v[1] * ev[0][1] + v[2] * ev[0][2]) > 0.99) v = Math.abs(ev[0][2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+        ev.push(v);
+      }
+      /* screen rows: right, up (the second axis runs down the screen), toward the viewer */
+      const r0 = ev[0],
+        r1 = ev[1].map(x => -x),
+        r2 = [r0[1] * r1[2] - r0[2] * r1[1], r0[2] * r1[0] - r0[0] * r1[2], r0[0] * r1[1] - r0[1] * r1[0]];
+      return [r0, r1, r2];
+    };
+    const cenAt = k => {
+      if (!cenOf.has(k)) {
+        const N = frames[k - 1].nodes;
+        cenOf.set(k, [0, 1, 2].map(t => N.reduce((s, a) => s + a.p[t], 0) / N.length));
+      }
+      return cenOf.get(k);
+    };
+    /* one size for all the geometries, so they compare */
+    let rmax = 0;
+    for (let k = 1; k <= n; k += Math.max(1, Math.floor(n / 60))) {
+      const c = cenAt(k);
+      for (const a of frames[k - 1].nodes) rmax = Math.max(rmax, Math.hypot(a.p[0] - c[0], a.p[1] - c[1], a.p[2] - c[2]) + rad(a.el));
+    }
+    rmax = rmax || 1;
+    const draw = () => {
+      const f = frames[curK - 1],
+        dpr = window.devicePixelRatio || 1,
+        W = cv.clientWidth,
+        H = cv.clientHeight;
+      if (!W || !H) return;
+      if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) {
+        cv.width = Math.round(W * dpr);
+        cv.height = Math.round(H * dpr);
+      }
+      cx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      cx.clearRect(0, 0, W, H);
+      if (!Rm) Rm = pcaR(f);
+      const N = f.nodes,
+        big = N.length > 3000;
+      if (!bondsOf.has(curK)) bondsOf.set(curK, big ? [] : xyzBonds(N));
+      const B = bondsOf.get(curK),
+        c = cenAt(curK),
+        V = N.map(a => mulv(Rm, [a.p[0] - c[0], a.p[1] - c[1], a.p[2] - c[2]])),
+        sc = ((Math.min(W, H) / 2 - 10) / rmax) * zf,
+        X = v => W / 2 + v[0] * sc,
+        Y = v => H / 2 - v[1] * sc;
+      const allH = hcb.checked,
+        /* hydrogens on carbon hidden unless asked for (as the sheet's 3D style does) */
+        onC = new Set(),
+        it = [];
+      if (!allH)
+        for (const [i, j] of B) {
+          if (N[i].el === 'H' && N[j].el === 'C') onC.add(i);
+          if (N[j].el === 'H' && N[i].el === 'C') onC.add(j);
+        }
+      const seen = i => !onC.has(i);
+      let z0 = Infinity,
+        z1 = -Infinity;
+      N.forEach((a, i) => seen(i) && ((z0 = Math.min(z0, V[i][2])), (z1 = Math.max(z1, V[i][2]))));
+      const paper = v3paper(),
+        ink = v3hls(v3rgb(paper))[1] < 0.5 ? '#e2e8f1' : '#000000',
+        /* depth fog: nothing in the first 1 Å, then 1.2 × depth², at most 70 % of the way to the paper */
+        fog = z => (z1 - z0 < 1 ? 0 : Math.min(1.2 * Math.max(0, Math.min(1, (z1 - z - 1) / (z1 - z0))) ** 2, 0.7));
+      cx.fillStyle = paper;
+      cx.fillRect(0, 0, W, H);
+      N.forEach((a, i) => seen(i) && it.push({ z: V[i][2], l: 1, i }));
+      for (const [i, j] of B) if (seen(i) && seen(j)) it.push({ z: (V[i][2] + V[j][2]) / 2, l: 0, i, j });
+      it.sort((p, q) => p.z - q.z || p.l - q.l);
+      cx.lineCap = 'round';
+      for (const q of it) {
+        if (q.j == null) {
+          const a = N[q.i],
+            v = V[q.i],
+            r = Math.max(1.5, rad(a.el) * sc),
+            t = fog(v[2]),
+            [hi, me, lo] = v3tints(col(a.el), 1).map(c => v3mix(c, paper, t)),
+            g = cx.createRadialGradient(X(v) - r * 0.34, Y(v) - r * 0.34, 0, X(v), Y(v), r * 1.32);
+          g.addColorStop(0, hi);
+          g.addColorStop(0.4, me);
+          g.addColorStop(1, lo);
+          cx.fillStyle = g;
+          cx.beginPath();
+          cx.arc(X(v), Y(v), r, 0, Math.PI * 2);
+          cx.fill();
+          cx.lineWidth = Math.max(0.6, 0.063 * sc);
+          cx.strokeStyle = v3mix(ink, paper, t);
+          cx.stroke();
+        } else {
+          /* a bond from the edge of one ball to the edge of the other */
+          const A = V[q.i],
+            Bv = V[q.j],
+            dx = X(Bv) - X(A),
+            dy = Y(Bv) - Y(A),
+            l = Math.hypot(dx, dy) || 1,
+            w = Math.max(1, 0.158 * sc),
+            ea = rad(N[q.i].el) * sc * 0.97 + w / 2,
+            eb = rad(N[q.j].el) * sc * 0.97 + w / 2;
+          if (ea + eb >= l) continue;
+          cx.lineWidth = w;
+          cx.strokeStyle = v3mix(ink, paper, fog(q.z));
+          cx.beginPath();
+          cx.moveTo(X(A) + (dx / l) * ea, Y(A) + (dy / l) * ea);
+          cx.lineTo(X(Bv) - (dx / l) * eb, Y(Bv) - (dy / l) * eb);
+          cx.stroke();
+        }
+      }
+    };
+    /* rotating: a drag right rotates about the screen's vertical axis, a drag down about its horizontal axis */
+    let drag = null;
+    cv.addEventListener('pointerdown', e => {
+      drag = { x: e.clientX, y: e.clientY };
+      cv.setPointerCapture(e.pointerId);
+      cv.style.cursor = 'grabbing';
+    });
+    cv.addEventListener('pointermove', e => {
+      if (!drag || !Rm) return;
+      const ay = (e.clientX - drag.x) * 0.01,
+        ax = (e.clientY - drag.y) * 0.01,
+        cy = Math.cos(ay),
+        sy = Math.sin(ay),
+        cxa = Math.cos(ax),
+        sxa = Math.sin(ax);
+      Rm = mm(
+        mm(
+          [
+            [cy, 0, sy],
+            [0, 1, 0],
+            [-sy, 0, cy]
+          ],
+          [
+            [1, 0, 0],
+            [0, cxa, -sxa],
+            [0, sxa, cxa]
+          ]
+        ),
+        Rm
+      );
+      drag = { x: e.clientX, y: e.clientY };
+      draw();
+    });
+    const up = () => {
+      drag = null;
+      cv.style.cursor = 'grab';
+    };
+    cv.addEventListener('pointerup', up);
+    cv.addEventListener('pointercancel', up);
+    cv.addEventListener(
+      'wheel',
+      e => {
+        e.preventDefault();
+        zf = Math.max(0.3, Math.min(8, zf * Math.exp(-e.deltaY * 0.0015)));
+        draw();
+      },
+      { passive: false }
+    );
+    cv.addEventListener('dblclick', () => {
+      Rm = null;
+      zf = 1;
+      draw();
+    });
+    hcb.onchange = draw;
     const show = k => {
       k = Math.max(1, Math.min(n, Math.round(+k) || n));
       rng.value = num.value = k;
+      curK = k;
+      draw();
       const f = frames[k - 1];
       tx.textContent =
         'Geometry ' + k + ' of ' + n + ': ' + f.nodes.length + ' atoms' + (E[k - 1] != null ? ', E = ' + E[k - 1] : '') + (f.title && E[k - 1] == null ? ' — ' + f.title.slice(0, 120) : '');
@@ -46370,7 +47499,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const done = v => {
       box.remove();
       document.removeEventListener('keydown', key, true);
-      pick(v);
+      /* the view as turned: across the sheet the screen's right, down it the screen's down */
+      pick(v, Rm ? [Rm[0].slice(), Rm[1].map(x => -x)] : null);
     };
     document.addEventListener('keydown', key, true);
     box.addEventListener('click', e => {
@@ -46391,8 +47521,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     const fr = opt && opt.frame;
     if (frames.length > 1 && fr == null && !(opt && opt.api)) {
-      xyzChoose(frames, name || 'XYZ', k => {
-        if (k != null) importXyz(text, name, { frame: k });
+      xyzChoose(frames, name || 'XYZ', (k, ev) => {
+        if (k != null) importXyz(text, name, { frame: k, ev });
       });
       return;
     }
@@ -46415,7 +47545,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const base = String(name || 'XYZ').replace(/\.[^.]*$/, '');
     place3D(
       frames.map((f, k) => ({
-        name: f.title && f.title.length <= 60 && !/^[-+\d.eE\s]+$/.test(f.title) ? f.title : frames.length > 1 ? base + ' ' + (k + 1) : base,
+        ev: opt && opt.ev,
+        name: f.title && f.title.length <= 60 && !/^[-+\d.eE\s]+$/.test(f.title) && !/^\s*(?:energy|E)\b\s*[:=]?\s*-?\d/i.test(f.title) ? f.title : frames.length > 1 ? base + ' ' + (k + 1) : base,
         get r() {
           if (f.nodes.length > 3000) return null;
           const r = perceive3D(f.nodes, xyzBonds(f.nodes)),
@@ -47020,6 +48151,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ext = (name.split('.').pop() || '').toLowerCase();
     if (ext === 'cdx') {
       toast('Open .cdx files with File → Open or drag them onto the sheet', true);
+      return;
+    }
+    if (ext === 'cml' || (/^\s*(<\?xml[^>]*>\s*)?<(\w+:)?cml[\s>]/i.test(text) && ext !== 'cdxml')) {
+      let r;
+      try {
+        r = cmlToMdl(text);
+      } catch (e) {
+        toast('That CML file could not be read: ' + ((e && e.message) || e), true);
+        return;
+      }
+      const base = name.replace(/\.cml$/i, '');
+      importText(base + (r.rxn ? '.rxn' : '.sdf'), r.rxn || r.sdf);
       return;
     }
     if (ext === 'json' || ext === 'reactio') {
@@ -50182,6 +51325,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     'cmd:copyOle': () => {
       copyOle();
+    },
+    'cmd:copyTex': () => {
+      copyLatex();
     },
     'cmd:newDoc': () => {
       newTab();
@@ -53427,7 +54573,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const deg of [270, 180, 120, 90]) SHP_TPL.push(sh ? { arc: deg, shaft: 'dashed' } : { arc: deg });
   let curShp = SHP_TPL[0];
   /* charts have a button of their own */
-  const CHART_TPL = [{ kind: 'pie' }, { kind: 'radar' }, { kind: 'jab' }];
+  const CHART_TPL = [{ kind: 'pie' }, { kind: 'radar' }, { kind: 'jab' }, { kind: 'ene' }];
   let curChart = CHART_TPL[0];
   const shpNow = () => (tool === 'chart' ? curChart : curShp);
   function imgCorners(r) {
@@ -53886,7 +55032,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const W = 34,
       H = 24;
     let inner = '';
-    if (t.kind === 'jab')
+    if (t.kind === 'ene')
+      inner =
+        '<g fill="none" stroke="currentColor"><path d="M3 2V22" stroke-width="1.1"/><path d="M5 17H9M13 6H17M21 13H25M28 19H32" stroke-width="2"/><path d="M9 17L13 6M17 6L21 13M25 13L28 19" stroke-width="1"/></g>';
+    else if (t.kind === 'jab')
       inner =
         '<g stroke="currentColor" fill="none"><path d="M3 21H31M3 9H16M3 4H16M20 13H31" stroke-width="1.6"/><path d="M8 21V10.5" stroke-width="1.1"/><path d="M8 9.2l-1.6 2.6h3.2z" fill="currentColor" stroke="none"/><path d="M13 9.5q1 1.2 0 2.4t0 2.4 0 2.4 0 2.4V19.7" stroke-width="1"/><path d="M13 21l-1.5-2.4h3z" fill="currentColor" stroke="none"/><path d="M16 9.5L19.5 12.6" stroke-width="1" stroke-dasharray="1.6 1"/><path d="M25 13.5V19.6" stroke-width="1.1"/><path d="M25 21l-1.5-2.6h3z" fill="currentColor" stroke="none"/></g>';
     else if (t.kind === 'radar')
@@ -53996,7 +55145,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     '<span class="ttl">Charts</span>' +
     CHART_TPL.map(
       (t, i) =>
-        `<button type="button" data-chart="${i}" title="${t.kind === 'jab' ? 'Jablonski diagram: energy levels and the transitions between them, absorption, fluorescence, phosphorescence, IC, ISC (double-click it to edit; the arrows follow their levels)' : t.kind === 'radar' ? 'Sensitivity screen (as by Glorius): one axis per condition, coloured zones, your values as a line (double-click it to edit)' : 'Product ratio chart: a ring with percentages and a legend (double-click it to edit)'}">${shpIcon(t)}</button>`
+        `<button type="button" data-chart="${i}" title="${t.kind === 'ene' ? 'Energy diagram of a reaction: states and their energies from a table (typed, pasted from Excel or opened from a file), drawn to scale as ordinary lines and texts (double-click a level to edit the table)' : t.kind === 'jab' ? 'Jablonski diagram: energy levels and the transitions between them, absorption, fluorescence, phosphorescence, IC, ISC (double-click it to edit; the arrows follow their levels)' : t.kind === 'radar' ? 'Sensitivity screen (as by Glorius): one axis per condition, coloured zones, your values as a line (double-click it to edit)' : 'Product ratio chart: a ring with percentages and a legend (double-click it to edit)'}">${shpIcon(t)}</button>`
     ).join('');
   document.querySelector('.editor').appendChild(chartPop);
   function syncChartPop() {
@@ -54040,6 +55189,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let x2 = p1.x,
       y2 = p1.y;
     const t = shpNow();
+    if (t.kind === 'ene') {
+      /* a click on a diagram opens it; elsewhere a new one, energy 0 at the place clicked */
+      const on = findArrow(p0);
+      if (on && on.eg != null && eneModel(on.eg)) openEneEd(on.eg);
+      else eneCreate(p0.x, p0.y);
+      return;
+    }
     if ((t.kind === 'shp' && (t.sh === 'circle' || shift)) || t.kind === 'pie' || t.kind === 'radar') {
       const d = Math.max(Math.abs(x2 - p0.x), Math.abs(y2 - p0.y));
       x2 = p0.x + Math.sign(x2 - p0.x || 1) * d;
@@ -59720,6 +60876,878 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   });
   document.addEventListener('pointerdown', e => {
     if (!jabEd.hidden && !e.target.closest('#jabEd')) jabEd.hidden = true;
+  });
+  /* ===== Energy diagram of a reaction: states and their energies from a table, drawn to scale =====
+   The diagram is made of ordinary objects (level lines, joins, a smooth curve and its dots, texts, an energy axis), so
+   each can be moved, recoloured or deleted by hand and goes to CDXML and the pictures as any other. Each part carries
+   eg (the diagram's id), ek (what it is: 'lv:3:1' the level of row 3 in column 1…) and em (the diagram: its table and
+   settings). The table: rows of cells, the first column the names of the states (R, TS1, INT1…), then one column per
+   path with its energies; a column marked "in brackets" belongs to the path before it (ΔH beside ΔG) and is written
+   under its levels, not to scale. An empty cell: the path does not go through that state. Changed in the table, the
+   diagram is drawn again where it was, and what was moved by hand keeps its shift; what was deleted stays deleted. */
+  const ENE_COL = ['#d0312d', '#2448c4', '#1f8a4c', '#7a3fb5', '#c77c02', '#0f8b8d'];
+  function eneNum(s) {
+    const m = /[-−–]?\s*\d+(?:[.,]\d+)?/.exec(String(s == null ? '' : s));
+    if (!m) return null;
+    const v = parseFloat(m[0].replace(/[−–]/, '-').replace(/\s/g, '').replace(',', '.'));
+    return isFinite(v) ? v : null;
+  }
+  const eneFs0 = () => (S.doc && S.doc.text) || STY().text || 13;
+  function eneNew(x, y) {
+    const fs = eneFs0();
+    return {
+      x,
+      y,
+      fs,
+      sx: fs * 4.6,
+      sy: fs * 0.3,
+      lw: fs * 2.5,
+      style: 'lines',
+      axis: 1,
+      title: 'ΔG (kcal/mol)',
+      names: 1,
+      vals: 1,
+      /* each path with names of its own (the first column: for the cells left empty) */
+      head: ['State', 'Path A', '(ΔH)', 'Names A', 'Path B', 'Names B'],
+      kind: ['n', 'e', 'b', 'm', 'e', 'm'],
+      col: ['', ENE_COL[0], '', '', ENE_COL[1], ''],
+      rows: [
+        ['R', '0.0', '0.0', 'R', '0.0', 'R'],
+        ['TS1', '24.3', '22.0', 'TS1', '18.6', "TS1'"],
+        ['INT1', '5.2', '4.1', 'INT1', '-3.4', "INT1'"],
+        ['TS2', '15.8', '14.9', 'TS2', '12.1', "TS2'"],
+        ['P', '-12.5', '-13.0', 'P', '-12.5', 'P']
+      ]
+    };
+  }
+  /* the paths: each energy column, with the bracket column after it if there is one */
+  function enePaths(M) {
+    const out = [];
+    (M.kind || []).forEach((k, c) => {
+      if (k === 'e') out.push({ c, b: null, m: null, col: (M.col || [])[c] || ENE_COL[out.length % ENE_COL.length], name: (M.head || [])[c] || '' });
+      else if (k === 'b' && out.length && out[out.length - 1].b == null) out[out.length - 1].b = c;
+      else if (k === 'm' && out.length && out[out.length - 1].m == null) out[out.length - 1].m = c;
+    });
+    return out;
+  }
+  /* the parts wanted, each {k: key, a: an arrow-like object | t: a text}, laid out from M.x (the first state) and M.y
+     (energy 0). A level moved or stretched by hand is kept in M.mv ('state:column': [dx of its left end, dy (kept 0:
+     a level stays at its energy), dx of its right end]): its joins, numbers and name go with it. A cell ending in ~ is reached through a break of the scale (a
+     mark across its join; two levels of the same energy: the mark alone) */
+  function eneBuild(M) {
+    const fs = +M.fs || eneFs0(),
+      ink = '#15202d',
+      P = enePaths(M),
+      rows = M.rows || [],
+      xc = i => M.x + i * M.sx,
+      yE = e => M.y - e * M.sy,
+      half = M.lw / 2,
+      out = [],
+      lw = docLW(),
+      smooth = M.style === 'smooth',
+      side = M.lab === 'side',
+      mv = M.mv || {},
+      neg = t => String(t).replace(/(^|[\s(])-(?=\d|[.,]\d)/g, '$1−'),
+      text = (k, s, x, y, align, color) => {
+        const o = { x, y, text: String(s), fs: true, nochem: true };
+        if (Math.abs(fs - eneFs0()) > 0.01) o.size = fs;
+        if (color && color !== ink) o.color = color;
+        if (M.bold && !/^(tl|tt|kt):|^tk/.test(k)) o.bold = true;
+        const w = textW(o);
+        if (align === 'center') o.x -= w / 2;
+        else if (align === 'right') o.x -= w;
+        out.push({ k, t: o });
+      },
+      line = (k, x1, y1, x2, y2, col, extra) => out.push({ k, a: { x1, y1, x2, y2, head: 'none', shp: 1, ...(col && col !== ink ? { col } : {}), ...extra } });
+    /* the points of each path; a state where several paths have the same energy is one level, in the colour of the first
+       of them (a black column put first keeps the shared levels black) */
+    const pts = P.map(p => {
+      const L = [];
+      rows.forEach((r, i) => {
+        const raw = String(r[p.c] == null ? '' : r[p.c]).trim(),
+          e = eneNum(raw);
+        if (e != null)
+          L.push({ i, e, s: raw.replace(/~\s*$/, '').trim(), brk: /~\s*$/.test(raw), b: p.b != null && String(r[p.b] || '').trim() ? String(r[p.b]).trim().replace(/~\s*$/, '') : '', nm: p.m != null ? String(r[p.m] == null ? '' : r[p.m]).trim() : '' });
+      });
+      return L;
+    });
+    let eMin = Infinity,
+      eMax = -Infinity;
+    pts.forEach(L => L.forEach(q => ((eMin = Math.min(eMin, q.e)), (eMax = Math.max(eMax, q.e)))));
+    if (!isFinite(eMin)) return out;
+    const owner = new Map();
+    pts.forEach((L, j) => L.forEach(q => owner.has(q.i + '|' + q.e) || owner.set(q.i + '|' + q.e, j)));
+    /* where each level is: its ends and height, moved by hand or not */
+    const lev = (q, j) => {
+      const o = owner.get(q.i + '|' + q.e),
+        c = P[o].c,
+        m = mv[q.i + ':' + c] || [0, 0, 0],
+        a = xc(q.i) - half + m[0],
+        b = xc(q.i) + half + m[2];
+      return { o, c, a, b, x: (a + b) / 2, y: yE(q.e), col: P[o].col, own: o === j };
+    };
+    const isMax = (L, n) => L.length > 1 && (n === 0 || L[n - 1].e < L[n].e) && (n === L.length - 1 || L[n + 1].e < L[n].e);
+    /* a break mark: two short wavy strokes across the join at (x, y), along dx, dy */
+    const brk = (k, x, y, ux, uy, col) => {
+      const nx = -uy,
+        ny = ux,
+        h = fs * 0.75,
+        g = fs * 0.18;
+      for (const s of [-1, 1])
+        line(k + ':' + s, x + ux * g * s - nx * h, y + uy * g * s - ny * h, x + ux * g * s + nx * h, y + uy * g * s + ny * h, col, { shaft: 'wavy' });
+    };
+    const joinStyle = M.style === 'dashed' || (smooth && M.dash) ? { shaft: 'dashed' } : {};
+    pts.forEach((L, j) => {
+      const col = P[j].col,
+        c = P[j].c;
+      if (smooth) {
+        /* one curve through the points, flat at each of them (a minimum or a maximum), a dot on each */
+        if (L.length > 1) {
+          const V = L.map(q => lev(q, j)),
+            A = V.map((v, n) => {
+              const p = { x: v.x, y: v.y },
+                dl = n ? (v.x - V[n - 1].x) / 2.6 : 0,
+                dr = n < V.length - 1 ? (V[n + 1].x - v.x) / 2.6 : 0;
+              return { p, i: { x: p.x - dl, y: p.y }, o: { x: p.x + dr, y: p.y } };
+            });
+          const r = { x1: 0, y1: 0, x2: 0, y2: 0, head: 'none', shp: 1, w: Math.max(lw * 1.6, 1), ...(col !== ink ? { col } : {}), ...joinStyle };
+          penStore(r, A);
+          out.push({ k: 'cv:' + c, a: r });
+        }
+        for (const q of L) {
+          const v = lev(q, j);
+          if (!v.own) continue;
+          const d = fs * 0.22;
+          out.push({ k: 'dt:' + q.i + ':' + v.c, a: { kind: 'shp', sh: 'ellipse', st: 'plain', x1: v.x - d, y1: v.y - d, x2: v.x + d, y2: v.y + d, fill: v.col, col: v.col } });
+        }
+      } else {
+        for (const q of L) {
+          const v = lev(q, j);
+          if (v.own) line('lv:' + q.i + ':' + v.c, v.a, v.y, v.b, v.y, v.col, { w: Math.max(lw * 2.4, 1.6) });
+        }
+        for (let n = 1; n < L.length; n++) {
+          const A = lev(L[n - 1], j),
+            B = lev(L[n], j),
+            /* a join several paths share is drawn once, by the first of them */
+            dup = pts.slice(0, j).some(M2 => M2.some((x, m) => m && M2[m - 1].i === L[n - 1].i && M2[m - 1].e === L[n - 1].e && x.i === L[n].i && x.e === L[n].e));
+          if (dup) continue;
+          const k = 'jn:' + c + ':' + L[n - 1].i + ':' + L[n].i;
+          if (!L[n].brk) {
+            line(k, A.b, A.y, B.a, B.y, col, joinStyle);
+            continue;
+          }
+          /* through a break: the join cut in the middle with the mark across it; between two levels at one height the
+             mark alone */
+          const dx = B.a - A.b,
+            dy = B.y - A.y,
+            len = Math.hypot(dx, dy) || 1,
+            ux = dx / len,
+            uy = dy / len,
+            mx = (A.b + B.a) / 2,
+            my = (A.y + B.y) / 2;
+          if (Math.abs(dy) < fs * 0.2) brk('bk:' + c + ':' + L[n].i, mx, my, ux, uy, col);
+          else {
+            const g = fs * 0.45;
+            line(k, A.b, A.y, mx - ux * g, my - uy * g, col, joinStyle);
+            line(k + ':2', mx + ux * g, my + uy * g, B.a, B.y, col, joinStyle);
+            brk('bk:' + c + ':' + L[n].i, mx, my, ux, uy, col);
+          }
+        }
+      }
+    });
+    /* the numbers of each level and the names of the states.
+       Over (levels): the energy over the level, the bracketed value under it; at a maximum both over it; where the levels of
+       one state are close, the bracketed value beside the energy. Beside: the numbers left of the level, the name over it.
+       Smooth curve: the numbers under the point, the name over a maximum. */
+    const lv = [];
+    pts.forEach((L, j) =>
+      L.forEach((q, n) => {
+        const v = lev(q, j);
+        if (v.own) lv.push({ q, v, mx: isMax(L, n) });
+      })
+    );
+    const by = new Map();
+    for (const z of lv) by.set(z.q.i, (by.get(z.q.i) || []).concat(z));
+    const numCol = z => (M.numcol === 0 ? ink : z.v.col);
+    for (const [i, V] of by) {
+      V.sort((a, b) => a.v.y - b.v.y);
+      /* a path with a names column of its own names its levels; the others share the name of the state, written once */
+      const nm0 = String((rows[i] || [])[0] || '').trim(),
+        Vg = V.filter(z => !z.q.nm),
+        gz = !Vg.length ? null : side || smooth ? Vg.reduce((a, w) => (w.v.o < a.v.o ? w : a)) : Vg[Vg.length - 1];
+      V.forEach((z, k) => {
+        const nm = z.q.nm || nm0,
+          nk = z.q.nm ? 'nm:' + i + ':' + z.v.c : 'nm:' + i;
+        const { v, q } = z,
+          c = v.c,
+          up = k ? v.y - V[k - 1].v.y : Infinity,
+          down = k < V.length - 1 ? V[k + 1].v.y - v.y : Infinity,
+          bt = q.b ? neg('(' + q.b.replace(/^\((.*)\)$/, '$1') + ')') : '',
+          val = neg(q.s),
+          nc = numCol(z),
+          /* the name once a state: beside the levels and on the curve by the level of the first path there; over and under:
+             under the lowest. A path's own name: by its level */
+          withName = M.names && nm && (z.q.nm || z === gz);
+        if (side) {
+          if (M.vals) text('ev:' + i + ':' + c, bt ? val + ' ' + bt : val, v.a - fs * 0.3, v.y + fs * 0.35, 'right', nc);
+          if (withName) text(nk, nm, v.x, v.y - fs * 0.45, 'center', v.col);
+          return;
+        }
+        if (smooth) {
+          let y = v.y + fs * 1.3;
+          if (M.vals) {
+            text('ev:' + i + ':' + c, val, v.x, y, 'center', nc);
+            if (bt) text('eb:' + i + ':' + c, bt, v.x, (y += fs * 1.15), 'center', nc);
+            y += fs * 1.15;
+          }
+          if (withName) text(nk, nm, v.x, z.mx ? v.y - fs * 0.6 : y, 'center', v.col);
+          return;
+        }
+        const under = k > 0 && up < fs * 1.6,
+          /* the two numbers on one line where a level close by leaves no room for two lines; wider than the level, the
+             joins would run through them: then both over it, as at a maximum, when there is room there */
+          wide = (val.length + bt.length + 1) * fs * 0.56 > v.b - v.a,
+          stack = bt && !z.mx && !under && down < fs * 2.9 && wide && up >= fs * 2.9,
+          inline = bt && !stack && (z.mx ? up < fs * 2.9 : down < fs * 2.9);
+        let yb = v.y + fs * 1.15,
+          yt = v.y;
+        if (M.vals) {
+          if (under) {
+            text('ev:' + i + ':' + c, inline ? val + ' ' + bt : val, v.x, yb, 'center', nc);
+            yb += fs * 1.15;
+            if (bt && !inline) text('eb:' + i + ':' + c, bt, v.x, yb, 'center', nc), (yb += fs * 1.15);
+          } else if ((z.mx || stack) && bt && !inline) {
+            text('ev:' + i + ':' + c, val, v.x, (yt = v.y - fs * 1.6), 'center', nc);
+            text('eb:' + i + ':' + c, bt, v.x, v.y - fs * 0.45, 'center', nc);
+          } else {
+            text('ev:' + i + ':' + c, inline ? val + ' ' + bt : val, v.x, (yt = v.y - fs * 0.45), 'center', nc);
+            if (bt && !inline) text('eb:' + i + ':' + c, bt, v.x, yb, 'center', nc), (yb += fs * 1.15);
+          }
+        }
+        /* a level close under this one (its numbers over it): the name goes over the numbers instead */
+        if (withName) text(nk, nm, v.x, down < yb - v.y + fs * 1.8 ? (yt < v.y ? yt - fs * 1.15 : v.y - fs * 0.45) : yb, 'center', v.col);
+      });
+    }
+    /* the energy axis on the left, with round ticks (or every M.step), and its title over it */
+    if (M.axis) {
+      const span = Math.max(1, eMax - eMin),
+        raw = span / 5,
+        mag = Math.pow(10, Math.floor(Math.log10(raw))),
+        step = +M.step > 0 ? +M.step : [1, 2, 5, 10].map(f => f * mag).find(s => s >= raw) || 10 * mag,
+        lo = Math.floor(eMin / step - 1e-9) * step,
+        hi = Math.ceil(eMax / step - 1e-9) * step,
+        ax = M.x - M.sx * 0.55 - half,
+        tick = fs * 0.35;
+      line('ax', ax, yE(lo), ax, yE(hi) - fs * 0.6, ink, {});
+      for (let v = lo; v <= hi + step * 1e-6; v += step) {
+        const vv = +v.toFixed(6);
+        line('tk:' + vv, ax - tick, yE(vv), ax, yE(vv), ink, {});
+        text('tl:' + vv, neg(String(Math.abs(vv) < 1e-9 ? 0 : vv)), ax - tick - fs * 0.25, yE(vv) + fs * 0.35, 'right', ink);
+      }
+      if (M.title) text('tt', M.title, ax - fs * 0.6, yE(hi) - fs * 1.1, 'left', ink);
+    }
+    /* the paths named in a key at the top right when there are two or more */
+    const named = P.filter(p => p.name);
+    if (named.length > 1 && M.key !== 0) {
+      const kx = M.x + (rows.length - 1) * M.sx + half + fs * 1.5;
+      named.forEach((p, n) => {
+        const y = yE(eMax) + n * fs * 1.4;
+        line('kl:' + p.c, kx, y - fs * 0.35, kx + fs * 1.6, y - fs * 0.35, p.col, { w: Math.max(lw * 2.4, 1.6) });
+        text('kt:' + p.c, p.name, kx + fs * 2, y, 'left', p.col);
+      });
+    }
+    return out;
+  }
+  const eneParts = id => [...mol.arrows.filter(r => r.eg === id), ...mol.texts.filter(t => t.eg === id)];
+  const eneModel = id => {
+    const p = eneParts(id).find(q => q.em);
+    return p ? p.em : null;
+  };
+  const eneAnchor = (o, isT) => (isT ? [o.x, o.y] : [o.x1, o.y1, o.x2, o.y2]);
+  /* draws M again: parts kept by key (moved by hand: shifted as much again), new ones added, those no longer wanted taken
+     away; a part deleted by hand stays away until Reset */
+  function eneApply(M) {
+    /* the axis (its line, ticks, numbers and title) is one group, and so is the key: a click takes them whole */
+    if (M.axg == null) M.axg = mol.next++;
+    if (M.keyg == null) M.keyg = mol.next++;
+    const want = eneBuild(M),
+      have = new Map(),
+      hide = new Set(M.hide || []);
+    /* a part copied and pasted is a plain object of its own: only the first with a key stays in the diagram */
+    for (const o of eneParts(M.id))
+      if (have.has(o.ek)) for (const k of ['eg', 'ek', 'em', 'ed0', 'el']) delete o[k];
+      else have.set(o.ek, o);
+    for (const k of M.keys || []) if (!have.has(k)) hide.add(k);
+    const keep = new Set();
+    for (const w of want) {
+      if (hide.has(w.k)) continue;
+      keep.add(w.k);
+      const isT = !!w.t,
+        o = w.t || w.a,
+        a0 = eneAnchor(o, isT),
+        old = have.get(w.k);
+      let obj;
+      if (old && !!old.text === isT) {
+        const e0 = old.ed0 || eneAnchor(old, isT),
+          d = isT ? [old.x - e0[0], old.y - e0[1]] : [old.x1 - e0[0], old.y1 - e0[1], old.x2 - e0[2], old.y2 - e0[3]];
+        for (const k of Object.keys(old)) if (!['id', 'eg', 'ek', 'em', 'ed0', 'el'].includes(k)) delete old[k];
+        Object.assign(old, o);
+        if (isT) {
+          old.x += d[0];
+          old.y += d[1];
+        } else if (old.bz) {
+          old.x1 += d[0];
+          old.y1 += d[1];
+          old.x2 += d[0];
+          old.y2 += d[1];
+        } else {
+          old.x1 += d[0];
+          old.y1 += d[1];
+          old.x2 += d[2];
+          old.y2 += d[3];
+        }
+        obj = old;
+      } else {
+        if (old) {
+          mol.arrows = mol.arrows.filter(q => q !== old);
+          mol.texts = mol.texts.filter(q => q !== old);
+        }
+        obj = { id: mol.next++, ...o };
+        (isT ? mol.texts : mol.arrows).push(obj);
+      }
+      obj.eg = M.id;
+      obj.ek = w.k;
+      if (/^(ax|tk:|tl:|tt)/.test(w.k)) obj.gid = M.axg;
+      else if (/^(kl|kt):/.test(w.k)) obj.gid = M.keyg;
+      obj.ed0 = a0;
+      obj.el = eneAnchor(obj, isT);
+      obj.em = M;
+    }
+    mol.arrows = mol.arrows.filter(q => q.eg !== M.id || keep.has(q.ek));
+    mol.texts = mol.texts.filter(q => q.eg !== M.id || keep.has(q.ek));
+    M.keys = [...keep];
+    M.hide = [...hide];
+  }
+  /* after each change: a level moved or stretched by hand takes its joins, numbers and name with it (kept in M.mv); the
+     whole diagram moved together moves its place */
+  function eneFollow() {
+    const ids = new Set();
+    for (const o of mol.arrows) if (o.eg != null) ids.add(o.eg);
+    for (const id of ids) {
+      const M = eneModel(id);
+      if (!M) continue;
+      /* what changed since the last look (el: where each part was then; ed0: where the diagram puts it) */
+      const parts = eneParts(id).filter(o => o.ed0),
+        isT = o => o.text != null,
+        last = o => o.el || o.ed0,
+        dOf = o => (isT(o) ? [o.x - last(o)[0], o.y - last(o)[1], o.x - last(o)[0], o.y - last(o)[1]] : [o.x1 - last(o)[0], o.y1 - last(o)[1], o.x2 - last(o)[2], o.y2 - last(o)[3]]),
+        shift = (o, d) => (o.ed0 = isT(o) ? [o.ed0[0] + d[0], o.ed0[1] + d[1]] : [o.ed0[0] + d[0], o.ed0[1] + d[1], o.ed0[2] + d[2], o.ed0[3] + d[3]]),
+        seen = () => parts.forEach(o => (o.el = eneAnchor(o, isT(o)))),
+        moved = parts.map(o => [o, dOf(o)]).filter(([, d]) => d.some(v => Math.abs(v) > 0.01));
+      if (!moved.length) continue;
+      const same = (d, e) => d.every((v, k) => Math.abs(v - e[k]) < 0.01),
+        d0 = moved[0][1];
+      /* the whole diagram moved together: its place moves, every part keeps its own shift */
+      if (moved.length === parts.length && same(d0, [d0[0], d0[1], d0[0], d0[1]]) && moved.every(([, d]) => same(d, d0))) {
+        M.x += d0[0];
+        M.y += d0[1];
+        for (const o of parts) shift(o, d0);
+        seen();
+        continue;
+      }
+      /* the axis and the levels do not leave their values: a shift up or down taken back */
+      for (const [o, d] of moved)
+        if (/^(ax|tk:|tl:|tt|lv:|dt:)/.test(o.ek) && (Math.abs(d[1]) > 0.01 || Math.abs(d[3]) > 0.01)) {
+          if (isT(o)) o.y -= d[1];
+          else {
+            o.y1 -= d[1];
+            o.y2 -= d[3];
+          }
+          d[1] = d[3] = 0;
+        }
+      const lvm = moved.filter(([o]) => /^(lv|dt):/.test(o.ek));
+      if (!lvm.length) {
+        seen();
+        continue;
+      }
+      M.mv = M.mv || {};
+      const tr = [];
+      for (const [o, d] of lvm) {
+        const [, i, c] = o.ek.split(':'),
+          k = i + ':' + c,
+          m = M.mv[k] || [0, 0, 0],
+          dy = (d[1] + d[3]) / 2;
+        M.mv[k] = [m[0] + d[0], m[1] + dy, m[2] + d[2]].map(v => +v.toFixed(4));
+        tr.push([d[0], dy]);
+        shift(o, d);
+      }
+      /* what was moved with a level goes with it anyway: its own shift stays as it was */
+      for (const [o, d] of moved)
+        if (!/^(lv|dt):/.test(o.ek) && tr.some(t => same(d, [t[0], t[1], t[0], t[1]]))) shift(o, d);
+      eneApply(M);
+    }
+  }
+  /* a table pasted from Excel, a CSV or tab file: rows of cells (quoted cells kept whole) */
+  function eneParseTable(s) {
+    s = String(s || '').replace(/\r\n?/g, '\n').replace(/\n+$/, '');
+    if (!s) return [];
+    const sep = s.includes('\t') ? '\t' : s.split('\n')[0].includes(';') ? ';' : ',';
+    const out = [];
+    let row = [],
+      cell = '',
+      q = false;
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+      if (q) {
+        if (ch === '"' && s[i + 1] === '"') (cell += '"'), i++;
+        else if (ch === '"') q = false;
+        else cell += ch;
+      } else if (ch === '"' && !cell) q = true;
+      else if (ch === sep) row.push(cell.trim()), (cell = '');
+      else if (ch === '\n') row.push(cell.trim()), out.push(row), (row = []), (cell = '');
+      else cell += ch;
+    }
+    row.push(cell.trim());
+    out.push(row);
+    return out;
+  }
+  /* the first sheet of an Excel file (.xlsx): its cells as text, numbers as Excel shows them unformatted */
+  async function eneXlsx(u) {
+    const z = await unzipAll(u),
+      td = new TextDecoder(),
+      get = n => (z.get(n) ? td.decode(z.get(n)) : ''),
+      unx = s => s.replace(/&#x([0-9a-f]+);/gi, (m, h) => String.fromCodePoint(parseInt(h, 16))).replace(/&#(\d+);/g, (m, d) => String.fromCodePoint(+d)).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+    const ss = [...get('xl/sharedStrings.xml').matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => unx([...m[1].matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(t => t[1]).join('')));
+    let sheet = 'xl/worksheets/sheet1.xml';
+    {
+      const wb = get('xl/workbook.xml'),
+        rel = get('xl/_rels/workbook.xml.rels'),
+        rid = /<sheet\b[^>]*r:id="([^"]+)"/.exec(wb);
+      if (rid) {
+        const t = new RegExp('<Relationship\\b[^>]*Id="' + rid[1] + '"[^>]*Target="([^"]+)"').exec(rel) || new RegExp('<Relationship\\b[^>]*Target="([^"]+)"[^>]*Id="' + rid[1] + '"').exec(rel);
+        if (t) sheet = t[1].startsWith('/') ? t[1].slice(1) : 'xl/' + t[1].replace(/^\.\//, '');
+      }
+    }
+    const x = get(sheet);
+    if (!x) throw new Error('no sheet found in this Excel file');
+    const grid = [];
+    const colN = r => [...r].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0) - 1;
+    for (const c of x.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const at = c[1],
+        ref = /\br="([A-Z]+)(\d+)"/.exec(at);
+      if (!ref) continue;
+      const t = (/\bt="([^"]+)"/.exec(at) || [])[1],
+        body = c[2] || '',
+        v = (/<v>([\s\S]*?)<\/v>/.exec(body) || [])[1];
+      let val = '';
+      if (t === 's') val = ss[+v] || '';
+      else if (t === 'inlineStr') val = unx([...body.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m => m[1]).join(''));
+      else if (v != null) {
+        val = unx(v);
+        if (t !== 'str' && t !== 'e' && t !== 'b' && isFinite(+val)) val = String(+(+val).toPrecision(12));
+      }
+      const R = +ref[2] - 1,
+        C = colN(ref[1]);
+      while (grid.length <= R) grid.push([]);
+      grid[R][C] = val;
+    }
+    const w = Math.max(0, ...grid.map(r => r.length)),
+      G = grid.map(r => [...Array(w).keys()].map(i => (r[i] == null ? '' : String(r[i])))).filter(r => r.some(v => v !== ''));
+    /* Excel keeps the number, not how it was shown: each column of numbers with as many decimals as its longest (29 → 29.0
+       beside 31.2) */
+    for (let c = 0; c < w; c++) {
+      const dec = G.map(r => (/^-?\d+(?:\.(\d+))?$/.exec(r[c]) || [])).filter(m => m.length);
+      if (!dec.length) continue;
+      const d = Math.min(4, Math.max(...dec.map(m => (m[1] || '').length)));
+      if (d) for (const r of G) if (/^-?\d+(?:\.\d+)?$/.test(r[c])) r[c] = (+r[c]).toFixed(d);
+    }
+    return G;
+  }
+  /* a table taken in: the first row its header when it holds no numbers; a column with "H" or brackets in its header
+     goes in brackets with the path before it */
+  function eneTake(M, grid) {
+    grid = grid.filter(r => r.some(v => String(v).trim() !== ''));
+    if (!grid.length) return false;
+    const w = Math.max(...grid.map(r => r.length));
+    grid = grid.map(r => [...Array(w).keys()].map(i => String(r[i] == null ? '' : r[i]).trim()));
+    const headed = grid[0].slice(1).every(v => eneNum(v) == null || /[a-zA-Z]/.test(v.replace(/[\d.,\s−–-]/g, '').slice(0, 3)));
+    const head = headed ? grid[0] : ['State', ...grid[0].slice(1).map((_, i) => 'Path ' + String.fromCharCode(65 + i))],
+      rows = headed ? grid.slice(1) : grid;
+    M.head = head.map((h, i) => h || (i ? 'Path ' + String.fromCharCode(64 + i) : 'State'));
+    let np = 0;
+    M.kind = M.head.map((h, i) => {
+      if (!i) return 'n';
+      if (np && rows.some(r => String(r[i] || '').trim()) && rows.every(r => !String(r[i] || '').trim() || (/\p{L}/u.test(r[i]) && !/^\s*[-−–+]?\s*[\d.,]/.test(r[i])))) return 'm';
+      if (np && (/^\(.*\)$/.test(h) || /Δ\s*H|\bdH\b|\bH\b|enthalp/i.test(h))) return 'b';
+      np++;
+      return 'e';
+    });
+    let ci = 0;
+    M.col = M.kind.map(k => (k === 'e' ? ENE_COL[ci++ % ENE_COL.length] : ''));
+    M.rows = rows;
+    return true;
+  }
+  /* the window: the table to type in or paste into, and how the diagram looks */
+  const eneEd = document.createElement('div');
+  eneEd.className = 'pop arred pieed';
+  {
+    const st = document.createElement('style');
+    st.textContent =
+      '#eneEd{width:auto;min-width:520px;max-width:min(900px,92vw);max-height:82vh;overflow:auto}#eneEd .ttl{cursor:move;display:block;user-select:none}#eneEd table{border-collapse:collapse;margin:4px 0}#eneEd td,#eneEd th{padding:0;border:1px solid var(--line,#d5dbe3)}#eneEd th{font-weight:400;background:var(--soft,#f2f5f9)}#eneEd td input,#eneEd th input{width:72px;border:0;padding:3px 4px;font:12px var(--mono,monospace);background:transparent}#eneEd th select{width:66px;border:0;font-size:11px;background:transparent}#eneEd th .eh{display:flex;align-items:center}#eneEd th input[type=color]{width:20px;height:18px;padding:0;border:0}#eneEd .rx{width:20px;padding:0;font-size:11px}#eneEd .eneopt{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;font-size:12px;margin:4px 0}#eneEd .eneopt label{display:flex;gap:4px;align-items:center}#eneEd .eneopt input[type=number]{width:56px}';
+    document.head.appendChild(st);
+  }
+  eneEd.id = 'eneEd';
+  eneEd.hidden = true;
+  document.querySelector('.editor').appendChild(eneEd);
+  let eneEdId = null,
+    eneEdSnap = false;
+  const eneFile = document.createElement('input');
+  eneFile.type = 'file';
+  eneFile.accept = '.xlsx,.csv,.tsv,.txt';
+  eneFile.hidden = true;
+  document.body.appendChild(eneFile);
+  function eneEdTouch() {
+    if (!eneEdSnap) {
+      snap();
+      eneEdSnap = true;
+    }
+  }
+  function renderEneEd() {
+    const M = eneEdId == null ? null : eneModel(eneEdId);
+    if (!M) return;
+    const b = (k, v, t, ti) => `<button type="button" data-ee="${k}" data-v="${v}"${ti ? ` title="${ti}"` : ''}${t.length === 1 ? ' class="rx"' : ''}>${t}</button>`,
+      W = M.head.length;
+    const th = M.head
+      .map(
+        (h, c) =>
+          `<th><div class="eh"><input type="text" data-eh="${c}" value="${esc(h)}"${c ? '' : ' title="The names of the states"'}>${c && M.kind[c] === 'e' ? `<input type="color" data-ec="${c}" value="${M.col[c] || ENE_COL[0]}" title="The colour of this path">` : ''}</div>${c ? `<select data-ek="${c}" title="An energy column is a path of its own; a column in brackets is written under the levels of the path before it (ΔH beside ΔG); a names column names the states of the path before it (empty: the name in the first column)"><option value="e"${M.kind[c] === 'e' ? ' selected' : ''}>path</option><option value="b"${M.kind[c] === 'b' ? ' selected' : ''}>(in brackets)</option><option value="m"${M.kind[c] === 'm' ? ' selected' : ''}>(names)</option></select>${c > 1 ? b('cl', c, '←', 'Move this column left') : ''}${c < W - 1 ? b('cr', c, '→', 'Move this column right') : ''}${b('cdel', c, '×', 'Remove this column')}` : ''}</th>`
+      )
+      .join('');
+    const tb = (M.rows || [])
+      .map((r, i) => `<tr>${[...Array(W).keys()].map(c => `<td><input type="text" data-er="${i}" data-c="${c}" value="${esc(r[c] == null ? '' : r[c])}"></td>`).join('')}<td style="border:0;white-space:nowrap">${b('rup', i, '↑', 'Move this state up (Alt+↑ in its name)')}${b('rdn', i, '↓', 'Move this state down (Alt+↓ in its name)')}${b('rdel', i, '×', 'Remove this state')}</td></tr>`)
+      .join('');
+    eneEd.innerHTML =
+      '<span class="ttl" title="Drag to move this window">Energy diagram</span>' +
+      '<div class="note" style="margin:2px 0">One row per state (R, TS1, INT1…), one column of energies per path. Paste a table from Excel into any cell, or open a file. A value ending in ~ is reached through a break of the scale. ↑↓ move a state; Alt+↑/↓ in a path’s cell moves only that path’s value; an empty cell: the path skips that state. A column set to (in brackets) or (names) belongs to the path on its left (←→ move columns).</div>' +
+      `<div style="overflow:auto"><table><tr>${th}</tr>${tb}</table></div>` +
+      `<div class="aer"><span></span><div>${b('radd', 1, '+ State')}${b('cadd', 1, '+ Column', 'A column at the end: a path; set it to (in brackets) or (names) to belong to the path on its left')}${b('file', 1, 'Open Excel or CSV…', 'An .xlsx, .csv or tab-separated file: its first sheet, the first row as the header')}${b('copy', 1, 'Copy table', 'The table, tab-separated, to paste into Excel')}</div></div>` +
+      `<div class="eneopt"><label>Look <select data-eo="style"><option value="lines"${M.style === 'lines' ? ' selected' : ''}>levels, lines</option><option value="dashed"${M.style === 'dashed' ? ' selected' : ''}>levels, dashed</option><option value="smooth"${M.style === 'smooth' ? ' selected' : ''}>smooth curve</option></select></label>` +
+      `<label><input type="checkbox" data-eo="vals"${M.vals ? ' checked' : ''}> energies</label><label><input type="checkbox" data-eo="names"${M.names ? ' checked' : ''}> names</label><label><input type="checkbox" data-eo="axis"${M.axis ? ' checked' : ''}> axis</label>` +
+      `<label>Axis title <input type="text" data-eo="title" value="${esc(M.title || '')}" style="width:130px"></label><label title="Between the ticks of the axis (0: chosen)">step <input type="number" data-eo="step" value="${+M.step || 0}" min="0" step="1"></label></div>` +
+      `<div class="eneopt"><label>Numbers <select data-eo="lab"><option value="over"${M.lab !== 'side' ? ' selected' : ''}>over and under the levels</option><option value="side"${M.lab === 'side' ? ' selected' : ''}>beside the levels</option></select></label><label><input type="checkbox" data-eo="numcol"${M.numcol !== 0 ? ' checked' : ''}> in the colour of the path</label><label><input type="checkbox" data-eo="bold"${M.bold ? ' checked' : ''}> bold</label><label><input type="checkbox" data-eo="key"${M.key !== 0 ? ' checked' : ''}> key</label></div>` +
+      `<div class="eneopt"><label title="The height of one energy unit">Scale <input type="number" data-eo="sy" value="${+(+M.sy).toFixed(2)}" min="0.05" step="0.05"> per unit</label><label title="From one state to the next">Step <input type="number" data-eo="sx" value="${+(+M.sx).toFixed(1)}" min="10" step="2"></label><label>Level <input type="number" data-eo="lw" value="${+(+M.lw).toFixed(1)}" min="4" step="2"></label><label>Text <input type="number" data-eo="fs" value="${+(+M.fs).toFixed(1)}" min="4" max="60" step="0.5"></label></div>` +
+      `<div class="aer"><span></span><div>${b('dup', 1, 'Duplicate')}${b('reset', 1, 'Reset positions', 'Put the parts moved or deleted by hand back')}${b('del', 1, 'Delete diagram')}${b('close', 1, 'Close')}</div></div>` +
+      '<p class="note" style="margin:2px 0 0">The diagram is made of ordinary lines and texts: move, recolour or delete any of them, and put structures beside the levels. Changing the table draws it again to scale; what was moved keeps its shift. Double-click a level or a join to come back here.</p>';
+  }
+  function eneEdSync() {
+    if (eneEd.hidden) return;
+    if (eneEdId != null && eneModel(eneEdId)) renderEneEd();
+    else {
+      eneEd.hidden = true;
+      eneEdId = null;
+    }
+  }
+  function eneBox(id) {
+    let x0 = Infinity,
+      y0 = Infinity,
+      x1 = -Infinity,
+      y1 = -Infinity;
+    for (const o of eneParts(id)) {
+      const B = o.text != null ? { x0: o.x, y0: o.y - (o.size || 13), x1: o.x + textW(o), y1: o.y } : { x0: Math.min(o.x1, o.x2), y0: Math.min(o.y1, o.y2), x1: Math.max(o.x1, o.x2), y1: Math.max(o.y1, o.y2) };
+      x0 = Math.min(x0, B.x0);
+      y0 = Math.min(y0, B.y0);
+      x1 = Math.max(x1, B.x1);
+      y1 = Math.max(y1, B.y1);
+    }
+    return isFinite(x0) ? { x0, y0, x1, y1 } : null;
+  }
+  function openEneEd(id) {
+    eneEdId = id;
+    eneEdSnap = false;
+    renderEneEd();
+    const ed = document.querySelector('.editor').getBoundingClientRect(),
+      m = $('mol').getScreenCTM(),
+      pt = $('mol').createSVGPoint(),
+      B = eneBox(id) || { x1: 0, y0: 0 };
+    pt.x = B.x1;
+    pt.y = B.y0;
+    const q = pt.matrixTransform(m);
+    eneEd.hidden = false;
+    const w = eneEd.offsetWidth || 560;
+    eneEd.style.left = Math.max(8, Math.min(q.x - ed.left + 16, ed.width - w - 8)) + 'px';
+    eneEd.style.top = Math.max(8, Math.min(q.y - ed.top - 20, ed.height - (eneEd.offsetHeight || 360) - 8)) + 'px';
+  }
+  function eneCreate(x, y) {
+    snap();
+    const M = eneNew(x, y);
+    M.id = mol.next++;
+    /* energy 0 a little under the place clicked, the highest state under it */
+    eneApply(M);
+    commit();
+    setTimeout(() => openEneEd(M.id), 0);
+    return M;
+  }
+  /* a state moved up or down with all its paths (cols null), or only one path's value moved to the next state (cols: that
+     path's columns, its bracketed one too): the parts and the shifts made by hand that belong to a row go with it */
+  function eneCols(M, c) {
+    const p = enePaths(M).find(q => q.c === c || q.b === c || q.m === c);
+    return p ? [p.c, p.b, p.m].filter(x => x != null) : [c];
+  }
+  function eneMoveRow(M, a, b, cols) {
+    const n = (M.rows || []).length;
+    if (a < 0 || b < 0 || a >= n || b >= n || a === b) return false;
+    const perm = i => (i === a ? b : i === b ? a : i),
+      inC = c => !cols || cols.includes(+c),
+      key = k => {
+        let m;
+        if ((m = /^(lv|ev|eb|dt):(\d+):(\d+)$/.exec(k)) && inC(m[3])) return m[1] + ':' + perm(+m[2]) + ':' + m[3];
+        if ((m = /^jn:(\d+):(\d+):(\d+)(:2)?$/.exec(k)) && inC(m[1])) return 'jn:' + m[1] + ':' + perm(+m[2]) + ':' + perm(+m[3]) + (m[4] || '');
+        if ((m = /^bk:(\d+):(\d+)(:-?1)?$/.exec(k)) && inC(m[1])) return 'bk:' + m[1] + ':' + perm(+m[2]) + (m[3] || '');
+        if ((m = /^nm:(\d+)$/.exec(k)) && !cols) return 'nm:' + perm(+m[1]);
+        if ((m = /^nm:(\d+):(\d+)$/.exec(k)) && inC(m[2])) return 'nm:' + perm(+m[1]) + ':' + m[2];
+        return k;
+      };
+    if (cols)
+      for (const c of cols) {
+        const t = M.rows[a][c];
+        M.rows[a][c] = M.rows[b][c];
+        M.rows[b][c] = t;
+      }
+    else [M.rows[a], M.rows[b]] = [M.rows[b], M.rows[a]];
+    const mv = {};
+    for (const [k, v] of Object.entries(M.mv || {})) {
+      const [i, c] = k.split(':');
+      mv[inC(c) ? perm(+i) + ':' + c : k] = v;
+    }
+    M.mv = mv;
+    M.hide = (M.hide || []).map(key);
+    M.keys = (M.keys || []).map(key);
+    for (const o of eneParts(M.id)) o.ek = key(o.ek);
+    return true;
+  }
+  /* a column swapped with its neighbour (not the first one, the names of the states): what it is follows it (brackets and
+     names belong to the path on their left), and the parts and shifts keyed by column go with it */
+  function eneMoveCol(M, a, b) {
+    const W = (M.head || []).length;
+    if (a < 1 || b < 1 || a >= W || b >= W || a === b) return false;
+    const perm = c => (c === a ? b : c === b ? a : c),
+      sw = A => A && ([A[a], A[b]] = [A[b], A[a]]),
+      key = k => {
+        let m;
+        if ((m = /^(lv|ev|eb|dt):(\d+):(\d+)(.*)$/.exec(k))) return m[1] + ':' + m[2] + ':' + perm(+m[3]) + m[4];
+        if ((m = /^nm:(\d+):(\d+)$/.exec(k))) return 'nm:' + m[1] + ':' + perm(+m[2]);
+        if ((m = /^(jn|bk):(\d+):(.*)$/.exec(k))) return m[1] + ':' + perm(+m[2]) + ':' + m[3];
+        if ((m = /^(cv|kl|kt):(\d+)$/.exec(k))) return m[1] + ':' + perm(+m[2]);
+        return k;
+      };
+    for (const A of [M.head, M.kind, M.col]) sw(A);
+    (M.rows || []).forEach(sw);
+    const mv = {};
+    for (const [k, v] of Object.entries(M.mv || {})) {
+      const [i, c] = k.split(':');
+      mv[i + ':' + perm(+c)] = v;
+    }
+    M.mv = mv;
+    M.hide = (M.hide || []).map(key);
+    M.keys = (M.keys || []).map(key);
+    for (const o of eneParts(M.id)) o.ek = key(o.ek);
+    return true;
+  }
+  /* edits from the window: the table and the settings, drawn again at once (one Undo step while the window is open) */
+  function eneEdit(f, again) {
+    const M = eneModel(eneEdId);
+    if (!M) return;
+    eneEdTouch();
+    f(M);
+    eneApply(M);
+    commit();
+    if (again) renderEneEd();
+  }
+  eneEd.addEventListener('input', e => {
+    const t = e.target;
+    if (t.dataset.er != null) eneEdit(M => {
+      const r = M.rows[+t.dataset.er];
+      if (r) r[+t.dataset.c] = t.value;
+    });
+    else if (t.dataset.eh != null) eneEdit(M => (M.head[+t.dataset.eh] = t.value));
+    else if (t.dataset.ec != null) eneEdit(M => (M.col[+t.dataset.ec] = t.value));
+    else if (t.dataset.eo === 'title') eneEdit(M => (M.title = t.value));
+    else if (t.dataset.eo === 'step') {
+      const v = +t.value;
+      if (isFinite(v) && v >= 0) eneEdit(M => (M.step = v));
+    } else if (['sy', 'sx', 'lw', 'fs'].includes(t.dataset.eo)) {
+      const v = +t.value;
+      if (isFinite(v) && v > 0) eneEdit(M => (M[t.dataset.eo] = v));
+    }
+  });
+  eneEd.addEventListener('change', e => {
+    const t = e.target;
+    if (t.dataset.ek != null)
+      eneEdit(M => {
+        const c = +t.dataset.ek;
+        M.kind[c] = t.value;
+        if (t.value === 'e' && !M.col[c]) M.col[c] = ENE_COL[M.kind.filter(k => k === 'e').length % ENE_COL.length];
+      }, true);
+    else if (t.dataset.eo === 'style' || t.dataset.eo === 'lab') eneEdit(M => (M[t.dataset.eo] = t.value));
+    else if (['vals', 'names', 'axis', 'numcol', 'key', 'bold'].includes(t.dataset.eo)) eneEdit(M => (M[t.dataset.eo] = t.checked ? 1 : 0));
+  });
+  /* Alt+↑/↓ in a cell: in the names the whole state moves, in a path only that path's value (with its bracketed one) */
+  eneEd.addEventListener('keydown', e => {
+    const t = e.target;
+    if (t.dataset.er == null || !e.altKey || e.ctrlKey || e.metaKey || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const M = eneModel(eneEdId),
+      a = +t.dataset.er,
+      c = +t.dataset.c,
+      b = a + (e.key === 'ArrowUp' ? -1 : 1);
+    if (!M || b < 0 || b >= M.rows.length) return;
+    eneEdit(N => eneMoveRow(N, a, b, c ? eneCols(N, c) : null), true);
+    const n = eneEd.querySelector(`[data-er="${b}"][data-c="${c}"]`);
+    if (n) n.focus();
+  });
+  /* a table pasted into a cell fills the grid from that cell on, growing it as needed */
+  eneEd.addEventListener('paste', e => {
+    const t = e.target;
+    if (t.dataset.er == null && t.dataset.eh == null) return;
+    const s = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/[\t\n]/.test(s)) return;
+    e.preventDefault();
+    const G = eneParseTable(s);
+    eneEdit(M => {
+      /* pasted into the corner (the first header cell): the whole table, header and all */
+      if (t.dataset.eh === '0') {
+        eneTake(M, G);
+        return;
+      }
+      const r0 = t.dataset.er != null ? +t.dataset.er : -1,
+        c0 = +(t.dataset.c != null ? t.dataset.c : t.dataset.eh);
+      G.forEach((row, i) =>
+        row.forEach((v, j) => {
+          const r = r0 + i,
+            c = c0 + j;
+          while (M.head.length <= c) {
+            M.head.push('Path ' + String.fromCharCode(64 + M.head.length));
+            M.kind.push('e');
+            M.col.push(ENE_COL[M.kind.filter(k => k === 'e').length % ENE_COL.length]);
+            M.rows.forEach(rr => rr.push(''));
+          }
+          if (r < 0) M.head[c] = v;
+          else {
+            while (M.rows.length <= r) M.rows.push(M.head.map(() => ''));
+            M.rows[r][c] = v;
+          }
+        })
+      );
+    }, true);
+  });
+  eneFile.addEventListener('change', async () => {
+    const f = eneFile.files && eneFile.files[0];
+    eneFile.value = '';
+    if (!f) return;
+    try {
+      const G = /\.xlsx$/i.test(f.name) ? await eneXlsx(new Uint8Array(await f.arrayBuffer())) : eneParseTable(await f.text());
+      if (!G.length) throw new Error('the file holds no table');
+      eneEdit(M => eneTake(M, G), true);
+      toast('Table taken from ' + f.name);
+    } catch (err) {
+      toast('Could not read ' + f.name + ': ' + ((err && err.message) || err).replace('not a Word file (.docx)', 'not an Excel file (.xlsx)'), true);
+    }
+  });
+  eneEd.addEventListener('click', e => {
+    const b = e.target.closest('[data-ee]');
+    if (!b) return;
+    const k = b.dataset.ee,
+      v = +b.dataset.v;
+    if (k === 'close') {
+      eneEd.hidden = true;
+      return;
+    }
+    if (k === 'file') {
+      eneFile.click();
+      return;
+    }
+    if (k === 'copy') {
+      const M = eneModel(eneEdId);
+      if (!M) return;
+      const s = [M.head, ...M.rows].map(r => r.join('\t')).join('\n');
+      (navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(s) : Promise.reject()).then(() => toast('Table copied: paste it into Excel'), () => toast('Could not copy the table', true));
+      return;
+    }
+    if (k === 'del') {
+      snap();
+      const id = eneEdId;
+      mol.arrows = mol.arrows.filter(q => q.eg !== id);
+      mol.texts = mol.texts.filter(q => q.eg !== id);
+      eneEd.hidden = true;
+      eneEdId = null;
+      commit();
+      return;
+    }
+    if (k === 'dup') {
+      const M = eneModel(eneEdId);
+      if (!M) return;
+      snap();
+      const B = eneBox(M.id),
+        N = JSON.parse(JSON.stringify({ ...M, keys: [], hide: [] }));
+      N.id = mol.next++;
+      N.x += 0;
+      N.y += (B ? B.y1 - B.y0 : 200) + (M.fs || 13) * 3;
+      eneApply(N);
+      commit();
+      openEneEd(N.id);
+      return;
+    }
+    eneEdit(M => {
+      if (k === 'radd') M.rows.push(M.head.map(() => ''));
+      if (k === 'rdel') M.rows.splice(v, 1);
+      if (k === 'rup' || k === 'rdn') eneMoveRow(M, v, v + (k === 'rup' ? -1 : 1), null);
+      if (k === 'cl' || k === 'cr') eneMoveCol(M, v, v + (k === 'cl' ? -1 : 1));
+      if (k === 'cadd') {
+        M.head.push('Path ' + String.fromCharCode(64 + M.head.length));
+        M.kind.push('e');
+        M.col.push(ENE_COL[M.kind.filter(q => q === 'e').length % ENE_COL.length]);
+        M.rows.forEach(r => r.push(''));
+      }
+      if (k === 'cdel' && M.head.length > 2) {
+        for (const a of [M.head, M.kind, M.col]) a.splice(v, 1);
+        M.rows.forEach(r => r.splice(v, 1));
+      }
+      if (k === 'reset') {
+        M.hide = [];
+        M.mv = {};
+        for (const o of eneParts(M.id)) {
+          if (o.text != null) {
+            o.x = o.ed0[0];
+            o.y = o.ed0[1];
+          } else {
+            const d = [o.x1 - o.ed0[0], o.y1 - o.ed0[1]];
+            o.x1 = o.ed0[0];
+            o.y1 = o.ed0[1];
+            o.x2 = o.bz ? o.x2 - d[0] : o.ed0[2];
+            o.y2 = o.bz ? o.y2 - d[1] : o.ed0[3];
+          }
+        }
+      }
+    }, true);
+  });
+  /* the window moves by its title */
+  {
+    let mv = null;
+    eneEd.addEventListener('pointerdown', e => {
+      if (!e.target.classList.contains('ttl')) return;
+      mv = { x: e.clientX, y: e.clientY, l: eneEd.offsetLeft, t: eneEd.offsetTop };
+      eneEd.setPointerCapture(e.pointerId);
+    });
+    eneEd.addEventListener('pointermove', e => {
+      if (!mv) return;
+      eneEd.style.left = mv.l + e.clientX - mv.x + 'px';
+      eneEd.style.top = mv.t + e.clientY - mv.y + 'px';
+    });
+    eneEd.addEventListener('pointerup', () => (mv = null));
+  }
+  document.addEventListener('pointerdown', e => {
+    if (!eneEd.hidden && !e.target.closest('#eneEd') && !e.target.closest('#mol')) eneEd.hidden = true;
   });
   const chartBox = r => (r.kind === 'radar' ? radBox(r) : r.kind === 'jab' ? jabBox(r) : pieBox(r));
 
@@ -72611,6 +74639,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const API_UNDO = new Map();
   const ReactioAPI = {
     run(op, args) {
+      /* a command is not part of a paste made before it: what it draws is not selected as pasted, nor the view moved */
+      pasteMark = null;
       const f = API_OPS[op];
       if (!f) throw new Error('Unknown command "' + op + '". Commands: ' + Object.keys(API_OPS).join(', ') + ' (help {"op": "…"} for one)');
       args = args || {};
@@ -75700,13 +77730,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     saveTabs();
     renderTabs();
   }
-  const SAVE_EXT = ['reactio', 'json', 'cdxml', 'cdx', 'mol', 'sdf', 'rxn', 'smi', 'xyz'];
+  const SAVE_EXT = ['reactio', 'json', 'cdxml', 'cdx', 'mol', 'sdf', 'rxn', 'smi', 'xyz', 'cml'];
   function fileBody(ext) {
     if (ext === 'json' || ext === 'reactio') return JSON.stringify({ rd: 1, state: S }, null, 1);
     const F = exportFormats();
     if (ext === 'cdxml') return withRd(F.cdxml);
     if (ext === 'cdx') return cdxOfCdxml(withRdTag(F.cdxml));
-    return { mol: F.mol, sdf: F.sdf, rxn: F.rxn, smi: F.smi && F.smi + '\n' }[ext] || null;
+    return { mol: F.mol, sdf: F.sdf, rxn: F.rxn, smi: F.smi && F.smi + '\n', cml: F.cml }[ext] || null;
   }
   const NATIVE_FILES = () =>
     !!(
@@ -75778,6 +77808,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     '.rxn',
     '.cdxml',
     '.smi',
+    '.cml',
     '.smiles',
     '.txt',
     '.cdx'
@@ -75829,6 +77860,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       const r = await saveDoc0(mode);
       nlog('save ' + mode + (r ? ': done' : ': not saved'));
+      /* waited for: closing or quitting after this save must not drop the drawing before its LaTeX figure is written */
+      if (r && mode !== 'copy') await refreshLatexFigure();
       return r;
     } catch (e) {
       console.error(e);
@@ -76274,7 +78307,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['sdf', 'SDF (.sdf)', 'structures only, one record per compound'],
     ['rxn', 'Reaction (.rxn)', 'the reaction only'],
     ['smi', 'SMILES (.smi)', 'structures only, as text'],
-    ['xyz', 'XYZ (.xyz)', 'structures only, in 3D with hydrogens: the lowest of up to 20 MMFF94s+ conformers, with charge and multiplicity']
+    ['xyz', 'XYZ (.xyz)', 'structures only, in 3D with hydrogens: the lowest of up to 20 MMFF94s+ conformers, with charge and multiplicity'],
+    ['cml', 'CML (.cml)', 'structures only, as XML (Chemical Markup Language); a reaction with its reactants and products']
   ];
   function askFormat() {
     return new Promise(res => {
@@ -77185,6 +79219,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
   }
   window.__rd = {
+    eneFollow, eneBuild, openInTab, switchTab, closeTab,
+    get TABS() {
+      return TABS;
+    },
+    eneNew, eneApply, eneModel, eneParts, eneTake, eneParseTable, eneXlsx, eneCreate, openEneEd, eneMoveRow, eneCols, eneMoveCol,
     boatSpot,
     projSig,
     projKey,
