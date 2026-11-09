@@ -4,6 +4,16 @@
 in the Mac app) turns the drawing into a LaTeX figure whose compound numbers match the text. Ordinary Copy
 (Ctrl+C) is not changed.
 
+Pasted into [Lattice](https://github.com/leo1oel/lattice), from its next release, the figure brings its files: they are
+copied into `figures/`, the `\input` line goes in, and the preamble lines it needs are added.
+
+In any other LaTeX editor the paste gives only the `figure` block with `\input`. Copy the `.tex` and `.pdf` written beside
+the saved drawing into the project's `figures/` folder, and add `graphicx`, `tikz` and `chemnum` to the preamble, with
+the `\rcmpd` block from [LaTeX marks](latex-marks.md#using-marks-outside-lattice) if the figure has marks. An unsaved drawing writes no files, so save it first.
+
+The clipboard format is open and described in Lattice's
+[`docs/editable-figures.md`](https://github.com/leo1oel/lattice/blob/main/docs/editable-figures.md), for other editors to support.
+
 ## What it makes
 
 For a drawing saved as `scheme.reactio` it writes, next to it:

@@ -54,3 +54,54 @@ once, and those marks are not used:
 - Rest the pointer on a number in the PDF: its mark appears; a click copies `\rcmpd{…}`.
 - Type `\rcmpd{` or `\cmpd{`: the project's keys are listed with their numbers and the figure they are drawn in.
   With a chapter prefix made of a macro, the list shows the number without the chapter; the PDF is right.
+
+## Using marks outside Lattice
+
+Lattice adds this block by itself. In any other LaTeX editor, put it in the preamble once, after `\usepackage{chemnum}`:
+
+```latex
+% Compound marks from drawings: \rcmpd{what is inside [[ ]]}, added for editable figures
+\makeatletter
+\providecommand\rcmpd@series[2]{%
+  \@ifundefined{cmpdser@#1@#2}{%
+    \@ifundefined{c@cmpdser#1}{\newcounter{cmpdser#1}}{}%
+    \stepcounter{cmpdser#1}%
+    \expandafter\xdef\csname cmpdser@#1@#2\endcsname{\csname rcmpd@style@#1\endcsname{\value{cmpdser#1}}}%
+    \immediate\write\@auxout{\string\cmpdser@aux{#1}{#2}{\csname cmpdser@#1@#2\endcsname}}%
+  }{}%
+  \textbf{\csname cmpdser@#1@#2\endcsname}%
+}
+\providecommand\cmpdser@aux[3]{}
+\providecommand\rcmpd@style@A[1]{\@Alph{#1}}
+\providecommand\rcmpd@style@a[1]{\@alph{#1}}
+\providecommand\rcmpd@style@I[1]{\@Roman{#1}}
+\providecommand\rcmpd@style@i[1]{\@roman{#1}}
+\makeatother
+\ExplSyntaxOn
+\ProvideDocumentCommand \rcmpd { m }
+  {
+    \regex_match:nnTF { \A [A-Za-z0-9_-] } {#1}
+      {
+        \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq
+          { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }
+          {
+            \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. (num|dash) \Z } {#1} \l_tmpa_seq
+              {
+                \use:e
+                  {
+                    \exp_not:N \cmpd
+                    [ post-main-label-code = \str_if_eq:eeTF { \seq_item:Nn \l_tmpa_seq { 3 } } { num } { . } { - } , sub-counter-format = arabic ]
+                    { \seq_item:Nn \l_tmpa_seq { 2 } }
+                  }
+              }
+              {
+                \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. letter \Z } {#1} \l_tmpa_seq
+                  { \use:e { \exp_not:N \cmpd { \seq_item:Nn \l_tmpa_seq { 2 } } } }
+                  { \cmpd {#1} }
+              }
+          }
+      }
+      { \textbf { ?? } }
+  }
+\ExplSyntaxOff
+```
