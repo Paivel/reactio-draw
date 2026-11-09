@@ -90,8 +90,10 @@ func handle(s string) {
 			if _, err := os.Stat(r.Path); err == nil {
 				exists = true
 			}
-			if data, err := os.ReadFile(r.Path); err == nil && strings.HasSuffix(lower, ".tex") {
-				line = strings.TrimRight(strings.SplitN(string(data), "\n", 2)[0], "\r")
+			if strings.HasSuffix(lower, ".tex") {
+				if data, err := os.ReadFile(r.Path); err == nil {
+					line = strings.TrimRight(strings.SplitN(string(data), "\n", 2)[0], "\r")
+				}
 			}
 		}
 		reply(r.ID, map[string]interface{}{"line": line, "exists": exists})
