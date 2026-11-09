@@ -106,17 +106,36 @@ func pathAllowed(_ p: String) -> Bool {
     let dir = u.deletingLastPathComponent().path, stem = u.deletingPathExtension().lastPathComponent
     return list.contains { q in
         let r = URL(fileURLWithPath: q)
-        return r.pathExtension == "reactio" && r.deletingLastPathComponent().path == dir && texStem(r.lastPathComponent) == stem
+        return r.pathExtension == "reactio" && r.deletingLastPathComponent().path == dir && (texStem(r.lastPathComponent) == stem || plainStem(r.lastPathComponent) == stem)
     }
 }
-/* a file name as LaTeX takes it: no extension, characters other than letters, digits . _ - as _, no leading . or _ */
-func texStem(_ name: String) -> String {
+/* Cyrillic in Latin letters, accents dropped: the same table and rule as texStem in the page and the Go apps */
+let texLatin: [Character: String] = {
+    var m: [Character: String] = [:]
+    let f = "а a б b в v г g ґ g д d е e ё yo є ye ж zh з z и i і i ї yi й y к k л l м m н n о o п p р r с s т t у u ў u ф f х kh ц ts ч ch ш sh щ shch ъ - ы y ь - э e ю yu я ya à a á a â a ã a ä a å a ā a ă a ą a æ ae ç c ć c č c ď d đ d è e é e ê e ë e ē e ė e ę e ě e ğ g ì i í i î i ï i ī i ı i ł l ñ n ń n ň n ò o ó o ô o õ o ö o ø o ō o ő o œ oe ř r ś s š s ş s ß s ť t ù u ú u û u ü u ū u ů u ű u ý y ÿ y ź z ż z ž z".split(separator: " ")
+    var i = 0
+    while i + 1 < f.count { m[f[i].first!] = String(f[i + 1]); i += 2 }
+    return m
+}()
+func latinName(_ name: String) -> String {
+    var out = ""
+    for c in name.precomposedStringWithCanonicalMapping {
+        let low = Character(String(c).lowercased())
+        guard let t = texLatin[low] else { out.append(c); continue }
+        if t == "-" { continue }
+        out += c == low ? t : t.prefix(1).uppercased() + t.dropFirst()
+    }
+    return String(String.UnicodeScalarView(out.unicodeScalars.filter { !(0x300...0x36f).contains($0.value) }))
+}
+/* a name as figures were called before the rule above: an existing figure keeps its files */
+func plainStem(_ name: String) -> String {
     var s = name
     if let i = s.lastIndex(of: "."), i != s.startIndex { s = String(s[..<i]) }
     s = s.replacingOccurrences(of: "[^A-Za-z0-9._-]+", with: "_", options: .regularExpression)
     s = s.replacingOccurrences(of: "^[._]+", with: "", options: .regularExpression)
     return s.isEmpty ? "figure" : s
 }
+func texStem(_ name: String) -> String { plainStem(latinName(name)) }
 
 /* Update (Info → Check for updates, then Update): only when the person asks. The newest release's Mac archive (and the
    AI-assistants add-on, when it is installed) is downloaded, checked against the SHA-256 GitHub gives for it and

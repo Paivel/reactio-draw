@@ -39553,11 +39553,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      includes the figure, for other editors. In the apps, for a drawing kept in a .reactio file, the files are written
      next to it (saved first) and the manifest gives their paths; otherwise (a browser, which cannot write files, or a
      drawing not saved yet) they go in the manifest itself */
-  const texStem = s => {
+  /* Cyrillic in Latin letters, accents dropped: Схема 1 is Skhema_1. The table and the rule are the same in macapp/main.swift and the Go apps */
+  const TEX_LATIN = new Map(
+    'а a б b в v г g ґ g д d е e ё yo є ye ж zh з z и i і i ї yi й y к k л l м m н n о o п p р r с s т t у u ў u ф f х kh ц ts ч ch ш sh щ shch ъ - ы y ь - э e ю yu я ya à a á a â a ã a ä a å a ā a ă a ą a æ ae ç c ć c č c ď d đ d è e é e ê e ë e ē e ė e ę e ě e ğ g ì i í i î i ï i ī i ı i ł l ñ n ń n ň n ò o ó o ô o õ o ö o ø o ō o ő o œ oe ř r ś s š s ş s ß s ť t ù u ú u û u ü u ū u ů u ű u ý y ÿ y ź z ż z ž z'.match(/\S+ \S+/g).map(p => p.split(' '))
+  );
+  const latinName = s =>
+    [...String(s).normalize('NFC')]
+      .map(c => {
+        const t = TEX_LATIN.get(c.toLowerCase());
+        if (t == null) return c;
+        if (t === '-') return '';
+        return c === c.toLowerCase() ? t : t[0].toUpperCase() + t.slice(1);
+      })
+      .join('')
+      .replace(/[\u0300-\u036f]/g, '');
+  /* a name as figures were called before the rule above: an existing figure keeps its files */
+  const plainStem = s => {
     s = String(s);
     const i = s.lastIndexOf('.');
     return (i > 0 ? s.slice(0, i) : s).replace(/[^A-Za-z0-9._-]+/g, '_').replace(/^[._]+/, '') || 'figure';
   };
+  const texStem = s => plainStem(latinName(s));
   const b64of = u => {
     u = typeof u === 'string' ? new TextEncoder().encode(u) : u;
     let s = '';
@@ -39568,15 +39584,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const figureFilesFree = (tex, pdf, name) =>
     String((tex && tex.line) || '').trim() === '% editable-figure source: ' + name || (!(tex && tex.exists) && !(pdf && pdf.exists));
   /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
-  const siblingStem = t => {
-    const src = t.file.path;
-    return src.slice(0, Math.max(src.lastIndexOf('/'), src.lastIndexOf('\\')) + 1) + texStem(t.file.name);
-  };
+  const siblingDir = t => t.file.path.slice(0, Math.max(t.file.path.lastIndexOf('/'), t.file.path.lastIndexOf('\\')) + 1);
+  const siblingStem = t => siblingDir(t) + texStem(t.file.name);
+  /* the stem of the figure beside this drawing: an older figure of it keeps its name, so documents that include it go on working */
+  async function besideStem(t) {
+    const now = texStem(t.file.name),
+      old = plainStem(t.file.name);
+    if (old === now) return now;
+    const h = await window.rdNative.call('texHead', { path: siblingDir(t) + old + '.tex' });
+    return h && String(h.line || '').trim() === '% editable-figure source: ' + t.file.name ? old : now;
+  }
   async function writeFigureBeside(t) {
-    const stem = texStem(t.file.name),
+    const stem = await besideStem(t),
       f = await latexFigureOf(stem, t.file.name);
     for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
-      const path = siblingStem(t) + '.' + ext,
+      const path = siblingDir(t) + stem + '.' + ext,
         r = await window.rdNative.call('write', { path, b64: b64of(body) });
       if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
     }
@@ -39587,7 +39609,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const t = curTab();
     if (!NATIVE_FILES() || !(t && t.file && /\.reactio$/i.test(t.file.path || ''))) return;
     try {
-      const h = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' });
+      const h = await window.rdNative.call('texHead', { path: siblingDir(t) + (await besideStem(t)) + '.tex' });
       if (!h || String(h.line || '').trim() !== '% editable-figure source: ' + t.file.name) return;
       await writeFigureBeside(t);
       nlog('LaTeX figure updated');
@@ -39607,22 +39629,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const t = curTab();
       /* both files are written only if neither exists yet or the .tex says it is this drawing's figure: another file of
          that name (an exported scheme.pdf, say) is left alone */
-      const head = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' }),
-        pdf = await window.rdNative.call('texHead', { path: siblingStem(t) + '.pdf' }),
+      const beside = siblingDir(t) + (await besideStem(t)),
+        head = await window.rdNative.call('texHead', { path: beside + '.tex' }),
+        pdf = await window.rdNative.call('texHead', { path: beside + '.pdf' }),
         free = figureFilesFree(head, pdf, t.file.name);
       if (!free)
         throw new Error(texStem(t.file.name) + '.tex or .pdf already exists next to the drawing and is not its figure');
       /* the files themselves, never paths: a LaTeX editor must not read local paths named on a clipboard */
       const { stem, f } = await writeFigureBeside(t);
+      /* the copy in the LaTeX project goes by a plain name (a file called Схема (1).reactio stays as it is here), and its .tex says so */
+      const name = texStem(t.file.name),
+        source = name + '.reactio',
+        tex = f.tex.replace(/^.*/, () => '% editable-figure source: ' + source).split(stem + '.pdf').join(name + '.pdf');
       man = {
         version: 1,
-        name: stem,
-        source: { name: t.file.name, data: b64of(fileBody('reactio')) },
+        name,
+        source: { name: source, data: b64of(fileBody('reactio')) },
         outputs: [
-          { name: stem + '.pdf', data: b64of(f.pdf) },
-          { name: stem + '.tex', data: b64of(f.tex) }
+          { name: name + '.pdf', data: b64of(f.pdf) },
+          { name: name + '.tex', data: b64of(tex) }
         ],
-        entry: stem + '.tex',
+        entry: name + '.tex',
         packages: f.packages,
         ...(f.preamble ? { preamble: f.preamble } : {})
       };

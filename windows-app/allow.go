@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"unicode"
 	"sync"
 )
 
@@ -83,7 +84,7 @@ func pathAllowed(p string) bool {
 	}
 	dir, stem := filepath.Dir(n), strings.TrimSuffix(filepath.Base(n), ext)
 	for _, q := range allowList {
-		if filepath.Ext(q) == ".reactio" && filepath.Dir(q) == dir && texStem(filepath.Base(q)) == stem {
+		if filepath.Ext(q) == ".reactio" && filepath.Dir(q) == dir && (texStem(filepath.Base(q)) == stem || plainStem(filepath.Base(q)) == stem) {
 			return true
 		}
 	}
@@ -93,8 +94,44 @@ func pathAllowed(p string) bool {
 var texBad = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 var texLead = regexp.MustCompile(`^[._]+`)
 
-// a file name as LaTeX takes it: no extension, characters other than letters, digits . _ - as _, no leading . or _
-func texStem(name string) string {
+// Cyrillic in Latin letters, accents dropped: the same table and rule as texStem in the page and in macapp/main.swift
+const texLatinTable = "а a б b в v г g ґ g д d е e ё yo є ye ж zh з z и i і i ї yi й y к k л l м m н n о o п p р r с s т t у u ў u ф f х kh ц ts ч ch ш sh щ shch ъ - ы y ь - э e ю yu я ya à a á a â a ã a ä a å a ā a ă a ą a æ ae ç c ć c č c ď d đ d è e é e ê e ë e ē e ė e ę e ě e ğ g ì i í i î i ï i ī i ı i ł l ñ n ń n ň n ò o ó o ô o õ o ö o ø o ō o ő o œ oe ř r ś s š s ş s ß s ť t ù u ú u û u ü u ū u ů u ű u ý y ÿ y ź z ż z ž z"
+
+var texLatin = func() map[rune]string {
+	m := map[rune]string{}
+	f := strings.Fields(texLatinTable)
+	for i := 0; i+1 < len(f); i += 2 {
+		m[[]rune(f[i])[0]] = f[i+1]
+	}
+	return m
+}()
+
+// the two letters of the table a name may hold decomposed, whose base letter alone would read differently
+var texComposed = strings.NewReplacer("и\u0306", "й", "И\u0306", "Й", "е\u0308", "ё", "Е\u0308", "Ё", "і\u0308", "ї", "І\u0308", "Ї", "у\u0306", "ў", "У\u0306", "Ў")
+
+func latinName(name string) string {
+	var b strings.Builder
+	for _, c := range texComposed.Replace(name) {
+		if c >= 0x300 && c <= 0x36f {
+			continue
+		}
+		low := unicode.ToLower(c)
+		t, ok := texLatin[low]
+		switch {
+		case !ok:
+			b.WriteRune(c)
+		case t == "-":
+		case c == low:
+			b.WriteString(t)
+		default:
+			b.WriteString(strings.ToUpper(t[:1]) + t[1:])
+		}
+	}
+	return b.String()
+}
+
+// a name as figures were called before the rule above: an existing figure keeps its files
+func plainStem(name string) string {
 	if i := strings.LastIndex(name, "."); i > 0 {
 		name = name[:i]
 	}
@@ -104,3 +141,5 @@ func texStem(name string) string {
 	}
 	return s
 }
+
+func texStem(name string) string { return plainStem(latinName(name)) }
