@@ -77846,7 +77846,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       const r = await saveDoc0(mode);
       nlog('save ' + mode + (r ? ': done' : ': not saved'));
-      if (r && mode !== 'copy') refreshLatexFigure();
+      /* waited for: closing or quitting after this save must not drop the drawing before its LaTeX figure is written */
+      if (r && mode !== 'copy') await refreshLatexFigure();
       return r;
     } catch (e) {
       console.error(e);
