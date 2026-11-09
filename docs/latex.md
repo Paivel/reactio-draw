@@ -62,12 +62,12 @@ The clipboard gets two kinds of data:
 ```json
 {"version": 1,
  "name": "scheme",
- "source": {"path": "/Users/me/paper/scheme.reactio"},
- "outputs": [{"path": "/Users/me/paper/scheme.pdf"}, {"path": "/Users/me/paper/scheme.tex"}],
+ "source": {"name": "scheme.reactio", "data": "<base64>"},
+ "outputs": [{"name": "scheme.pdf", "data": "<base64>"}, {"name": "scheme.tex", "data": "<base64>"}],
  "entry": "scheme.tex",
  "packages": ["graphicx", "tikz", "chemnum"]}
 ```
 
-From the desktop apps the source and the outputs are paths of files on disk. From the web version, or for a
-drawing not saved yet, each is `{"name": "scheme.pdf", "data": "<base64>"}` instead. `entry` is the file to include; `packages` are
+The files always travel inside the manifest, as base64, never as paths on disk.
+`entry` is the file to include; `packages` are
 the packages it needs. `preamble`, when present, lists whole lines the entry needs before `\begin{document}`.

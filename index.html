@@ -39565,15 +39565,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   };
   async function writeFigureBeside(t) {
     const stem = texStem(t.file.name),
-      f = await latexFigureOf(stem, t.file.name),
-      out = [];
+      f = await latexFigureOf(stem, t.file.name);
     for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
       const path = siblingStem(t) + '.' + ext,
         r = await window.rdNative.call('write', { path, b64: b64of(body) });
       if (!r || !r.ok) throw new Error('Could not write ' + stem + '.' + ext + (r && r.err ? ': ' + r.err : ''));
-      out.push({ path });
     }
-    return { stem, out, packages: f.packages, preamble: f.preamble };
+    return { stem, f };
   }
   /* after a Save: a figure made from this file (the .tex next to it says so on its first line) follows the drawing */
   async function refreshLatexFigure() {
@@ -39594,7 +39592,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let man;
     const t0 = curTab();
     /* a drawing kept in a .reactio file: saved, and the figure written next to it; any other (new, unsaved, or kept as
-       CDXML…) goes in the manifest itself, as from a browser, and the LaTeX editor keeps the .reactio it gets */
+       CDXML…) goes only in the manifest, and the LaTeX editor keeps the .reactio it gets */
     if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
       if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
       const t = curTab();
@@ -39605,8 +39603,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         free = figureFilesFree(head, pdf, t.file.name);
       if (!free)
         throw new Error(texStem(t.file.name) + '.tex or .pdf already exists next to the drawing and is not its figure');
-      const { stem, out, packages, preamble } = await writeFigureBeside(t);
-      man = { version: 1, name: stem, source: { path: t.file.path }, outputs: out, entry: stem + '.tex', packages, ...(preamble ? { preamble } : {}) };
+      /* the files themselves, never paths: a LaTeX editor must not read local paths named on a clipboard */
+      const { stem, f } = await writeFigureBeside(t);
+      man = {
+        version: 1,
+        name: stem,
+        source: { name: t.file.name, data: b64of(fileBody('reactio')) },
+        outputs: [
+          { name: stem + '.pdf', data: b64of(f.pdf) },
+          { name: stem + '.tex', data: b64of(f.tex) }
+        ],
+        entry: stem + '.tex',
+        packages: f.packages,
+        ...(f.preamble ? { preamble: f.preamble } : {})
+      };
     } else {
       const t = curTab(),
         stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
