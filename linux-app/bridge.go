@@ -74,14 +74,18 @@ func handle(s string) {
 		allowPath(p)
 		reply(r.ID, map[string]interface{}{"path": p})
 	case "texHead":
-		// the first line of the .tex next to a chosen .reactio, which says whether it is that drawing's figure
-		line := ""
-		if strings.HasSuffix(strings.ToLower(r.Path), ".tex") && pathAllowed(r.Path) {
-			if data, err := os.ReadFile(r.Path); err == nil {
+		// whether the .tex or .pdf next to a chosen .reactio exists, and a .tex's first line, which says whether it is that drawing's figure
+		line, exists := "", false
+		lower := strings.ToLower(r.Path)
+		if (strings.HasSuffix(lower, ".tex") || strings.HasSuffix(lower, ".pdf")) && pathAllowed(r.Path) {
+			if _, err := os.Stat(r.Path); err == nil {
+				exists = true
+			}
+			if data, err := os.ReadFile(r.Path); err == nil && strings.HasSuffix(lower, ".tex") {
 				line = strings.TrimRight(strings.SplitN(string(data), "\n", 2)[0], "\r")
 			}
 		}
-		reply(r.ID, map[string]interface{}{"line": line})
+		reply(r.ID, map[string]interface{}{"line": line, "exists": exists})
 	case "write":
 		if r.Path == "" {
 			reply(r.ID, map[string]interface{}{"ok": false, "err": "no file"})

@@ -39432,7 +39432,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     String.raw`    \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq`,
     String.raw`      { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }`,
     String.raw`      {`,
-    String.raw`        \regex_extract_once:nnNTF { \A (.*) \. (num|dash) \Z } {#1} \l_tmpa_seq`,
+    String.raw`        \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. (num|dash) \Z } {#1} \l_tmpa_seq`,
     String.raw`          {`,
     String.raw`            \use:e`,
     String.raw`              {`,
@@ -39442,7 +39442,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     String.raw`              }`,
     String.raw`          }`,
     String.raw`          {`,
-    String.raw`            \regex_extract_once:nnNTF { \A (.*) \. letter \Z } {#1} \l_tmpa_seq`,
+    String.raw`            \regex_extract_once:nnNTF { \A ([^.]+ \. [^.]+) \. letter \Z } {#1} \l_tmpa_seq`,
     String.raw`              { \use:e { \exp_not:N \cmpd { \seq_item:Nn \l_tmpa_seq { 2 } } } }`,
     String.raw`              { \cmpd {#1} }`,
     String.raw`          }`,
@@ -39555,6 +39555,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192));
     return btoa(s);
   };
+  /* may a figure be written beside this drawing: neither file there yet, or the .tex names this drawing */
+  const figureFilesFree = (tex, pdf, name) =>
+    String((tex && tex.line) || '').trim() === '% editable-figure source: ' + name || (!(tex && tex.exists) && !(pdf && pdf.exists));
   /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
   const siblingStem = t => {
     const src = t.file.path;
@@ -39595,11 +39598,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
       if (!(await saveDoc('save'))) throw new Error('Could not save the drawing, so the LaTeX figure was not written');
       const t = curTab();
-      /* another file of that name, not this drawing's figure, is left alone */
-      const head = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' });
-      const first = String((head && head.line) || '').trim();
-      if (first && first !== '% editable-figure source: ' + t.file.name)
-        throw new Error(texStem(t.file.name) + '.tex already exists next to the drawing and is not its figure');
+      /* both files are written only if neither exists yet or the .tex says it is this drawing's figure: another file of
+         that name (an exported scheme.pdf, say) is left alone */
+      const head = await window.rdNative.call('texHead', { path: siblingStem(t) + '.tex' }),
+        pdf = await window.rdNative.call('texHead', { path: siblingStem(t) + '.pdf' }),
+        free = figureFilesFree(head, pdf, t.file.name);
+      if (!free)
+        throw new Error(texStem(t.file.name) + '.tex or .pdf already exists next to the drawing and is not its figure');
       const { stem, out, packages, preamble } = await writeFigureBeside(t);
       man = { version: 1, name: stem, source: { path: t.file.path }, outputs: out, entry: stem + '.tex', packages, ...(preamble ? { preamble } : {}) };
     } else {

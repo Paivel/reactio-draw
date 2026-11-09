@@ -281,10 +281,12 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             if !pathAllowed(path) { reply(id, ["ok": false, "ask": true]); return }
             do { try d.write(to: URL(fileURLWithPath: path), options: .atomic); reply(id, ["ok": true]) } catch { reply(id, ["ok": false, "err": "\(error.localizedDescription)"]) }
         case "texHead":
-            // the first line of the .tex next to a chosen .reactio, which says whether it is that drawing's figure
-            guard let path = m["path"] as? String, path.hasSuffix(".tex"), pathAllowed(path), let f = FileHandle(forReadingAtPath: path) else { reply(id, ["line": ""]); return }
+            // whether the .tex or .pdf next to a chosen .reactio exists, and a .tex's first line, which says whether it is that drawing's figure
+            guard let path = m["path"] as? String, path.hasSuffix(".tex") || path.hasSuffix(".pdf"), pathAllowed(path) else { reply(id, ["line": "", "exists": false]); return }
+            guard FileManager.default.fileExists(atPath: path) else { reply(id, ["line": "", "exists": false]); return }
+            guard path.hasSuffix(".tex"), let f = FileHandle(forReadingAtPath: path) else { reply(id, ["line": "", "exists": true]); return }
             let head = String(decoding: f.readData(ofLength: 4096), as: UTF8.self); f.closeFile()
-            reply(id, ["line": head.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""])
+            reply(id, ["line": head.split(whereSeparator: \.isNewline).first.map(String.init) ?? "", "exists": true])
         case "link":
             // a link on the page (Credits, what is new) opens in the default browser; only web addresses
             if let s = m["url"] as? String, let u = URL(string: s), ["http", "https"].contains(u.scheme?.lowercased() ?? "") {
