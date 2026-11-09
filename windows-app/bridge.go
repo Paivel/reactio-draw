@@ -3,6 +3,7 @@ package main
 // What the page asks the app for (window.rdNative.call on the page side).
 
 import (
+	"errors"
 	"encoding/base64"
 	"encoding/json"
 	"os"
@@ -108,15 +109,20 @@ func handle(s string) {
 			return
 		}
 		// write next to the file first, then replace it, so a failed write never leaves half a file
-		tmp := r.Path + ".reactio-tmp"
-		if err := os.WriteFile(tmp, b64(r.B64), 0644); err != nil {
+		tmp, err := writeNew(r.Path, b64(r.B64))
+		if err != nil {
 			reply(r.ID, map[string]interface{}{"ok": false, "err": err.Error()})
 			return
 		}
 		if err := os.Rename(tmp, r.Path); err != nil {
-			// another program may hold the file (an editor, OneDrive syncing it): try writing over it in place
+			// another program may hold the file (an editor, OneDrive syncing it): try writing over it in place, but
+			// never through a link to somewhere else
 			os.Remove(tmp)
-			if err2 := os.WriteFile(r.Path, b64(r.B64), 0644); err2 != nil {
+			err2 := errors.New("the file is a link")
+			if fi, e := os.Lstat(r.Path); e != nil || fi.Mode()&os.ModeSymlink == 0 {
+				err2 = os.WriteFile(r.Path, b64(r.B64), 0644)
+			}
+			if err2 != nil {
 				logf("could not save %s: %v; %v", r.Path, err, err2)
 				reply(r.ID, map[string]interface{}{"ok": false, "err": err2.Error(), "locked": true})
 				return
@@ -408,4 +414,26 @@ func aiKitInstalled() bool {
 	}
 	st, err := os.Stat(filepath.Join(filepath.Dir(exe), "reactio-mcp.exe"))
 	return err == nil && !st.IsDir()
+}
+
+// writeNew writes data to a new temporary file beside path (created with O_EXCL and a random name, so a link left
+// at a fixed temporary name is never followed) and returns that file's name
+func writeNew(path string, data []byte) (string, error) {
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.rdtmp")
+	if err != nil {
+		return "", err
+	}
+	tmp := f.Name()
+	_, err = f.Write(data)
+	if err2 := f.Close(); err == nil {
+		err = err2
+	}
+	if err == nil {
+		err = os.Chmod(tmp, 0644)
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return "", err
+	}
+	return tmp, nil
 }
