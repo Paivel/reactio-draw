@@ -55,13 +55,13 @@ var readKinds = map[string]bool{
 	".png": true, ".jpg": true, ".jpeg": true, ".webp": true, ".gif": true, ".heic": true, ".heif": true, ".tif": true,
 	".tiff": true, ".bmp": true, ".svg": true, ".mol": true, ".sdf": true, ".sd": true, ".rxn": true, ".cdxml": true,
 	".cdx": true, ".smi": true, ".smiles": true, ".json": true, ".reactio": true, ".txt": true, ".csv": true, ".tsv": true,
-	".xyz": true, ".cif": true, ".mrv": true, ".pdb": true, ".inchi": true, ".docx": true,
+	".xyz": true, ".cif": true, ".mrv": true, ".pdb": true, ".inchi": true, ".docx": true, ".cml": true,
 }
 
 var writeKinds = map[string]bool{
 	".png": true, ".svg": true, ".pdf": true, ".emf": true, ".mol": true, ".sdf": true, ".rxn": true, ".cdxml": true,
 	".cdx": true, ".smi": true, ".smiles": true, ".json": true, ".reactio": true, ".txt": true, ".csv": true, ".tsv": true,
-	".xyz": true, ".cif": true, ".inchi": true, ".docx": true,
+	".xyz": true, ".cif": true, ".inchi": true, ".docx": true, ".cml": true,
 }
 
 func samePathCase(p string) string {
