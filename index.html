@@ -39500,8 +39500,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       k = 1 / printPtPx(),
       f = v => (Math.round(v * 10000) / 10000).toString(),
       head = `% editable-figure source: ${src || name + '.reactio'}\n`;
+    /* at most the line wide and 80% of the text high, as large as drawn otherwise; a figure's own LaTeX, no extra package */
+    const fit =
+      '\\begingroup\n' +
+      `\\sbox0{\\includegraphics{${name}.pdf}}%\n` +
+      '\\edef\\rdw{\\the\\ifdim\\wd0>\\linewidth\\linewidth\\else\\wd0\\fi}%\n' +
+      '\\edef\\rdh{\\the\\ifdim\\ht0>.8\\textheight\\dimexpr.8\\textheight\\relax\\else\\ht0\\fi}%\n',
+      fitted = `\\includegraphics[width=\\rdw,height=\\rdh,keepaspectratio]{${name}.pdf}`;
     if (!T.length)
-      return { pdf, tex: head + `\\includegraphics{${name}.pdf}%\n`, packages: ['graphicx'] };
+      return { pdf, tex: head + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
     /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
     const N = cmpdNumberer('{n}', 1);
     for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
@@ -39531,11 +39538,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const tex =
       head +
       `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
+      fit +
       '\\begin{tikzpicture}\n' +
-      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {\\includegraphics{${name}.pdf}};\n` +
+      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${fitted}};\n` +
       '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
       nodes.join('\n') +
-      '\n  \\end{scope}\n\\end{tikzpicture}%\n';
+      '\n  \\end{scope}\n\\end{tikzpicture}%\n\\endgroup%\n';
     return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
   }
   /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
