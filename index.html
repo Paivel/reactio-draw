@@ -40071,6 +40071,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   const hasMark = s => /\[\[(?:[AaIi]:)?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+(?:\.(?:letter|num|dash))?)?\]\]/.test(String(s || ''));
   /* name: the figure's file name without extension (name.pdf, name.tex); src: the drawing's file name for the first line */
+  /* the .tex's first line names the drawing it is made from; a line break or ^ in a file name (^^5c is a backslash to
+     TeX) would put commands in the figure, so those become _ */
+  function figSrcLine(name) {
+    return '% editable-figure source: ' + String(name).replace(/[\r\n\u0085\u2028\u2029^\\]/g, '_');
+  }
   async function latexFigureOf(name, src) {
     const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
     let svg;
@@ -40085,7 +40090,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const [X0, Y0, VW, VH] = /viewBox="([^"]+)"/.exec(svg)[1].split(/\s+/).map(Number),
       k = 1 / printPtPx(),
       f = v => (Math.round(v * 10000) / 10000).toString(),
-      head = `% editable-figure source: ${src || name + '.reactio'}\n`;
+      head = figSrcLine(src || name + '.reactio') + '\n';
     /* at most the line wide and 80% of the text high, as large as drawn otherwise; a figure's own LaTeX, no extra package */
     const fit =
       '\\begingroup\n' +
@@ -40167,7 +40172,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   };
   /* may a figure be written beside this drawing: neither file there yet, or the .tex names this drawing */
   const figureFilesFree = (tex, pdf, name) =>
-    String((tex && tex.line) || '').trim() === '% editable-figure source: ' + name || (!(tex && tex.exists) && !(pdf && pdf.exists));
+    String((tex && tex.line) || '').trim() === figSrcLine(name) || (!(tex && tex.exists) && !(pdf && pdf.exists));
   /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
   const siblingDir = t => t.file.path.slice(0, Math.max(t.file.path.lastIndexOf('/'), t.file.path.lastIndexOf('\\')) + 1);
   const siblingStem = t => siblingDir(t) + texStem(t.file.name);
@@ -40177,7 +40182,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       old = plainStem(t.file.name);
     if (old === now) return now;
     const h = await window.rdNative.call('texHead', { path: siblingDir(t) + old + '.tex' });
-    return h && String(h.line || '').trim() === '% editable-figure source: ' + t.file.name ? old : now;
+    return h && String(h.line || '').trim() === figSrcLine(t.file.name) ? old : now;
   }
   async function writeFigureBeside(t) {
     const stem = await besideStem(t),
@@ -40195,7 +40200,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!NATIVE_FILES() || !(t && t.file && /\.reactio$/i.test(t.file.path || ''))) return;
     try {
       const h = await window.rdNative.call('texHead', { path: siblingDir(t) + (await besideStem(t)) + '.tex' });
-      if (!h || String(h.line || '').trim() !== '% editable-figure source: ' + t.file.name) return;
+      if (!h || String(h.line || '').trim() !== figSrcLine(t.file.name)) return;
       await writeFigureBeside(t);
       nlog('LaTeX figure updated');
     } catch (e) {
@@ -40225,7 +40230,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* the copy in the LaTeX project goes by a plain name (a file called Схема (1).reactio stays as it is here), and its .tex says so */
       const name = texStem(t.file.name),
         source = name + '.reactio',
-        tex = f.tex.replace(/^.*/, () => '% editable-figure source: ' + source).split(stem + '.pdf').join(name + '.pdf');
+        tex = f.tex.replace(/^.*/, () => figSrcLine(source)).split(stem + '.pdf').join(name + '.pdf');
       man = {
         version: 1,
         name,
