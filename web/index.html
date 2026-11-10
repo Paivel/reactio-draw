@@ -34538,6 +34538,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const D = NREAD.dict,
         i = D && D.key.get(r.key),
         cs = i != null ? String(D.casOf[i] || '').split('|').filter(Boolean) : [];
+      casFor.dict = cs;
       C.textContent = cs.join(', ');
       Nt.textContent = cs.length ? '' : D ? 'Not in the dictionary of names' + (casFor.one ? ': Search PubChem can look it up.' : '.') : '';
     };
@@ -34594,8 +34595,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         Nt.textContent = 'PubChem lists no CAS number for it.';
         return;
       }
-      $('casNo').textContent = cs.slice(0, 3).join(', ');
-      Nt.textContent = 'From PubChem' + (cs.length > 3 ? ' (' + cs.length + ' numbers; the first ' + 3 + ' shown)' : '') + '.';
+      /* one number: the dictionary's when it has one, else PubChem's first (its synonyms come most used first); the
+         others PubChem lists are often old, replaced numbers or those of a form or mixture, so they go in the note */
+      const had = F.dict || [],
+        main = had.find(c => cs.includes(c)) || had[0] || cs[0],
+        rest = cs.filter(c => c !== main && !had.includes(c));
+      $('casNo').textContent = main;
+      Nt.textContent =
+        (had.includes(main) ? 'In the dictionary of names and PubChem.' : 'From PubChem.') +
+        (rest.length
+          ? ' PubChem also lists ' + rest.slice(0, 3).join(', ') + (rest.length > 3 ? ' and ' + (rest.length - 3) + ' more' : '') + ': often an older number, or that of a form or mixture; check before using it.'
+          : '');
     } catch (e) {
       if (casFor === F) Nt.textContent = 'Could not ask PubChem: ' + ((e && e.message) || e);
     }
