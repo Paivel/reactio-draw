@@ -45833,6 +45833,100 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return { atoms, bonds, end: j, sgroups: [...sg.values()].filter(g => g.type === 'SRU') };
   }
+  /* one V3000 record: read by OpenChemLib and written again as V2000 for parseMolBlock, with the stereo groups;
+     a record too large for V2000 (more than 999 atoms or bonds) is read directly */
+  function molV3000(rec) {
+    try {
+      const O = oclLoad(),
+        M = O.Molecule,
+        om = M.fromMolfile(rec);
+      if (om.getAllAtoms() > 999 || om.getAllBonds() > 999) return parseV3000(rec);
+      om.ensureHelperArrays(M.cHelperParities);
+      const m = parseMolBlock(om.toMolfile().replace(/\r/g, '').split('\n'), 0);
+      if (!m) return null;
+      const ab = /STEABS\s+ATOMS=\(\d+((?:\s+\d+)*)\)/.exec(rec),
+        abs = new Set(
+          ab
+            ? ab[1]
+                .trim()
+                .split(/\s+/)
+                .map(n => +n - 1)
+            : []
+        );
+      m.atoms.forEach((a, i) => {
+        if (i >= om.getAllAtoms() || !om.isAtomStereoCenter(i)) return;
+        const t = om.getAtomESRType(i),
+          g = om.getAtomESRGroup(i) + 1;
+        if (t === 1) a.esr = '&' + g;
+        else if (t === 2) a.esr = 'or' + g;
+        else if (abs.has(i)) a.esr = 'abs';
+      });
+      return m;
+    } catch (e) {
+      return null;
+    }
+  }
+  /* the atoms, bonds and stereo groups of a V3000 CTAB, read as parseMolBlock reads V2000 */
+  function parseV3000(rec) {
+    const L = [];
+    for (const l of rec.replace(/\r/g, '').split('\n')) {
+      if (!l.startsWith('M  V30 ')) continue;
+      const t = l.slice(7);
+      /* a line ending in '-' goes on in the next one */
+      if (L.length && L[L.length - 1].endsWith('-')) L[L.length - 1] = L[L.length - 1].slice(0, -1) + t;
+      else L.push(t);
+    }
+    const atoms = [],
+      bonds = [],
+      ix = new Map();
+    const opt = (w, k) => {
+      const x = w.find(v => v.startsWith(k + '='));
+      return x == null ? null : x.slice(k.length + 1);
+    };
+    let sec = '';
+    for (const l of L) {
+      const w = l.trim().match(/"[^"]*"|\S+=\([^)]*\)|\S+/g) || [];
+      if (w[0] === 'BEGIN') sec = w[1];
+      else if (w[0] === 'END') sec = '';
+      else if (sec === 'ATOM' && w.length >= 5) {
+        let el = w[1].replace(/"/g, '');
+        const rg = /^\(\d+\s+(\d+)/.exec(opt(w, 'RGROUPS') || ''),
+          lab = el === 'R#' ? 'R' + (rg ? rg[1] : '') : !(el in AW) && el !== 'D' && /^[A-Z][a-z]?$/.test(el) ? el : '';
+        if (!(el in AW) && el !== 'D') el = 'C';
+        const a = { el, x: +w[2] / ANG, y: -w[3] / ANG, z: (+w[4] || 0) / ANG, chg: parseInt(opt(w, 'CHG')) || 0 };
+        if (lab) a.label = lab;
+        const rad = parseInt(opt(w, 'RAD')) || 0,
+          val = parseInt(opt(w, 'VAL')) || 0;
+        if (rad) a.rad = rad === 3 ? 2 : rad === 2 ? 1 : 2;
+        if (val) a.val = val < 0 ? 0 : val;
+        /* an isotope (MASS=, as M  ISO in V2000) */
+        const ms = parseInt(opt(w, 'MASS')) || 0;
+        if (ms && el === 'H' && ms === 2) a.el = 'D';
+        else if (ms && (ms + el) in AW) a.iso = ms;
+        ix.set(w[0], atoms.length);
+        atoms.push(a);
+      } else if (sec === 'BOND' && w.length >= 4) {
+        const o = parseInt(w[1]),
+          cfg = parseInt(opt(w, 'CFG')) || 0;
+        if (!ix.has(w[2]) || !ix.has(w[3])) continue;
+        bonds.push({
+          a: ix.get(w[2]),
+          b: ix.get(w[3]),
+          order: o >= 1 && o <= 3 ? o : 1,
+          stereo: o === 4 ? 'deloc' : cfg === 1 ? 'wedge' : cfg === 3 ? 'hash' : cfg === 2 && o === 1 ? 'wavy' : null
+        });
+      } else if (sec === 'COLLECTION') {
+        const g = /^MDLV30\/STE(ABS|RAC|REL)(\d*)$/.exec(w[0] || ''),
+          as = /^ATOMS=\(\d+((?:\s+\d+)*)\)$/.exec(w[1] || '');
+        if (g && as)
+          for (const n of as[1].trim().split(/\s+/)) {
+            const a = atoms[ix.get(n)];
+            if (a) a.esr = g[1] === 'ABS' ? 'abs' : (g[1] === 'RAC' ? '&' : 'or') + (+g[2] || 1);
+          }
+      }
+    }
+    return atoms.length ? { atoms, bonds, end: 0, sgroups: [] } : null;
+  }
   function addParsed(frags, arrowBetween) {
     snap();
     const bb = contentBox();
@@ -48231,68 +48325,36 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         } else i++;
       }
       addParsed(fr, nr);
-      toast(
-        'Opened reaction: ' + nr + ' reactant(s), ' + np + ' product(s)' + ISO_NOTE(text),
-        ISO_RX.test(text)
-      );
+      toast('Opened reaction: ' + nr + ' reactant(s), ' + np + ' product(s)');
       return;
     }
-    if (/V2000/.test(text)) {
+    /* a Molfile or an SDF: each record by itself, V2000 or V3000 (an SDF may mix them: ours writes a record with a
+       stereo group as V3000) */
+    if (/V[23]000/.test(text) && !lines[0].startsWith('$RXN')) {
       const fr = [];
-      let i = 0;
-      while (i < lines.length) {
-        const m = parseMolBlock(lines, i);
-        if (!m) break;
-        fr.push(m);
-        i = m.end + 1;
-        while (i < lines.length && !lines[i].startsWith('$$$$')) i++;
-        i++;
-        if (i >= lines.length || !lines[i + 3] || !/V2000/.test(lines[i + 3])) break;
+      let v3 = 0;
+      /* each record after a $$$$ line starts on the line after it */
+      for (const [k, r0] of text.replace(/\r/g, '').split(/^\$\$\$\$.*$/m).entries()) {
+        const rec = k ? r0.replace(/^\n/, '') : r0,
+          rl = rec.split('\n');
+        if (/V3000/.test(rl[3] || '')) {
+          v3++;
+          const m = molV3000(rec);
+          if (m) fr.push(m);
+        } else if (/V2000/.test(rl[3] || '')) {
+          const m = parseMolBlock(rl, 0);
+          if (m) fr.push(m);
+        }
       }
       if (fr.length) {
         addParsed(fr);
-        toast('Opened ' + fr.length + ' structure(s)' + ISO_NOTE(text), ISO_RX.test(text));
+        toast('Opened ' + fr.length + ' structure(s)' + (v3 && fr.length === v3 ? ' (V3000)' : ''));
         return;
       }
-    }
-    if (/V3000/.test(text) && !lines[0].startsWith('$RXN')) {
-      const fr = [];
-      for (const rec of text.replace(/\r/g, '').split(/^\$\$\$\$.*$/m)) {
-        if (!/V3000/.test(rec)) continue;
-        try {
-          const O = oclLoad(),
-            M = O.Molecule,
-            om = M.fromMolfile(rec);
-          om.ensureHelperArrays(M.cHelperParities);
-          const m = parseMolBlock(om.toMolfile().replace(/\r/g, '').split('\n'), 0);
-          if (!m) continue;
-          const ab = /STEABS\s+ATOMS=\(\d+((?:\s+\d+)*)\)/.exec(rec),
-            abs = new Set(
-              ab
-                ? ab[1]
-                    .trim()
-                    .split(/\s+/)
-                    .map(n => +n - 1)
-                : []
-            );
-          m.atoms.forEach((a, i) => {
-            if (i >= om.getAllAtoms() || !om.isAtomStereoCenter(i)) return;
-            const t = om.getAtomESRType(i),
-              g = om.getAtomESRGroup(i) + 1;
-            if (t === 1) a.esr = '&' + g;
-            else if (t === 2) a.esr = 'or' + g;
-            else if (abs.has(i)) a.esr = 'abs';
-          });
-          fr.push(m);
-        } catch (e) {}
-      }
-      if (fr.length) {
-        addParsed(fr);
-        toast('Opened ' + fr.length + ' structure(s) (V3000)' + ISO_NOTE(text), ISO_RX.test(text));
+      if (v3) {
+        toast('Could not read this V3000 file', true);
         return;
       }
-      toast('Could not read this V3000 file', true);
-      return;
     }
     const smis = lines
       .map(l => {
@@ -48336,11 +48398,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else toast('Could not read ' + name + (bad ? ': ' + bad : ''), true);
   }
   /* CDXML pasted from another program: placed where the user last worked, like Reactio Draw's own copies */
-  /* isotope labels are kept (Molfile M  ISO, CDXML Isotope); only V3000 MASS= is not read yet: say so instead of
-     dropping it silently */
-  const ISO_RX = /\bMASS=\d/m,
-    ISO_NOTE = t =>
-      ISO_RX.test(t) ? '. Isotope labels of V3000 Molfiles are not read yet and were left out' : '';
   function importCdxml(text) {
     const n0 = mol.next;
     importCdxml0(text);
