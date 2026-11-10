@@ -19814,22 +19814,95 @@ function kdOf(st) {
   function cxJoin(list, sep) {
     let n = 0;
     const G = new Map(),
-      out = [];
+      out = [],
+      labs = [];
     for (const x of list) {
       const m = /^(\S*)(?:\s+\|([^|]*)\|)?$/.exec(x || '') || [0, x || '', ''];
-      const smi = m[1];
-      if (m[2])
-        for (const part of m[2].split(/,(?=[a&o]\d*:)/)) {
+      const smi = m[1],
+        k0 = (smi.match(CX_ATOM) || []).length;
+      let cx = m[2] || '';
+      /* the atom labels ($…$): one per atom, the structures' lists one after another */
+      const lm = /\$([^$]*)\$/.exec(cx),
+        l = lm ? lm[1].split(';') : [];
+      for (let i = 0; i < k0; i++) labs.push(l[i] || '');
+      if (lm) cx = cx.replace(lm[0], '').replace(/^,|,$/g, '');
+      if (cx)
+        for (const part of cx.split(/,(?=[a&o]\d*:)/)) {
           const [k, v] = part.split(':');
           if (!v) continue;
           if (!G.has(k)) G.set(k, []);
           v.split(',').forEach(i => G.get(k).push(+i + n));
         }
-      n += (smi.match(CX_ATOM) || []).length;
+      n += k0;
       out.push(smi);
     }
-    const j = out.join(sep);
-    return G.size ? j + ' |' + [...G].map(([k, v]) => k + ':' + v.join(',')).join(',') + '|' : j;
+    const j = out.join(sep),
+      parts = [...G].map(([k, v]) => k + ':' + v.join(','));
+    if (labs.some(Boolean)) parts.unshift('$' + labs.join(';') + '$');
+    return parts.length ? j + ' |' + parts.join(',') + '|' : j;
+  }
+  /* CXSMILES atom labels: the SMILES writes an atom label it cannot open up (R1, Ar) as *; |$;;R1$| gives each * its
+     label again, by its place in the SMILES (a bare R is what a * reads as anyway) */
+  function cxLabels(f, s) {
+    const st = f.filter(a => a.label && !a.grp && !a.multi);
+    if (!st.length) return s;
+    /* the stereo SMILES (OpenChemLib) writes such an atom as [?]: a * too */
+    s = String(s || '').replace(/\[\?\]/g, '*');
+    if (!st.some(a => a.label !== 'R') || st.some(a => /[;$|\s]/.test(a.label))) return s;
+    const m = /^(\S*)(?:\s+\|([^|]*)\|)?$/.exec(s);
+    if (!m || (m[2] && m[2].includes('$'))) return s;
+    const toks = m[1].match(CX_ATOM) || [],
+      pos = toks.map((t, i) => (t === '*' || /^\[\d*\*/.test(t) ? i : -1)).filter(i => i >= 0);
+    if (pos.length !== st.length) return s;
+    let labs = st;
+    if (new Set(st.map(a => a.label)).size > 1) {
+      /* which * is which: both graphs (the structure, the SMILES read back) refined alike, atom by its neighbours, until
+         each * has a class; a * goes to a label atom of its class (two in one class are alike by symmetry) */
+      const X = apiSmilesLabels(m[1]),
+        g = parseSmiles(X.smiles);
+      if (!g || g.nodes.length !== toks.length) return s;
+      const ph = X.smiles.match(/\[(U|Xe)\]/)[1],
+        plainH = (el, q) => el === 'H' && !q.iso && !q.chg && !q.label,
+        A = f.filter(a => !a.multi && !plainH(a.el, a)),
+        ia = new Map(A.map((a, i) => [a.id, i])),
+        adjA = A.map(() => []);
+      for (const b of mol.bonds)
+        if (ia.has(b.a) && ia.has(b.b) && !isDative(b)) {
+          adjA[ia.get(b.a)].push(ia.get(b.b));
+          adjA[ia.get(b.b)].push(ia.get(b.a));
+        }
+      const keepB = g.nodes.map((nd, i) => (plainH(nd.el, nd) ? -1 : i)).filter(i => i >= 0),
+        ib = new Map(keepB.map((k, i) => [k, i])),
+        adjB = keepB.map(() => []);
+      for (const e of g.edges)
+        if (ib.has(e.a) && ib.has(e.b)) {
+          adjB[ib.get(e.a)].push(ib.get(e.b));
+          adjB[ib.get(e.b)].push(ib.get(e.a));
+        }
+      if (A.length !== keepB.length) return s;
+      let hA = A.map(a => (a.label ? '*' : a.el) + (a.chg || 0)),
+        hB = keepB.map(k => (g.nodes[k].el === ph ? '*' : g.nodes[k].el) + (g.nodes[k].chg || 0));
+      for (let it = 0; it < Math.min(A.length, 30); it++) {
+        const d = new Map(),
+          id = t => (d.has(t) ? d.get(t) : d.set(t, d.size).get(t)),
+          step = (h, adj) => h.map((x, i) => id(x + '(' + adj[i].map(j => h[j]).sort().join(',') + ')'));
+        hA = step(hA, adjA);
+        hB = step(hB, adjB);
+      }
+      const cls = new Map();
+      A.forEach((a, i) => {
+        if (a.label && !a.grp) (cls.get(hA[i]) || cls.set(hA[i], []).get(hA[i])).push(a);
+      });
+      labs = [];
+      for (const p of pos) {
+        const c = ib.has(p) && cls.get(hB[ib.get(p)]);
+        if (!c || !c.length) return s;
+        labs.push(c.shift());
+      }
+    }
+    const L = toks.map(() => '');
+    pos.forEach((p, k) => (L[p] = labs[k].label === 'R' ? '' : labs[k].label));
+    return m[1] + ' |$' + L.join(';') + '$' + (m[2] ? ',' + m[2] : '') + '|';
   }
   function cxSplit(text) {
     const m = /^(\S+)\s+\|([^|]*)\|\s*$/.exec(String(text || '').trim());
@@ -20460,7 +20533,7 @@ function kdOf(st) {
     }
   }
   function currentSmiles0(onlySel, cx) {
-    const S1 = f => fragSmilesS(f, cx),
+    const S1 = f => (cx ? cxLabels(f, fragSmilesS(f, cx)) : fragSmilesS(f, cx)),
       J = (l, sep) => (cx ? cxJoin(l, sep) : l.join(sep));
     const frs = fragments();
     if (sel.size) return J(frs.filter(fr => fr.some(a => sel.has(a.id))).map(S1), '.');
@@ -48378,10 +48451,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         } catch (e) {}
         continue;
       }
-      const g = parseSmiles(s);
+      /* R atoms (*) and CXSMILES atom labels, as addSmiles reads them */
+      const X = apiSmilesLabels(s),
+        g = parseSmiles(X.smiles);
       if (g) {
         if (!ok) snap();
-        applySmilesStereo(s, placeGraph(g, null));
+        const at = placeGraph(g, null);
+        applySmilesStereo(X.smiles, at);
+        X.fix(at);
         ok++;
       } else if (parseSmiles.why) bad = parseSmiles.why;
     }
@@ -67268,6 +67345,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       s = s.slice(0, m.index);
       const lm = m[1].match(/\$([^$]*)\$/);
       if (lm) cx = lm[1].split(';');
+      /* the rest of the |…| part (stereo groups) stays with the SMILES */
+      const rest = m[1].replace(/\$[^$]*\$/, '').replace(/^,+|,+$/g, '');
+      if (rest) s += ' |' + rest + '|';
     }
     const maps = [],
       /* a stand-in element for the * atoms while the SMILES is read (one the SMILES does not use itself) */
