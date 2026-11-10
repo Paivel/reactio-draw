@@ -25271,6 +25271,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (d.mode === 'scale') {
       if (d.moved) {
+        try {
+          eneScaled(d);
+        } catch (e) {
+          console.warn('eneScaled', e);
+        }
         commit();
         toast(d.sx === d.sy ? 'Scaled to ' + Math.round(d.sx * 100) + '%' : 'Stretched');
       } else render();
@@ -61865,6 +61870,60 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     mol.texts = mol.texts.filter(q => q.eg !== M.id || keep.has(q.ek));
     M.keys = [...keep];
     M.hide = [...hide];
+  }
+  /* an energy diagram resized whole with the selection's handles: its spacing (and, for an even scale, its text and line
+     sizes) take the new size, so it is drawn again at that size, parts moved by hand keeping their shift scaled with it;
+     each part handled on its own instead (eneFollow) took back the levels' moves up or down, as a level stays at its
+     energy, and left the joins, numbers and axis apart from them */
+  function eneScaled(d) {
+    const A = d.anchor,
+      sx = d.sx,
+      sy = d.sy;
+    if (!A || !(sx > 0) || !(sy > 0)) return;
+    const ids = new Set();
+    for (const o of [...mol.arrows, ...mol.texts]) if (o.eg != null) ids.add(o.eg);
+    for (const id of ids) {
+      const M = eneModel(id),
+        parts = eneParts(id);
+      if (!M || !parts.length) continue;
+      /* only a diagram selected whole */
+      if (!parts.every(o => (o.text != null ? selTxt.has(o.id) : selArr.has(o.id)))) continue;
+      const X = x => A.x + (x - A.x) * sx,
+        Y = y => A.y + (y - A.y) * sy,
+        k = sx === sy ? sx : 1;
+      M.x = X(M.x);
+      M.y = Y(M.y);
+      M.sx *= sx;
+      M.sy *= sy;
+      if (k !== 1) {
+        if (M.fs) M.fs *= k;
+        if (M.lw) M.lw *= k;
+      }
+      if (M.mv) for (const key of Object.keys(M.mv)) M.mv[key] = [M.mv[key][0] * sx, M.mv[key][1] * sy, M.mv[key][2] * sx].map(v => +v.toFixed(4));
+      /* each part where it was, scaled plainly (the resize also re-sizes and re-places texts by their size), and where the
+         diagram put it, scaled the same: a hand-made shift stays, scaled */
+      const O = new Map();
+      for (const [r, x1, y1, x2, y2] of (d.orig && d.orig.arrows) || []) O.set(r, [x1, y1, x2, y2]);
+      for (const [t, x, y] of (d.orig && d.orig.texts) || []) O.set(t, [x, y]);
+      for (const o of parts) {
+        const w = O.get(o);
+        if (!w) continue;
+        if (o.text != null) {
+          o.x = X(w[0]);
+          o.y = Y(w[1]);
+        } else {
+          o.x1 = X(w[0]);
+          o.y1 = Y(w[1]);
+          o.x2 = X(w[2]);
+          o.y2 = Y(w[3]);
+        }
+      }
+      for (const o of parts) {
+        if (!o.ed0) continue;
+        o.ed0 = o.text != null ? [X(o.ed0[0]), Y(o.ed0[1])] : [X(o.ed0[0]), Y(o.ed0[1]), X(o.ed0[2]), Y(o.ed0[3])];
+      }
+      eneApply(M);
+    }
   }
   /* after each change: a level moved or stretched by hand takes its joins, numbers and name with it (kept in M.mv); the
      whole diagram moved together moves its place */
