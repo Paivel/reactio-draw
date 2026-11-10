@@ -8689,6 +8689,8 @@ function kdOf(st) {
       adj[e.b].push([e.a, k]);
     });
     const flip = d => (d === '/' ? '\\' : '/');
+    const want = [],
+      ringWrong = [];
     g.edges.forEach((db, k) => {
       if (db.order !== 2 || !pos[db.a] || !pos[db.b]) return;
       const A = db.a,
@@ -8714,15 +8716,16 @@ function kdOf(st) {
           (pos[B].x - pos[A].x) * (pos[P].y - pos[A].y) - (pos[B].y - pos[A].y) * (pos[P].x - pos[A].x)
         );
       const isTrans = side(xa.n) !== side(yb.n);
+      want.push({ A, B, k, x: xa.n, y: yb.n, trans: wantTrans });
       if (isTrans === wantTrans) return;
-      /* atoms on B's side (not reaching A); skip if the double bond is in a ring */
+      /* atoms on B's side (not reaching A); a double bond in a ring is left for the ring layout below */
       const seen = new Set([B]),
         q = [B];
       while (q.length) {
         const u = q.shift();
         for (const [v, ek] of adj[u]) {
           if (ek === k || seen.has(v)) continue;
-          if (v === A) return;
+          if (v === A) return ringWrong.push(want[want.length - 1]);
           seen.add(v);
           q.push(v);
         }
@@ -8742,6 +8745,80 @@ function kdOf(st) {
         pos[v] = { x: 2 * fx - p.x, y: 2 * fy - p.y };
       }
     });
+    if (ringWrong.length) ezRingLayout(g, pos, adj, want, ringWrong);
+  }
+  /* a ring double bond drawn Z that should be E ((E)-cyclooctene and larger): no flip can turn it, so the piece is laid out
+     again by OpenChemLib with the E/Z of every double bond set; kept only when every / and \\ is then honoured */
+  function ezRingLayout(g, pos, adj, want, wrong) {
+    const ringLen = w => {
+      const d = new Map([[w.A, 0]]),
+        q = [w.A];
+      while (q.length) {
+        const u = q.shift();
+        for (const [v, ek] of adj[u])
+          if (ek !== w.k && !d.has(v)) {
+            d.set(v, d.get(u) + 1);
+            q.push(v);
+          }
+      }
+      return d.has(w.B) ? d.get(w.B) + 1 : 0;
+    };
+    const comps = compsG(g);
+    for (const comp of comps) {
+      const inC = new Set(comp);
+      if (comp.length > 300 || comp.some(v => !pos[v])) continue;
+      if (!wrong.some(w => inC.has(w.A) && w.trans && ringLen(w) >= 8)) continue;
+      try {
+        const O = oclLoad(),
+          ix = new Map(comp.map((v, i) => [v, i])),
+          m = new O.Molecule(comp.length, g.edges.length),
+          bix = new Map();
+        for (const v of comp) {
+          const nd = g.nodes[v],
+            z = ZOF(nd.el),
+            i = m.addAtom(z > 0 ? z : 6);
+          if (nd.chg) m.setAtomCharge(i, nd.chg);
+        }
+        g.edges.forEach((e, k) => {
+          if (!inC.has(e.a)) return;
+          const b = m.addBond(ix.get(e.a), ix.get(e.b));
+          m.setBondOrder(b, Math.min(e.order || 1, 3));
+          bix.set(k, b);
+        });
+        m.ensureHelperArrays(31);
+        /* OpenChemLib's parity 1 is E for the lowest-numbered neighbour on each side */
+        const lowest = (at, other) => Math.min(...adj[at].map(([n]) => n).filter(n => n !== other));
+        for (const w of want)
+          if (inC.has(w.A)) {
+            const same = (w.x === lowest(w.A, w.B)) === (w.y === lowest(w.B, w.A));
+            m.setBondParity(bix.get(w.k), w.trans === same ? 1 : 2, false);
+          }
+        m.setParitiesValid(0);
+        m.inventCoordinates();
+        let sum = 0;
+        for (let b = 0; b < m.getAllBonds(); b++) {
+          const a = m.getBondAtom(0, b),
+            c = m.getBondAtom(1, b);
+          sum += Math.hypot(m.getAtomX(a) - m.getAtomX(c), m.getAtomY(a) - m.getAtomY(c));
+        }
+        const k = m.getAllBonds() ? L / (sum / m.getAllBonds()) : 1,
+          p2 = new Map(comp.map((v, i) => [v, { x: m.getAtomX(i) * k, y: -m.getAtomY(i) * k }])),
+          ok = want
+            .filter(w => inC.has(w.A))
+            .every(w => {
+              const P = p2.get(w.A),
+                Q = p2.get(w.B),
+                sd = R => Math.sign((Q.x - P.x) * (R.y - P.y) - (Q.y - P.y) * (R.x - P.x));
+              return (sd(p2.get(w.x)) !== sd(p2.get(w.y))) === w.trans;
+            });
+        if (!ok) continue;
+        const cx = comp.reduce((t, v) => t + pos[v].x, 0) / comp.length,
+          cy = comp.reduce((t, v) => t + pos[v].y, 0) / comp.length,
+          nx = comp.reduce((t, v) => t + p2.get(v).x, 0) / comp.length,
+          ny = comp.reduce((t, v) => t + p2.get(v).y, 0) / comp.length;
+        for (const v of comp) pos[v] = { x: p2.get(v).x - nx + cx, y: p2.get(v).y - ny + cy };
+      } catch (e) {}
+    }
   }
   function compsG(g) {
     const n = g.nodes.length,
