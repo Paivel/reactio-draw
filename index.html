@@ -48925,7 +48925,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
     if (ext === 'cdxml' || /<CDXML/i.test(text)) {
-      importCdxml(text);
+      const n0 = mol.next;
+      if (importCdxml(text) === false) {
+        toast('That CDXML file could not be read: not well-formed XML', true);
+        return;
+      }
+      if (mol.next === n0) {
+        toast('Nothing to draw in ' + name, true);
+        return;
+      }
       toast('Opened ' + name);
       return;
     }
@@ -49024,7 +49032,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* CDXML pasted from another program: placed where the user last worked, like Reactio Draw's own copies */
   function importCdxml(text) {
     const n0 = mol.next;
-    importCdxml0(text);
+    /* false: the text is not XML that can be read */
+    if (importCdxml0(text) === false) return false;
     if (mol.next === n0) return;
     const A = mol.atoms.filter(a => a.id >= n0),
       R = mol.arrows.filter(r => r.id >= n0),
@@ -49151,7 +49160,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (doc.querySelector('parsererror')) {
       toast('That CDXML could not be read', true);
-      return;
+      return false;
     }
     /* grouped objects: read as if they sat on the page */
     for (let g; (g = doc.querySelector('page > group')); ) g.replaceWith(...g.children);
