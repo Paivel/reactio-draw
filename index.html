@@ -52108,13 +52108,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         od = Math.abs(g.d);
         over = A;
       }
+      /* the nearest arrow before or after the point, counting the distance off its line too (a reaction on the row
+         below starts further left than the one above, but its arrow is the one on the point's row) */
       if (Math.abs(g.d) <= 160) {
-        if (g.t > g.len && g.t - g.len < ld) {
-          ld = g.t - g.len;
+        if (g.t > g.len && Math.hypot(g.t - g.len, g.d) < ld) {
+          ld = Math.hypot(g.t - g.len, g.d);
           left = A;
         }
-        if (g.t < 0 && -g.t < rd) {
-          rd = -g.t;
+        if (g.t < 0 && Math.hypot(g.t, g.d) < rd) {
+          rd = Math.hypot(g.t, g.d);
           right = A;
         }
       }
