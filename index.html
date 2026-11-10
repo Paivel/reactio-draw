@@ -34509,8 +34509,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     Pb.style.opacity = one ? '' : '.5';
     Pb.title = one ? 'Ask PubChem (pubchem.ncbi.nlm.nih.gov) for the CAS number of the selected molecule: only its InChIKey is sent' : 'Select one compound (a molecule or a salt) to ask PubChem for its CAS number';
     if (!r) return;
+    /* (once PubChem has been asked, its answer stays: the dictionary's late answer does not write over it) */
     const show = () => {
-      if (!casFor || casFor.k !== k) return;
+      if (!casFor || casFor.k !== k || casFor.asked) return;
       const D = NREAD.dict,
         i = D && D.key.get(r.key),
         cs = i != null ? String(D.casOf[i] || '').split('|').filter(Boolean) : [];
@@ -34522,7 +34523,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     namesEnsure(false)
       .then(ok => {
         if (ok) return show();
-        if (!casFor || casFor.k !== k) return;
+        if (!casFor || casFor.k !== k || casFor.asked) return;
         Nt.textContent = '';
         const b = document.createElement('button');
         b.type = 'button';
@@ -34535,7 +34536,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         C.appendChild(b);
       })
       .catch(e => {
-        if (casFor && casFor.k === k) Nt.textContent = e.message;
+        if (casFor && casFor.k === k && !casFor.asked) Nt.textContent = e.message;
       });
   }
   $('copyCas').onclick = async () => {
@@ -34552,6 +34553,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!F && sel.size && ID_SHOWN.inchi && ID_SHOWN.inchi.r && !ID_SHOWN.inchi.r.ok)
       return toast(ID_SHOWN.inchi.r.message || 'No InChI for this structure', true);
     if (!F || !F.one) return toast('Select one compound (a molecule or a salt) to ask PubChem for its CAS number', true);
+    F.asked = true;
     Nt.textContent = 'Asking PubChem…';
     try {
       const r = await fetch('https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/inchikey/' + encodeURIComponent(F.key) + '/synonyms/JSON');
