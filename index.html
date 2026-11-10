@@ -50581,6 +50581,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const P = window.__rdPending.splice(0);
     setTimeout(() => P.forEach(f => window.__rdOpenFile(f[0], f[1], f[2])), 0);
   }
+  /* files opened with the app that it could not read (too large, no permission): "a.mol: too large (70 MB, at most 64)" */
+  if (Array.isArray(window.__rdFileErrors) && window.__rdFileErrors.length) {
+    const E = window.__rdFileErrors.splice(0);
+    setTimeout(() => toast('Could not open ' + E.join('; '), true), 400);
+  }
   fileIn.addEventListener('change', () => {
     const f = fileIn.files && fileIn.files[0];
     if (!f) return;
@@ -76119,6 +76124,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   async function rdCliRun(C) {
     const argv = ((C && C.argv) || []).map(String),
       files = (C && C.files) || {},
+      fileErrs = (C && C.fileErrs) || {},
       dirs = new Set((C && C.dirs) || []);
     const res = { out: '', err: '', code: 0, writes: [] };
     const say = s => {
@@ -76172,6 +76178,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       pos.push(a);
     }
     const cmd = (pos.shift() || '').toLowerCase();
+    /* a file that is there but could not be read by the app (too large, no permission): its reason, not "no such file" */
+    for (const p of pos.concat([opt.i, opt.input]))
+      if (p && Object.prototype.hasOwnProperty.call(fileErrs, p)) return fail('reactio: ' + p + ': ' + fileErrs[p], 1);
     if (opt.help || !cmd || cmd === 'help') {
       say(CLI_HELP);
       return res;

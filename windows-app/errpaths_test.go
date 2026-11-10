@@ -260,12 +260,14 @@ func TestWinErrFileArgsOversize(t *testing.T) {
 	f.Close()
 	old := os.Args
 	os.Args = []string{"ReactioDraw.exe", big}
-	files := fileArgs()
+	files, errs := fileArgs()
 	os.Args = old
 	if len(files) != 0 {
 		t.Fatalf("an over-size file was opened")
 	}
-	t.Skip("bug 82: a file of 64 MB or more opened with the app is skipped without a word")
+	if len(errs) != 1 || errs[0] != "big.mol: too large (64 MB, at most 64)" {
+		t.Errorf("bug 82: a file of 64 MB or more opened with the app must be reported: %q", errs)
+	}
 }
 
 func TestWinErrLocalAPIInfoNotWritten(t *testing.T) {

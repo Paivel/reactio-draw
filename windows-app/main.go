@@ -126,7 +126,12 @@ func main() {
 	// Reactio Draw is open already: its window takes the files
 	if !app.embedding && !cliOn && !hasArg("/register", "-register") {
 		if otherInstance() {
-			if files := fileArgs(); len(files) > 0 {
+			files, errs := fileArgs()
+			if len(errs) > 0 {
+				// this process only hands files over: it says itself what could not be opened
+				messageBox("Could not open "+strings.Join(errs, "\n"), appName)
+			}
+			if len(files) > 0 || len(errs) > 0 {
 				handOver(files)
 				return
 			}
@@ -245,9 +250,14 @@ func main() {
 	if cliOn {
 		w.Init(cliScript())
 	} else if !app.embedding {
-		if files := fileArgs(); len(files) > 0 {
+		files, errs := fileArgs()
+		if len(files) > 0 {
 			j, _ := json.Marshal(files)
 			w.Init("window.__rdPending=" + string(j) + ";")
+		}
+		if len(errs) > 0 {
+			j, _ := json.Marshal(errs)
+			w.Init("window.__rdFileErrors=" + string(j) + ";")
 		}
 		if app.owner {
 			go watchInbox()

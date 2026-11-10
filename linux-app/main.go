@@ -68,8 +68,11 @@ func devtoolsOn() bool {
 }
 
 /* files given on the command line (Open with, a double-click in the file manager) */
-func fileArgs() [][3]string {
+// fileArgs: the files opened with the app, and a message for each one that could not be opened ("a.mol: too large
+// (70 MB, at most 64)")
+func fileArgs() ([][3]string, []string) {
 	var files [][3]string
+	var errs []string
 	for _, a := range os.Args[1:] {
 		if strings.HasPrefix(a, "-") {
 			continue
@@ -77,15 +80,17 @@ func fileArgs() [][3]string {
 		if u, err := url.Parse(a); err == nil && u.Scheme == "file" {
 			a = u.Path
 		}
-		if st, err := os.Stat(a); err == nil && !st.IsDir() && st.Size() < 64<<20 {
-			if b, err := os.ReadFile(a); err == nil {
-				abs, _ := filepath.Abs(a)
-				allowPath(abs)
-				files = append(files, [3]string{filepath.Base(a), base64.StdEncoding.EncodeToString(b), abs})
-			}
+		b, why := argFile(a)
+		if why != "" {
+			logf("cannot open %s: %s", a, why)
+			errs = append(errs, filepath.Base(a)+": "+why)
+			continue
 		}
+		abs, _ := filepath.Abs(a)
+		allowPath(abs)
+		files = append(files, [3]string{filepath.Base(a), base64.StdEncoding.EncodeToString(b), abs})
 	}
-	return files
+	return files, errs
 }
 
 func main() {
@@ -159,9 +164,16 @@ func main() {
   window.addEventListener('unhandledrejection',e=>L('rejection: '+(e.reason&&e.reason.message||e.reason)));})();`
 	if cliRequested() {
 		pre += cliScript()
-	} else if files := fileArgs(); len(files) > 0 {
-		j, _ := json.Marshal(files)
-		pre += "window.__rdPending=" + string(j) + ";"
+	} else {
+		files, errs := fileArgs()
+		if len(files) > 0 {
+			j, _ := json.Marshal(files)
+			pre += "window.__rdPending=" + string(j) + ";"
+		}
+		if len(errs) > 0 {
+			j, _ := json.Marshal(errs)
+			pre += "window.__rdFileErrors=" + string(j) + ";"
+		}
 	}
 	if !cliRequested() {
 		pre += `window.__rdUpdate={asset:"` + updAssetName() + `"};`

@@ -653,7 +653,7 @@ func TestErrFileArgsOversize(t *testing.T) {
 	os.Mkdir(dir, 0755)
 	old := os.Args
 	os.Args = []string{"ReactioDraw", big, dir, filepath.Join(d, "missing.mol"), "-flag"}
-	files := fileArgs()
+	files, errs := fileArgs()
 	os.Args = old
 	if len(files) != 0 {
 		t.Fatalf("an over-size, folder or missing file was opened: %v", len(files))
@@ -661,8 +661,44 @@ func TestErrFileArgsOversize(t *testing.T) {
 	if pathAllowed(big) {
 		t.Errorf("an over-size file not opened became writable")
 	}
-	/* nothing tells the user: no log line, no message to the page (window.__rdPending has only what was read) */
-	t.Skip("bug 82: a file of 64 MB or more (or unreadable) opened with the app is skipped without a word")
+	/* each one is named, with its reason, for the page's message line (window.__rdFileErrors) */
+	want := []string{"big.mol: too large (64 MB, at most 64)", "afolder.mol: is a folder", "missing.mol: cannot be read: no such file"}
+	if len(errs) != len(want) {
+		t.Fatalf("bug 82: the files that could not be opened are not all reported: %q", errs)
+	}
+	for i, w := range want {
+		if !strings.HasPrefix(errs[i], w) {
+			t.Errorf("bug 82: %q, want %q", errs[i], w)
+		}
+	}
+}
+
+/* the command line: a file that is there but cannot be opened is reported with its reason, not as "no such file" */
+func TestErrCliScriptFileErrors(t *testing.T) {
+	d := eSetup(t)
+	big := filepath.Join(d, "big.mol")
+	f, _ := os.Create(big)
+	f.Truncate(70 << 20)
+	f.Close()
+	ok := filepath.Join(d, "ok.mol")
+	os.WriteFile(ok, []byte("M  END"), 0644)
+	old, oldCli := os.Args, cli
+	os.Args = []string{"ReactioDraw", "--cli", "image", big, ok, "CCO", "C/C=C/C"}
+	js := cliScript() // (it also starts the command line's 10-minute limit: far longer than these tests run)
+	os.Args, cli = old, oldCli
+	var v struct {
+		Files    map[string]map[string]string
+		FileErrs map[string]string
+	}
+	if err := json.Unmarshal([]byte(strings.TrimSuffix(strings.TrimPrefix(js, "window.__rdCli="), ";")), &v); err != nil {
+		t.Fatalf("%v: %s", err, js)
+	}
+	if v.FileErrs[big] != "too large (70 MB, at most 64)" || v.Files[big] != nil {
+		t.Errorf("bug 82: an over-size file on the command line: %q", v.FileErrs)
+	}
+	if v.Files[ok]["b64"] != eB64("M  END") || len(v.FileErrs) != 1 {
+		t.Errorf("a good file or a SMILES taken for a bad file: %v %q", v.Files, v.FileErrs)
+	}
 }
 
 // ---------- the local API ----------

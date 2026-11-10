@@ -7,7 +7,9 @@ package main
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -26,6 +28,7 @@ func cliScript() string {
 	cli.on = true
 	args := os.Args[2:]
 	files := map[string]map[string]string{}
+	fileErrs := map[string]string{}
 	dirs := []string{}
 	for i := 0; i < len(args); i++ {
 		a := args[i]
@@ -39,13 +42,17 @@ func cliScript() string {
 			i++
 			continue
 		}
-		if st, err := os.Stat(a); err == nil && !st.IsDir() && st.Size() < 64<<20 {
-			if b, err := os.ReadFile(a); err == nil {
+		// an argument that is no file (a SMILES, a name) is left to the page; a file that is there but cannot be
+		// opened is reported by the page with its reason (it would say "no such file")
+		if st, err := os.Stat(a); (err == nil && !st.IsDir()) || errors.Is(err, fs.ErrPermission) {
+			if b, why := argFile(a); why == "" {
 				files[a] = map[string]string{"name": filepath.Base(a), "b64": base64.StdEncoding.EncodeToString(b)}
+			} else {
+				fileErrs[a] = why
 			}
 		}
 	}
-	j, _ := json.Marshal(map[string]interface{}{"argv": args, "files": files, "dirs": dirs})
+	j, _ := json.Marshal(map[string]interface{}{"argv": args, "files": files, "dirs": dirs, "fileErrs": fileErrs})
 	go func() {
 		time.Sleep(10 * time.Minute)
 		fmt.Fprintln(os.Stderr, "reactio: no answer after 10 minutes")
@@ -83,6 +90,26 @@ func cliDone(msg string) {
 	os.Stdout.WriteString(r.Out)
 	os.Stderr.WriteString(r.Err)
 	cliExit(r.Code)
+}
+
+// argFile reads a file named on the command line or opened with the app (at most 64 MB); when it cannot, the reason
+// for the user ("too large (70 MB, at most 64)", "cannot be read: permission denied")
+func argFile(a string) ([]byte, string) {
+	st, err := os.Stat(a)
+	if err != nil {
+		return nil, "cannot be read: " + errReason(err)
+	}
+	if st.IsDir() {
+		return nil, "is a folder, not a file"
+	}
+	if st.Size() >= 64<<20 {
+		return nil, fmt.Sprintf("too large (%d MB, at most 64)", st.Size()>>20)
+	}
+	b, err := os.ReadFile(a)
+	if err != nil {
+		return nil, "cannot be read: " + errReason(err)
+	}
+	return b, ""
 }
 
 func cliExit(code int) {

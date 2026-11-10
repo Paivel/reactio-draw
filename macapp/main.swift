@@ -36,11 +36,17 @@ func allowedFolders() -> [String] {
         return nil
     } catch { return error.localizedDescription }
 }
+/* a file named on the command line or opened from Finder (at most 64 MB), or why it cannot be opened */
+func readArgFile(_ path: String) -> (Data?, String) {
+    let size = ((try? FileManager.default.attributesOfItem(atPath: path))?[.size] as? NSNumber)?.intValue ?? 0
+    if size >= 64 << 20 { return (nil, "too large (\(size >> 20) MB, at most 64)") }
+    do { let d = try Data(contentsOf: URL(fileURLWithPath: path)); return (d, "") } catch { return (nil, "cannot be read: " + error.localizedDescription) }
+}
 let cliArgs: [String]? = CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--cli" ? Array(CommandLine.arguments.dropFirst(2)) : nil
 var cliOut = ""
 func cliErr(_ s: String) { FileHandle.standardError.write(s.data(using: .utf8) ?? Data()) }
 func cliScript(_ args: [String]) -> String {
-    var files: [String: [String: String]] = [:], dirs: [String] = []
+    var files: [String: [String: String]] = [:], dirs: [String] = [], fileErrs: [String: String] = [:]
     let fm = FileManager.default
     var i = 0
     while i < args.count {
@@ -54,13 +60,14 @@ func cliScript(_ args: [String]) -> String {
             }
             i += 2; continue
         }
-        if fm.fileExists(atPath: a, isDirectory: &isDir), !isDir.boolValue,
-           let d = try? Data(contentsOf: URL(fileURLWithPath: a)), d.count < 64 << 20 {
-            files[a] = ["name": (a as NSString).lastPathComponent, "b64": d.base64EncodedString()]
+        if fm.fileExists(atPath: a, isDirectory: &isDir), !isDir.boolValue {
+            // a file that is there but cannot be opened: the page gives the reason (it would say "no such file")
+            let (data, why) = readArgFile(a)
+            if let d = data { files[a] = ["name": (a as NSString).lastPathComponent, "b64": d.base64EncodedString()] } else { fileErrs[a] = why }
         }
         i += 1
     }
-    let obj: [String: Any] = ["argv": args, "files": files, "dirs": dirs]
+    let obj: [String: Any] = ["argv": args, "files": files, "dirs": dirs, "fileErrs": fileErrs]
     let j = (try? JSONSerialization.data(withJSONObject: obj)).flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
     return "window.__rdCli=\(j);"
 }
@@ -1001,12 +1008,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     func flushFiles() {
         guard loaded, let web = web else { return }
         let list = pending; pending = []
+        var errs: [String] = []
         for url in list {
-            guard let d = try? Data(contentsOf: url), d.count < 64 << 20,
-                  let j = try? JSONSerialization.data(withJSONObject: [url.lastPathComponent, d.base64EncodedString(), url.path]),
+            let (data, why) = readArgFile(url.path)
+            guard let d = data else { errs.append(url.lastPathComponent + ": " + why); continue }
+            guard let j = try? JSONSerialization.data(withJSONObject: [url.lastPathComponent, d.base64EncodedString(), url.path]),
                   let a = String(data: j, encoding: .utf8) else { continue }
             allowPath(url.path)
             web.evaluateJavaScript("window.__rdOpenFile&&window.__rdOpenFile.apply(null,\(a))", completionHandler: nil)
+        }
+        // the files that could not be opened (too large, no permission) are named in the message line
+        if !errs.isEmpty, let j = try? JSONSerialization.data(withJSONObject: ["Could not open " + errs.joined(separator: "; ")]),
+           let a = String(data: j, encoding: .utf8) {
+            web.evaluateJavaScript("window.__rdToast&&window.__rdToast(\(a)[0],true)", completionHandler: nil)
         }
         if !list.isEmpty { window?.makeKeyAndOrderFront(nil); NSApp.activate(ignoringOtherApps: true) }
     }
