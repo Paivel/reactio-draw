@@ -70909,6 +70909,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       snap();
       tgs.forEach(t => apiShift(t, dx, dy));
+      /* a compound number goes along with its compound, as when it is dragged (unless it was moved itself) */
+      const movedIds = new Set(tgs.flatMap(t => (t.atoms ? t.atoms.map(q => q.id) : [])));
+      for (const t of mol.texts)
+        if (cnumWith(t, movedIds) && !tgs.some(g => g.text === t)) {
+          t.x += dx;
+          t.y += dy;
+        }
       commit();
       return { moved: tgs.length, dx, dy };
     },
