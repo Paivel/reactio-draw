@@ -17201,13 +17201,18 @@ function kdOf(st) {
       delete a.label;
       delete a.grp;
       delete a.lsty;
+      /* the R atom read from SMILES ([*]) has no hydrogens of its own; the element gets its usual ones (OH, NH2) */
+      delete a.hExp;
+      delete a.hUsed;
       a.el = eh[1];
       a.chg = 0;
       return true;
     }
-    if (setLabel(a, t)) return true;
-    /* a substituent read back from a compound as SMILES (its first atom on the bond) */
-    if (/^[A-Za-z[]/.test(t) && !/\s/.test(t) && parseSmiles(t)) {
+    /* a substituent read back from a compound as SMILES (its first atom on the bond); one written with branches or
+       brackets and no H is SMILES, not a condensed formula (OCC(F)(F)F is OCH2CF3, where a formula would fill it with =) */
+    const smiLike = /^[A-Za-z[]/.test(t) && !/\s/.test(t) && parseSmiles(t);
+    if (!(smiLike && !/H/.test(t) && /[()[\]=#]/.test(t)) && setLabel(a, t)) return true;
+    if (smiLike) {
       a.grp = t;
       a.label = t;
       /* drawn as atoms once the compound is on the sheet (not as a label that spells the SMILES) */
@@ -17460,7 +17465,8 @@ function kdOf(st) {
             ss = new O.SSSearcher();
           ss.setFragment(q);
           ss.setMolecule(om);
-          ml = ss.findFragmentInMolecule(5, 1) ? ss.getMatchList() : [];
+          /* every mapping, not one per atom set: on a symmetric ring only some put the R site where the substituent is */
+          ml = ss.findFragmentInMolecule({ countMode: 'rigorous' }) ? ss.getMatchList() : [];
         } catch (e) {
           ml = [];
         }
