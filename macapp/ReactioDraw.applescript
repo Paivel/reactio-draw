@@ -81,6 +81,7 @@ on |rd|(p)
 			do shell script quoted form of cli & " convert " & quoted form of src & " -o " & quoted form of out
 		else if cmd is "edit" then
 			-- src: the picture's id, out: its alt text (the drawing is in it); Reactio Draw opens it in a tab
+			if not my plainId(src) then return "Reactio Draw could not do this: the picture's id is not a plain name."
 			do shell script "mkdir -p " & quoted form of xdir
 			set f to xdir & src & ".rdword"
 			set fp to open for access (POSIX file f) with write permission
@@ -93,10 +94,12 @@ on |rd|(p)
 			-- was not found then) and drawings opened for editing days ago are cleared away first
 			return do shell script "cd " & quoted form of xdir & " 2>/dev/null && find . -maxdepth 1 \\( -name '*.tag' -o -name '*.png' -o -name '*.svg' \\) -mmin +10 -delete; find . -maxdepth 1 -name '*.rdword' -mtime +2 -delete; for f in *.tag; do [ -f \"$f\" ] && printf '%s\\t' \"${f%.tag}\"; done; true"
 		else if cmd is "tag" then
+			if not my plainId(src) then return ""
 			return do shell script "cat " & quoted form of (xdir & src & ".tag")
 		else if cmd is "dir" then
 			return xdir
 		else if cmd is "done" then
+			if not my plainId(src) then return ""
 			do shell script "cd " & quoted form of xdir & " && rm -f " & quoted form of (src & ".tag") & " " & quoted form of (src & ".png") & " " & quoted form of (src & ".svg") & " " & quoted form of (src & ".rdword")
 		end if
 		return ""
@@ -104,3 +107,13 @@ on |rd|(p)
 		return "Reactio Draw could not do this: " & e
 	end try
 end |rd|
+
+-- a drawing's id names files in xdir and comes from a picture's alt text: 1 to 64 letters, digits, _ or -, as Reactio
+-- Draw itself accepts
+on plainId(s)
+	if (count of s) < 1 or (count of s) > 64 then return false
+	repeat with c in characters of s
+		if "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-" does not contain (c as text) then return false
+	end repeat
+	return true
+end plainId

@@ -300,13 +300,19 @@ Private Function IsRD(s As Object) As Boolean
 End Function
 
 ' the id that ties a picture to its drawing open in Reactio Draw: [RD:...] at the end of its alt text
+' (it names files in Office's exchange folder, and the alt text may come from a document someone sent: an id that is
+' not 1 to 64 letters, digits, _ or -, as Reactio Draw accepts, is replaced by a new one)
 Private Function DrawingId(s As Object) As String
-    Dim a As String, i As Long, j As Long
+    Dim a As String, i As Long, j As Long, id As String
     a = s.AlternativeText
     i = InStr(a, "[RD:")
     If i > 0 Then
         j = InStr(i, a, "]")
-        If j > i Then DrawingId = Mid$(a, i + 4, j - i - 4): Exit Function
+        If j > i Then
+            id = Mid$(a, i + 4, j - i - 4)
+            If Len(id) >= 1 And Len(id) <= 64 And Not id Like "*[!A-Za-z0-9_-]*" Then DrawingId = id: Exit Function
+            a = Left$(a, i - 1) & Mid$(a, j + 1)
+        End If
     End If
     Randomize
     DrawingId = Format$(Now, "yymmddhhnnss") & CStr(Int(Rnd * 9000) + 1000)
