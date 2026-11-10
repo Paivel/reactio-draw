@@ -19145,6 +19145,8 @@ function kdOf(st) {
     }
     return out.join('');
   }
+  /* the most atoms the drug-likeness numbers (cLogP, TPSA, pKa) are worked out for: OpenChemLib reads about 400 a second */
+  const DRUG_MAX = 1000;
   function updateInfo() {
     const { atoms: target, scope, frs, txts } = analysisTarget();
     $('single').hidden = !target;
@@ -19195,8 +19197,14 @@ function kdOf(st) {
         };
         /* a big structure (OpenChemLib reads 400 atoms in a second): worked out just after the change is drawn, so an edit
            or a Clean Up is not held up by the panel; the same numbers, a moment later */
-        if (target.length > 120) {
-          const tok = (updateInfo.drugTok = (updateInfo.drugTok || 0) + 1),
+        /* worked out only for what is selected: on a whole sheet of a large drawing OpenChemLib held the page for a minute
+           and more after every change; and not above DRUG_MAX atoms even then */
+        const drugTok = (updateInfo.drugTok = (updateInfo.drugTok || 0) + 1);
+        if (scope !== 'Selection' || target.length > DRUG_MAX) {
+          show(null);
+          $('ro5').textContent = scope !== 'Selection' ? 'select a structure' : 'too large (' + target.length + ' atoms)';
+        } else if (target.length > 120) {
+          const tok = drugTok,
             tg = target.slice();
           ['clogp', 'tpsa', 'hbda', 'rotb', 'ro5', 'pka'].forEach(k => ($(k).textContent = '…'));
           setTimeout(() => {
