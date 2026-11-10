@@ -142,8 +142,8 @@ func TestWinErrBridgeMalformed(t *testing.T) {
 		t.Errorf("write without path: %v", r)
 	}
 	handle(`{"id":"wt1","cmd":"write","path":5}`)
-	if _, ok := wReply("wt1", 200*time.Millisecond); !ok {
-		t.Skip("bug 76: a message with a field of the wrong type is dropped with no reply")
+	if r, ok := wReply("wt1", 200*time.Millisecond); !ok || r["ok"] != false || r["err"] == nil {
+		t.Errorf("bug 76: a message with a field of the wrong type must be answered with an error: %v %v", ok, r)
 	}
 }
 

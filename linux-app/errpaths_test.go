@@ -199,8 +199,8 @@ func TestErrBridgeWrongTypeGetsReply(t *testing.T) {
 	handle(`{"id":"wt1","cmd":"write","path":5,"b64":"eA=="}`)
 	handle(`{"id":"wt2","cmd":"texHead","path":["a"]}`)
 	for _, id := range []string{"wt1", "wt2"} {
-		if _, ok := eReply(id, 200*time.Millisecond); !ok {
-			t.Skip("bug 76: a message with a field of the wrong type is dropped with no reply; the page's call waits forever")
+		if r, ok := eReply(id, 200*time.Millisecond); !ok || r["ok"] != false || r["err"] == nil {
+			t.Errorf("bug 76: a message with a field of the wrong type must be answered with an error: %v %v", ok, r)
 		}
 	}
 }

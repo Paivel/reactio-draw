@@ -310,7 +310,9 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "app.reactiodraw.local" else { return }
         guard let s = message.body as? String, let d = s.data(using: .utf8),
               let m = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
-              let id = m["id"] as? String, let cmd = m["cmd"] as? String else { return }
+              let id = m["id"] as? String else { return }
+        // the id can be read: answered even when the command cannot, so the page does not wait for ever
+        guard let cmd = m["cmd"] as? String else { reply(id, ["ok": false, "err": "bad message"]); return }
         switch cmd {
         case "save":
             let p = NSSavePanel(); p.nameFieldStringValue = m["name"] as? String ?? "Reactio Draw"; p.canCreateDirectories = true
