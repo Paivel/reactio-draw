@@ -113,6 +113,7 @@ func opsinName(name string) (string, string, string) {
 	if name == "" {
 		return "", "empty", ""
 	}
+	stopped := ""
 	for try := 0; try < 2; try++ {
 		if opsinCmd == nil {
 			if err := opsinStart(); err != nil {
@@ -132,6 +133,7 @@ func opsinName(name string) (string, string, string) {
 		select {
 		case r := <-ch:
 			if r.err != nil {
+				stopped = helperStopped(opsinCmd, opsinErr)
 				opsinStop()
 				continue
 			}
@@ -154,7 +156,39 @@ func opsinName(name string) (string, string, string) {
 			return "", "timeout", ""
 		}
 	}
-	return "", "nojava", ""
+	// Java was found and started, but OPSIN stopped on this name (twice): not "no Java"
+	return "", "crashed", "OPSIN (Java) stopped: " + stopped
+}
+
+// helperStopped: a helper program (Python, Java) has stopped answering: it is ended, and the first line of what it
+// wrote to its error output says why ("without a message" when it wrote nothing)
+func helperStopped(c *exec.Cmd, errOut *tailBuf) string {
+	if c != nil && c.Process != nil {
+		c.Process.Kill()
+		done := make(chan struct{})
+		go func() { c.Wait(); close(done) }() // the rest of its error output comes in
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+		}
+	}
+	var lines []string
+	for _, l := range strings.Split(errOut.take(), "\n") {
+		if l = strings.TrimSpace(l); l != "" {
+			lines = append(lines, l)
+		}
+	}
+	if len(lines) == 0 {
+		return "without a message"
+	}
+	l := lines[0]
+	if strings.HasPrefix(l, "Traceback ") {
+		l = lines[len(lines)-1] // a Python traceback: its last line is the error itself
+	}
+	if len(l) > 300 {
+		l = l[:300] + "…"
+	}
+	return l
 }
 
 // toolPath: helper files shipped beside the program, in its tools folder (nothing is unpacked at run time)

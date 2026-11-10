@@ -21,6 +21,8 @@ var namerMu sync.Mutex
 var namerCmd *exec.Cmd
 var namerIn *bufio.Writer
 var namerOut *bufio.Reader
+var namerErr = &tailBuf{}
+var namerPy string
 
 func pythonCandidates() [][]string {
 	c := [][]string{}
@@ -65,6 +67,8 @@ func namerStart() (string, error) {
 		c.Env = append(os.Environ(), "PYTHONIOENCODING=utf-8")
 		in, _ := c.StdinPipe()
 		out, _ := c.StdoutPipe()
+		namerErr.take()
+		c.Stderr = namerErr
 		if err := c.Start(); err != nil {
 			continue
 		}
@@ -81,7 +85,7 @@ func namerStart() (string, error) {
 		var m map[string]interface{}
 		json.Unmarshal([]byte(first), &m)
 		if _, ok := m["ready"]; ok {
-			namerCmd, namerIn, namerOut = c, bufio.NewWriter(in), rd
+			namerCmd, namerIn, namerOut, namerPy = c, bufio.NewWriter(in), rd, cand[0]
 			logf("namer started with %s (openclatura %v)", cand[0], m["ready"])
 			return "", nil
 		}
@@ -109,14 +113,17 @@ func namerName(smi string) (string, string, string) {
 	if smi == "" {
 		return "", "empty", ""
 	}
+	stopped := ""
 	for try := 0; try < 2; try++ {
 		if namerCmd == nil {
 			if msg, err := namerStart(); err != nil {
 				return "", err.Error(), msg
 			}
 		}
+		namerErr.take()
 		namerIn.WriteString(smi + "\n")
 		if err := namerIn.Flush(); err != nil {
+			stopped = helperStopped(namerCmd, namerErr)
 			namerStop()
 			continue
 		}
@@ -125,6 +132,7 @@ func namerName(smi string) (string, string, string) {
 		select {
 		case line := <-ch:
 			if line == "" {
+				stopped = helperStopped(namerCmd, namerErr)
 				namerStop()
 				continue
 			}
@@ -139,5 +147,6 @@ func namerName(smi string) (string, string, string) {
 			return "", "timeout", "naming took too long"
 		}
 	}
-	return "", "nopython", ""
+	// Python was found and the helper started, but it stopped on this structure (twice): not "no Python"
+	return "", "crashed", "the naming helper (" + namerPy + ") stopped: " + stopped
 }

@@ -42,6 +42,13 @@ func readArgFile(_ path: String) -> (Data?, String) {
     if size >= 64 << 20 { return (nil, "too large (\(size >> 20) MB, at most 64)") }
     do { let d = try Data(contentsOf: URL(fileURLWithPath: path)); return (d, "") } catch { return (nil, "cannot be read: " + error.localizedDescription) }
 }
+/* the first line a helper (Python, Java) wrote to its error output before it stopped; for a Python traceback its last line */
+func firstErrLine(_ d: Data) -> String {
+    let lines = String(decoding: d, as: UTF8.self).split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    guard var l = lines.first else { return "without a message" }
+    if l.hasPrefix("Traceback "), let last = lines.last { l = last }
+    return l.count > 300 ? String(l.prefix(300)) + "…" : l
+}
 let cliArgs: [String]? = CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--cli" ? Array(CommandLine.arguments.dropFirst(2)) : nil
 var cliOut = ""
 func cliErr(_ s: String) { FileHandle.standardError.write(s.data(using: .utf8) ?? Data()) }
@@ -645,7 +652,10 @@ final class Opsin {
             if let r = msg.range(of: "uninterpretable: ") { msg = String(msg[r.upperBound...]); if let t = msg.range(of: " The following") { msg = String(msg[..<t.lowerBound]) }; msg = "not understood: " + msg.trimmingCharacters(in: .whitespacesAndNewlines) }
             return ["err": "unparsable", "msg": msg.trimmingCharacters(in: .whitespacesAndNewlines)]
         }
-        return ["err": "nojava"]
+        // Java was found and started, but OPSIN stopped on this name (twice): not "no Java"
+        Thread.sleep(forTimeInterval: 0.1)
+        errLock.lock(); let tail = errBuf; errLock.unlock()
+        return ["err": "crashed", "msg": "OPSIN (Java) stopped: " + firstErrLine(tail)]
     }
 }
 
@@ -700,6 +710,8 @@ final class Namer {
     var inH: FileHandle?
     var outH: FileHandle?
     var outBuf = Data()
+    var errBuf = Data()
+    let errLock = NSLock()
 
     func candidates() -> [String] {
         let home = NSHomeDirectory()
@@ -744,7 +756,11 @@ final class Namer {
         for py in candidates() {
             let p = Process(); p.executableURL = URL(fileURLWithPath: py); p.arguments = ["-u", script]
             var env = ProcessInfo.processInfo.environment; env["PYTHONIOENCODING"] = "utf-8"; p.environment = env
-            let i = Pipe(), o = Pipe(); p.standardInput = i; p.standardOutput = o; p.standardError = FileHandle.nullDevice
+            let i = Pipe(), o = Pipe(), e = Pipe(); p.standardInput = i; p.standardOutput = o; p.standardError = e
+            e.fileHandleForReading.readabilityHandler = { [weak self] h in
+                let d = h.availableData; if d.isEmpty { h.readabilityHandler = nil; return }
+                guard let s = self else { return }; s.errLock.lock(); s.errBuf.append(d); if s.errBuf.count > 4000 { s.errBuf = s.errBuf.suffix(4000) }; s.errLock.unlock()
+            }
             do { try p.run() } catch { continue }
             proc = p; inH = i.fileHandleForWriting; outH = o.fileHandleForReading; outBuf = Data()
             if let first = readLine(timeout: 90), let d = first.data(using: .utf8), let m = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] {
@@ -764,13 +780,17 @@ final class Namer {
         if smi.isEmpty { return ["err": "empty"] }
         for _ in 0..<2 {
             if proc == nil || proc?.isRunning != true { if let e = start() { return e } }
+            errLock.lock(); errBuf = Data(); errLock.unlock()
             inH?.write((smi + "\n").data(using: .utf8)!)
             guard let line = readLine(timeout: 60), let d = line.data(using: .utf8),
                   let m = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any] else { stop(); continue }
             if let n = m["name"] as? String, !n.isEmpty { return ["name": n] }
             return ["err": "noname", "msg": m["msg"] as? String ?? ""]
         }
-        return ["err": "nopython"]
+        // Python was found and the helper started, but it stopped on this structure (twice): not "no Python"
+        Thread.sleep(forTimeInterval: 0.1)
+        errLock.lock(); let tail = errBuf; errLock.unlock()
+        return ["err": "crashed", "msg": "the naming helper stopped: " + firstErrLine(tail)]
     }
 }
 

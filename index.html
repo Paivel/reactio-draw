@@ -32239,6 +32239,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (r && r.smiles) return { smiles: r.smiles, source: 'OPSIN (Java)' };
         /* Java's own trouble matters only when the page could not read names either */
         if (r && (r.err === 'nojava' || r.err === 'noopsin') && !NREAD.opsin) return { err: r.err, msg: '' };
+        /* Java is there but OPSIN stopped (r.msg: the first line of its error output) */
+        if (r && r.err === 'crashed' && !NREAD.opsin) return { err: 'crashed', msg: r.msg || '' };
         if (r && r.msg && !packErr) return { err: 'unread', msg: r.msg };
       } catch (e) {}
     }
@@ -32326,7 +32328,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         toast(
           r.err === 'nojava'
             ? 'Java was not found. Install Java (for example Eclipse Temurin from adoptium.net) and try again.'
-            : r.err === 'noopsin'
+            : r.err === 'crashed'
+              ? 'The name reader could not run: ' + r.msg
+              : r.err === 'noopsin'
               ? 'OPSIN is missing from this copy of the app.'
               : r.err === 'nopack'
                 ? '“' + nm + '” is not in the list of common names, and the name reader was not downloaded.'
@@ -72313,7 +72317,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         throw new Error(
           r.err === 'nojava'
             ? 'Java was not found'
-            : r.err === 'nopack'
+            : r.err === 'crashed'
+              ? 'the name reader could not run: ' + r.msg
+              : r.err === 'nopack'
               ? 'Not in the list of common names, and the name reader was not downloaded'
               : r.err === 'pack'
                 ? 'the name reader could not start: ' + r.msg

@@ -554,13 +554,13 @@ func TestErrHelperCrashReportedAsMissing(t *testing.T) {
 	defer namerStop()
 	eTools(t, map[string]string{"reactio_name.py": "# stand-in\n"})
 	t.Setenv("PATH", filepath.Join(d, "empty"))
-	t.Setenv("REACTIO_PYTHON", eScript(t, d, "python", `echo '{"ready":"1.0"}'; read l; exit 1`))
+	t.Setenv("REACTIO_PYTHON", eScript(t, d, "python", `echo '{"ready":"1.0"}'; read l; echo "ImportError: boom in the helper" >&2; echo "second line" >&2; exit 1`))
 	r := eSend(t, map[string]interface{}{"cmd": "iupac", "name": "CCO"}, 10*time.Second)
 	if r["err"] == "" || r["err"] == nil {
 		t.Fatalf("a crashing helper gave no error: %v", r)
 	}
-	if r["err"] == "nopython" {
-		t.Skip("bug 83: the naming helper crashed twice and the page is told \"nopython\" (Python not found)")
+	if r["err"] != "crashed" || !strings.Contains(fmt.Sprint(r["msg"]), "ImportError: boom in the helper") || strings.Contains(fmt.Sprint(r["msg"]), "second line") {
+		t.Errorf("bug 83: a crashing naming helper must be reported as crashed with the first line of its error output: %v", r)
 	}
 }
 
@@ -607,14 +607,14 @@ func TestErrOpsinMissingAndBroken(t *testing.T) {
 		t.Errorf("Java cannot start: %v", r)
 	}
 	/* Java that dies on every name */
-	eScript(t, filepath.Join(jh, "bin"), "java", `exit 1`)
+	eScript(t, filepath.Join(jh, "bin"), "java", `echo "Error: boom in OPSIN" >&2; exit 1`)
 	opsinStop()
 	r = eSend(t, map[string]interface{}{"cmd": "opsin", "name": "methane"}, 5*time.Second)
 	if r["err"] == nil || r["smiles"] != nil {
 		t.Fatalf("a dying OPSIN gave no error: %v", r)
 	}
-	if r["err"] == "nojava" {
-		t.Skip("bug 83: OPSIN died on each try and the page is told \"nojava\" (Java not installed)")
+	if r["err"] != "crashed" || !strings.Contains(fmt.Sprint(r["msg"]), "Error: boom in OPSIN") {
+		t.Errorf("bug 83: OPSIN dying on each try must be reported as crashed with its error output, not \"nojava\": %v", r)
 	}
 }
 
