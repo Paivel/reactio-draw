@@ -37910,6 +37910,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           gRight = labRightOf(g, onb),
           lab =
             g.label; /* a CDXML label is kept in reading order (CO2H, OTBDPS) and shown turned round when it is right-justified (HO2C, TBDPSO) */
+        /* a label drawn on its own (Boc, C2H5) goes out as a node with its text only: a lone labelled node reads as a
+           caption (a reagent's name), a plain one as the label again */
+        if (!outB.length && fr.every(q => gs.has(q.id))) {
+          s += `<n id="${i}" p="${P(g.x, g.y)}"${colAt(a.col, 'color')}><t ${labPos(a, P, g.x, g.y, [])}>${cdxLabelRuns(g, lab, false, (g.bold ? 1 : 0) | (g.italic ? 2 : 0) | (g.ul ? 4 : 0))}</t></n>`;
+          for (const x of g.ids) if (x !== a.id) nid.set(x, i);
+          continue;
+        }
         s += `<n id="${i}" p="${P(g.x, g.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(g.x, g.y)} ${(a.d3 * k).toFixed(2)}"` : ''} NodeType="${/\d/.test(g.label) || g.label.length > 3 ? 'Fragment' : 'Nickname'}"${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}>${inner}</fragment><t ${labPos(
           a,
           P,
@@ -49091,13 +49098,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const made = [];
       const ns = [...fr.querySelectorAll(':scope > n')],
         bs = [...fr.querySelectorAll(':scope > b')];
-      /* a lone reagent label (THF, MeCN, AcOH…): keep it as text, the grid knows these */
-      if (ns.length === 1 && !bs.length && LABELED.test(ns[0].getAttribute('NodeType') || '')) {
+      /* a lone reagent label (THF, MeCN, AcOH…, or "CH3MgBr, THF" as an alternative group): keep it as text, the grid knows these */
+      if (
+        ns.length === 1 &&
+        !bs.length &&
+        (LABELED.test(ns[0].getAttribute('NodeType') || '') ||
+          /AlternativeGroup$/.test(ns[0].getAttribute('NodeType') || ''))
+      ) {
         const lab = ns[0].querySelector(':scope > t');
         const txt = lab ? lab.textContent.trim() : '';
-        /* a substituent label holding its structure (Boc, C2H5 drawn on its own) stays a labelled atom */
-        const grp = txt && ns[0].querySelector(':scope > fragment > n') && !/[+-]$/.test(txt) && resolveLabel(txt);
-        if (txt && !grp) {
+        if (txt) {
           /* with its size, styles, colour and alignment, as a caption (a table's cells are often such labels) */
           const t = cdxText(lab, true) || { id: mol.next++, x: pt(ns[0].getAttribute('p')).x + ox, y: pt(ns[0].getAttribute('p')).y, text: txt, size: textDef.size, fs: true };
           mol.texts.push(t);
