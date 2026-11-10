@@ -46126,7 +46126,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a,
         b,
         order: o >= 1 && o <= 3 ? o : 1,
-        stereo: o === 4 ? 'deloc' : st === 1 ? 'wedge' : st === 6 ? 'hash' : st === 4 ? 'wavy' : null
+        stereo: o === 4 ? 'deloc' : st === 1 ? 'wedge' : st === 6 ? 'hash' : st === 4 ? 'wavy' : null,
+        /* a double bond of unknown geometry (stereo 3, "either") is drawn crossed and has no E/Z */
+        ...(o === 2 && st === 3 ? { dx: 1 } : {})
       });
     }
     let j = start + 4 + na + nb;
@@ -46291,7 +46293,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           a: ix.get(w[2]),
           b: ix.get(w[3]),
           order: o >= 1 && o <= 3 ? o : 1,
-          stereo: o === 4 ? 'deloc' : cfg === 1 ? 'wedge' : cfg === 3 ? 'hash' : cfg === 2 && o === 1 ? 'wavy' : null
+          stereo: o === 4 ? 'deloc' : cfg === 1 ? 'wedge' : cfg === 3 ? 'hash' : cfg === 2 && o === 1 ? 'wavy' : null,
+          ...(o === 2 && cfg === 2 ? { dx: 1 } : {})
         });
       } else if (sec === 'COLLECTION') {
         const g = /^MDLV30\/STE(ABS|RAC|REL)(\d*)$/.exec(w[0] || ''),
@@ -46354,7 +46357,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             a: map[b.a].id,
             b: map[b.b].id,
             order: b.order,
-            stereo: b.stereo || null
+            stereo: b.stereo || null,
+            ...(b.dx ? { dx: 1 } : {})
           });
       });
       /* η-rings: the attachment point lists its ring atoms */
