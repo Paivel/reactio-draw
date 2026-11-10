@@ -70911,12 +70911,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     version: () => ({ name: 'Reactio Draw', version: RD_VERSION }),
     list: () => fragments().map((fr, i) => ({ id: apiFragId(fr), ...apiDescribe(fr, i) })),
     scheme: () => {
-      const s = schemeOrder();
+      const s = schemeOrder(),
+        len = s.ar ? Math.hypot(s.ar.x2 - s.ar.x1, s.ar.y2 - s.ar.y1) : 0;
       return {
         arrows: mol.arrows.filter(isRxnArrow).length,
         reactionSmiles: currentSmiles(false, true),
+        /* what stands over or under the arrow, between its ends, is a reagent (or a condition), not a reactant */
         items: s.list.map(x => ({
-          role: x.role === 'p' ? 'product' : 'reactant',
+          role: x.role === 'p' ? 'product' : s.ar && x.t >= 0 && x.t <= len ? 'reagent' : 'reactant',
           formula: x.fr ? formulaText(countsOf(x.fr)) : x.tc ? formulaText(x.tc) : null,
           text: x.txt ? x.txt.text : undefined
         }))
