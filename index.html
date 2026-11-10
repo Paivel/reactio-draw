@@ -15433,7 +15433,8 @@ function kdOf(st) {
     gr.setAttribute('width', view.w);
     gr.setAttribute('height', view.h);
     /* squares under 3 pixels are only a grey haze, and many of them (millions at 1%) cost drawing time */
-    gr.style.display = (20 * (svg.clientWidth || BW)) / view.w < 3 ? 'none' : '';
+    /* (visibility, not display: display is the grid's own on/off, syncGrid) */
+    gr.style.visibility = (20 * (svg.clientWidth || BW)) / view.w < 3 ? 'hidden' : '';
     $('zoomv').textContent = Math.round(((svg.clientWidth || BW) / view.w / PX1) * 100) + '%';
     try {
       scrollBars();
