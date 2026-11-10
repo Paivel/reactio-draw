@@ -4516,7 +4516,7 @@ function kdOf(st) {
                 : 'Version ' + tag.replace(/^v/i, '') + ' is installed: Reactio Draw starts again when it closes.';
               setTimeout(() => {
                 if (window.__rdBeforeQuit) window.__rdBeforeQuit();
-                else window.rdNative.call('quit', {});
+                else tellApp('quit', {});
               }, 1200);
             };
           } else if (tag && newer(tag, RD_VERSION)) {
@@ -43487,7 +43487,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } catch (e) {
         console.error(e);
       }
-      N.call('embedClose', {});
+      N.call('embedClose', {}).catch(e => console.warn('could not answer the app (embedClose)', e));
     };
     document.addEventListener(
       'keydown',
@@ -76005,22 +76005,28 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     await new Promise(r => setTimeout(r, 0));
   };
   window.apiStopAsked = () => !!(API_RUN.depth && API_RUN.stop);
+  /* an answer to the app (an API result, the command line's result): when the native bridge is gone, the call throws or
+     its promise rejects; either way there is no one left to answer, so it is only logged */
+  function tellApp(cmd, o) {
+    try {
+      const p = window.rdNative && window.rdNative.call(cmd, o);
+      if (p && typeof p.catch === 'function') p.catch(e => console.warn('could not answer the app (' + cmd + ')', e));
+    } catch (e) {
+      console.warn('could not answer the app (' + cmd + ')', e);
+    }
+  }
   window.__rdApiCall = async (id, op, args) => {
     let out;
     /* what the command running now is doing (for the connector's "still working" answer) */
     if (op === '__busy') {
       out = { ok: true, result: API_RUN.depth ? { op: API_RUN.op, step: API_RUN.step, seconds: Math.round((Date.now() - API_RUN.t0) / 1000) } : { idle: true } };
-      try {
-        window.rdNative && window.rdNative.call('apiResult', { name: id, msg: JSON.stringify(out) });
-      } catch (e) {}
+      tellApp('apiResult', { name: id, msg: JSON.stringify(out) });
       return;
     }
     if (op === '__answer') {
       const a = RD_ANS.get(String((args && args.cid) || ''));
       out = { ok: true, result: a || { pending: true } };
-      try {
-        window.rdNative && window.rdNative.call('apiResult', { name: id, msg: JSON.stringify(out) });
-      } catch (e) {}
+      tellApp('apiResult', { name: id, msg: JSON.stringify(out) });
       return;
     }
     let cid = null;
@@ -76067,9 +76073,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       RD_ANS.set(cid, out);
       while (RD_ANS.size > 6) RD_ANS.delete(RD_ANS.keys().next().value);
     }
-    try {
-      window.rdNative && window.rdNative.call('apiResult', { name: id, msg });
-    } catch (e) {}
+    tellApp('apiResult', { name: id, msg });
   };
   /* command line: reactio <command> … (reactio.exe on Windows, the reactio script on Mac and Linux) starts the app with --cli; the app
    loads this page unseen (?embed&cli) with window.__rdCli={argv,files,dirs} (the files named on the command line, read by the app)
@@ -76609,9 +76613,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           r = { out: '', err: 'reactio: ' + ((e && e.message) || e) + '\n', code: 1, writes: [] };
         }
         window.__rdCliResult = r;
-        try {
-          window.rdNative && window.rdNative.call('cliDone', { msg: JSON.stringify(r) });
-        } catch (e) {}
+        tellApp('cliDone', { msg: JSON.stringify(r) });
       }, 0);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', cliGo);
     else cliGo();
@@ -79570,11 +79572,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         closeDocNow();
       }
       save();
-      window.rdNative && window.rdNative.call('quit', {});
+      tellApp('quit', {});
       return true;
     } catch (e) {
       console.error(e);
-      window.rdNative && window.rdNative.call('quit', {});
+      tellApp('quit', {});
       return true;
     }
   };
