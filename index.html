@@ -43714,6 +43714,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ]);
     return new Blob([...parts, ...central, end], { type: 'application/zip' });
   }
+  /* resolves true when the file was written or handed to the browser's downloads, false when it was not (the user
+     cancelled, or saving failed: the message is shown here) */
   async function offerFile(filename, data) {
     /* desktop app: native save dialog, any file type */
     if (window.rdDesktop) {
@@ -43721,12 +43723,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const d = data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data;
         const r = await window.rdDesktop.save(filename, d);
         /* r.error: the app could not write it (Windows shows its own message box and sends no reason) */
-        if (r && r.ok) toast('Saved ' + r.path);
-        else if (r && (r.error || r.err)) toast('Could not save ' + filename + ': ' + (r.error || r.err), true);
+        if (r && r.ok) {
+          toast('Saved ' + r.path);
+          return true;
+        }
+        if (r && (r.error || r.err)) toast('Could not save ' + filename + ': ' + (r.error || r.err), true);
       } catch (e) {
         toast('Could not save: ' + ((e && e.message) || e), true);
       }
-      return;
+      return false;
     }
     let dl = null;
     try {
@@ -43753,10 +43758,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           await w.write(blob);
           await w.close();
           toast('Saved ' + h.name);
+          return true;
         } catch (e) {
           if (e && e.name !== 'AbortError') toast('Could not save: ' + e.message, true);
+          return false;
         }
-        return;
       }
       const a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
@@ -43768,22 +43774,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a.remove();
       }, 2000);
       toast('Saved to Downloads: ' + filename);
-      return;
+      return true;
     }
     if (!dl) {
       toast('Saving files is not available in this view. Use the Copy buttons instead.', true);
-      return;
+      return false;
     }
     try {
       await dl.save({ filename, data });
       toast('Saved ' + filename);
+      return true;
     } catch (e) {
-      if (e && e.code === 'declined') return;
+      if (e && e.code === 'declined') return false;
       if (e && e.code === 'rejected_extension') {
         toast('This file type cannot be saved from the browser here; use the zip export.', true);
-        return;
+        return false;
       }
       toast('Could not save: ' + ((e && e.message) || 'unavailable'), true);
+      return false;
     }
   }
   function docName() {
@@ -79020,10 +79028,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         toast('Could not save ' + name + ': ' + ((e && e.message) || e), true);
         return false;
       }
-    } else if (window.claude && !window.rdDesktop && ext !== 'json')
-      /* the hosted view saves common extensions only: chemistry files travel inside a zip there */
-      await offerFile(name + '.zip', zipOf([[name, body]]));
-    else await offerFile(name, typeof body === 'string' ? body : new Blob([body]));
+    } else {
+      /* the hosted view saves common extensions only: chemistry files travel inside a zip there. offerFile shows its
+         own message when the file was not saved; the document then stays unsaved */
+      const done =
+        window.claude && !window.rdDesktop && ext !== 'json'
+          ? await offerFile(name + '.zip', zipOf([[name, body]]))
+          : await offerFile(name, typeof body === 'string' ? body : new Blob([body]));
+      if (!done) return false;
+    }
     if (fh && mode !== 'copy') fhPut(t.id, fh);
     if (mode !== 'copy') {
       if (mode === 'as' || !t.file) {
