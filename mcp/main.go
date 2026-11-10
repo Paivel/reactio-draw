@@ -566,9 +566,17 @@ func placeReference(args map[string]interface{}) map[string]interface{} {
 			err = exec.Command("powershell", "-NoProfile", "-STA", "-Command",
 				`Add-Type -AssemblyName System.Windows.Forms; $i=[Windows.Forms.Clipboard]::GetImage(); if ($i -eq $null) { exit 1 }; $i.Save('`+tmp+`')`).Run()
 		default:
+			_, e1 := exec.LookPath("xclip")
+			_, e2 := exec.LookPath("wl-paste")
+			if e1 != nil && e2 != nil {
+				return text("Cannot read the clipboard: neither xclip nor wl-paste is installed. Install one (for example: sudo apt install xclip, or wl-clipboard on Wayland), or give the picture's path", true)
+			}
 			var out []byte
-			out, err = exec.Command("xclip", "-selection", "clipboard", "-t", "image/png", "-o").Output()
-			if err != nil {
+			err = errors.New("no clipboard tool")
+			if e1 == nil {
+				out, err = exec.Command("xclip", "-selection", "clipboard", "-t", "image/png", "-o").Output()
+			}
+			if err != nil && e2 == nil {
 				out, err = exec.Command("wl-paste", "--type", "image/png").Output()
 			}
 			if err == nil {

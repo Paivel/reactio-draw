@@ -661,7 +661,7 @@ func TestErrPlaceReferenceNoClipboardTool(t *testing.T) {
 		t.Fatalf("no clipboard tool: not an error: %s", s)
 	}
 	if !strings.Contains(s, "xclip") && !strings.Contains(s, "wl-paste") {
-		t.Skip("bug 84: without xclip or wl-paste, place_reference says there is no picture on the clipboard")
+		t.Errorf("bug 84: without xclip or wl-paste, place_reference must name the missing tool: %s", s)
 	}
 }
 
