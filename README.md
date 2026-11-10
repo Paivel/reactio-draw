@@ -26,7 +26,7 @@ https://github.com/user-attachments/assets/1637fe6d-b6d1-4ec5-9d68-9a41d62ef0c8
 | **Working fast** | scrolling in every direction (two fingers, or Shift+wheel sideways) and zoom to the pointer; a hotkey for every button and command, all reassignable, with search by name or by key; your own templates and labels on keys |
 | **API and command line** | a local API for scripts (Python, R, curl) in the desktop apps; a command line, `reactio`, that renders, converts and checks files without opening a window ([Command line.txt](Command%20line.txt)); and the same commands for web pages that embed the editor ([EMBEDDING.md](EMBEDDING.md)) |
 | **Styles** | ACS, RSC, Nature, Angewandte and more, colour themes (one of them color-blind safe), dark sheets |
-| **Light** | the whole editor is one web page of 6.5 MB (about 2.1 MB over the network; 13 MB as a single offline file with the NMR tables and the name reader), with no server and nothing to install; the apps are about 24–32 MB to download. The NMR tables (2.2 MB) come only when you first predict a spectrum, the name reader (3.1 MB) only with the first name it is needed for. For comparison, the Ketcher npm package is about 110 MB and Kekule.js about 42 MB |
+| **Light** | the whole editor is one web page of 6.5 MB (about 2.1 MB over the network; 13 MB as a single offline file with the NMR tables and the name reader), with no server and nothing to install; the apps are about 24–32 MB to download. The NMR tables (2.2 MB) come only when you first predict a spectrum, the name reader (3.1 MB) only with the first name it is needed for. |
 
 
 ## Download

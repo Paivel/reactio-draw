@@ -15,7 +15,7 @@ Where it is:
   reactio convert <input>  --format smi                             (no -o: text formats go to the screen)
   reactio convert molecule.cdx -o molecule.xyz             (3D coordinates for quantum chemistry: lowest MMFF94s+ conformer)
   reactio convert molecule.cdx --format sdf3d -o molecule.sdf   (the same 3D shape with its bonds, charges and configuration,
-                               for Avogadro and other 3D programs)
+                               for 3D and modelling programs)
   reactio calc    <input…>     formula, Mol. Wt., exact mass, [M+H]+, elemental analysis, cLogP, TPSA, R/S and E/Z of
                                every structure
   reactio nmr     <input>  [--nucleus 1H|13C|19F|31P]                predicted shifts (13C by default)

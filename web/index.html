@@ -5197,7 +5197,7 @@ function kdOf(st) {
     return n;
   }
   /* main-group elements: [group, period]. A charged atom is checked as the element with the same number of electrons (P− as S, so PF6−, AsF6−,
-   SbF6−, SiF6 2− pass; N+ as C; B− as C, so BF4− passes), as RDKit does; from period 3 on the shell expands (P 3/5, S 2/4/6, Cl 1/3/5/7),
+   SbF6−, SiF6 2− pass; N+ as C; B− as C, so BF4− passes); from period 3 on the shell expands (P 3/5, S 2/4/6, Cl 1/3/5/7),
    period 2 never does (N at most 3 bonds, O 2). Neutral P with four bonds and S with five take one H, 
    (HP(O)(OH)2, phosphorous acid). Source: RDKit atomic_data */
   const MAIN_G = {
@@ -16000,7 +16000,7 @@ function kdOf(st) {
         z1 = Math.max(z1, a.z);
       }
       if (z1 - z0 < L * 0.4) continue;
-      /* automatic depth cue, as molecular viewers do it (PyMOL fog_start 0.45, ChimeraX depthCueStart 0.5): the front part stays solid, and from a bit before the middle the color fades linearly toward the paper, to 35% at the back */
+      /* automatic depth cue: the front part stays solid, and from a bit before the middle the color fades linearly toward the paper, to 35% at the back */
       const op = z => {
         const t = (z1 - z) / (z1 - z0),
           f = Math.max(0, Math.min(1, (t - 0.45) / 0.55));
@@ -45225,7 +45225,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['pdf', 'Vector image for LaTeX and journals (.pdf)'],
     ['tif', 'Image for journals (.tiff, 600 dpi)'],
     ['f-xyz', 'XYZ, 3D coordinates for quantum chemistry (.xyz): conformer search, charge and multiplicity'],
-    ['f-sdf3', 'SDF with the 3D shape and its bonds (.sdf): for Avogadro and other 3D programs'],
+    ['f-sdf3', 'SDF with the 3D shape and its bonds (.sdf): for 3D and modelling programs'],
     ['anim', 'Animation, each structure turning into the next (.gif, video, frames)…'],
     ['h', 'Copy to clipboard'],
     ['c-cdxml', 'CDXML'],
@@ -47967,7 +47967,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     return E;
   }
-  /* the energy written in a frame's comment line (xtb "energy: -12.3", ORCA "E -123.4", or the line a number alone) */
+  /* the energy written in a frame's comment line ("energy: -12.3", "E -123.4", or the line a number alone) */
   function xyzEnergy(t) {
     const m = /(?:energy|\bE)\s*[:=]?\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)/i.exec(t || '') || /^\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)\s*$/.exec(t || '');
     return m ? +m[1] : null;
@@ -48361,7 +48361,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      xyz-export), ported to this version. One structure (a molfile from the drawing, abbreviations expanded) → hydrogens
      added → conformers from OpenChemLib's torsion library → each minimised with MMFF94s+ → the lowest kept. The drawn
      stereocentres and E/Z bonds are checked against the 3D result; charge and spin multiplicity go in the comment line,
-     as ORCA, Gaussian and xtb need them. A structure that already has a 3D shape on the sheet (from a .cif, an .xyz or
+     as quantum chemistry programs need them. A structure that already has a 3D shape on the sheet (from a .cif, an .xyz or
      the 3D styles) keeps it. xyz3D runs in a worker too, so it uses nothing from outside. */
   function xyz3D(O, mb, o, prog) {
     o = o || {};
@@ -48509,7 +48509,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return r.atoms.length + '\n' + head + '\n' + r.atoms.map(a => a.el.padEnd(3) + f(a.x) + f(a.y) + f(a.z)).join('\n') + '\n';
   }
   /* one SDF record with the 3D shape (Å): the atoms with their bonds, charges and radicals, so a program that reads it
-     (Avogadro, a quantum chemistry program) needs not guess the bonds as from an .xyz; V3000 above 999 atoms */
+     (a 3D or modelling program) needs not guess the bonds as from an .xyz; V3000 above 999 atoms */
   function sdf3DRecord(r, title) {
     const f = v => v.toFixed(4).padStart(10),
       A = r.atoms,
@@ -48896,7 +48896,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           else copyText(r.xyz, 'XYZ copied');
           close();
         });
-        /* both files: .xyz for quantum chemistry, .sdf with the bonds (Avogadro and other 3D programs) */
+        /* both files: .xyz for quantum chemistry, .sdf with the bonds (3D and modelling programs) */
         const save = (ext, body) => {
           const name = docName() + ext;
           if (window.rdDesktop || !window.claude) offerFile(name, body);
