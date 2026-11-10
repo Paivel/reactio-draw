@@ -69117,6 +69117,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ux = Q.x - P.x,
       uy = Q.y - P.y,
       l2 = ux * ux + uy * uy || 1;
+    let sig0 = null;
+    try {
+      sig0 = stereoSig(fr.map(q => q.id));
+    } catch (e) {}
     for (const q of fr)
       if (S.has(q.id) && q !== Q) {
         const vx = q.x - P.x,
@@ -69125,6 +69129,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         q.x = P.x + 2 * t * ux - vx;
         q.y = P.y + 2 * t * uy - vy;
       }
+    /* the mirror turns the wedges of the moved side round: each centre whose configuration changed gets them back */
+    if (sig0 && sig0.size)
+      try {
+        const s1 = stereoSig(fr.map(q => q.id)),
+          bad = new Set();
+        for (const [kk, v] of sig0) if (kk[0] === 'a' && s1.get(kk) !== v) bad.add(+kk.slice(1));
+        for (const b of mol.bonds) if ((b.stereo === 'wedge' || b.stereo === 'hash') && bad.has(b.a)) b.stereo = b.stereo === 'wedge' ? 'hash' : 'wedge';
+      } catch (e) {}
     return S.size - 1;
   }
   /* a structure of the scheme fitted: to the figure (fit), or laid out like one drawn before (like) */
