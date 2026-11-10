@@ -4,7 +4,7 @@
 in the Mac app) turns the drawing into a LaTeX figure whose compound numbers match the text. Ordinary Copy
 (Ctrl+C) is not changed.
 
-Pasted into [Lattice](https://github.com/leo1oel/lattice), from its next release, the figure brings its files: they are
+Pasted into [Lattice](https://github.com/leo1oel/lattice), the figure brings its files: they are
 copied into `figures/`, the `\input` line goes in, and the preamble lines it needs are added.
 
 In any other LaTeX editor the paste gives only the `figure` block with `\input`. Copy the `.tex` and `.pdf` written beside
