@@ -36569,7 +36569,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   const ZOF = el => (el === 'D' ? 1 : SYMS.indexOf(el) + 1);
   const ELOFZ = z => SYMS[z - 1] || 'C';
   /* a copy of the drawing with abbreviations expanded into atoms (for chemistry formats) */
-  function expandedCopy() {
+  function expandedCopy(ionBonds) {
     const saved = mol;
     mol = JSON.parse(JSON.stringify(saved));
     try {
@@ -36586,8 +36586,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             ionic = full && /[+-]\d*\]/.test(full);
           /* a salt label (CO2NEt4, CO2Na) always goes out as its ions, even if it was drawn when the label meant the neutral group */
           if (ionic && full.includes('.')) smi = full;
+          /* ionBonds (CDXML): the ion stays on its bond, charged inside its label, as CDXML files keep N–PF6 */ else if (
+            ionic &&
+            ionBonds
+          )
+            smi = full;
           /* a counter-ion label drawn on a bond (N–PF6, N–BF4) goes out as an ion pair: the atom it hangs on takes the opposite
-       charge (its hydrogens kept as drawn) and the ion stands on its own, so every CDXML reader sees both charges */ else if (
+       charge (its hydrogens kept as drawn) and the ion stands on its own, so every reader sees both charges */ else if (
             ionic
           ) {
             const bs = mol.bonds.filter(b => b.a === a.id || b.b === a.id),
@@ -37063,7 +37068,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   function exportFormats() {
     const saved = mol;
-    const m = expandedCopy();
+    const m = expandedCopy(),
+      mc = mol.atoms.some(a => a.label && a.grp && /[+-]\d*\]/.test(resolveLabel(a.label) || ''))
+        ? expandedCopy(true)
+        : m;
     mol = m;
     MOL_SRU = true;
     try {
@@ -37098,7 +37106,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         groups.map((x, i) => ({ block: molBlockE(numOrder(x.fr), fragBonds(m, x.fr), ''), role: x.role, title: 'compound ' + (i + 1) })),
         !!sch.ar
       );
-      return { mol: all, sdf, rxn, smi, cml, cdxml: cdxmlOf(withGridsOut(m), sch) };
+      mol = mc;
+      const cdxml = cdxmlOf(withGridsOut(mc), mc === m ? sch : schemeOrder());
+      return { mol: all, sdf, rxn, smi, cml, cdxml };
     } finally {
       mol = saved;
       MOL_SRU = false;
@@ -48701,7 +48711,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* the structure a CDXML file keeps inside a label (CO2NEt4, OTBS…), written as a SMILES rooted at the atom that
    carries the outside bond, so the label stays a label here: bracket atoms with their hydrogens, the free valence
    left at the root is where the label attaches */
-  function innerSmiles(ins, ib, rootId) {
+  function innerSmiles(ins, ib, rootId, rootBonds) {
     const ext = new Set(
       ins.filter(q => q.getAttribute('NodeType') === 'ExternalConnectionPoint').map(q => q.getAttribute('id'))
     );
@@ -48720,6 +48730,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       });
     }
     if (!A.has(rootId)) return null;
+    A.get(rootId).used += rootBonds || 0;
     for (const b of ib) {
       const x = b.getAttribute('B'),
         y = b.getAttribute('E'),
@@ -49073,7 +49084,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           continue;
         }
         /* a label Reactio Draw does not know: draw the structure the file keeps inside it */
-        const inner = LABELED.test(nt) ? n.querySelector(':scope > fragment') : null;
+        const inner0 = LABELED.test(nt) ? n.querySelector(':scope > fragment') : null,
+          inner =
+            inner0 &&
+            [...inner0.querySelectorAll(':scope > n')].some(q => q.getAttribute('NodeType') !== 'ExternalConnectionPoint')
+              ? inner0
+              : null; /* a structure with no atoms in it (only its connection point) leaves the bare label */
         if (inner) {
           const im = new Map(),
             ins = [...inner.querySelectorAll(':scope > n')],
@@ -49126,7 +49142,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               if (exts.includes(B)) roots.add(E);
               if (exts.includes(E)) roots.add(B);
             }
-            const smi = txt && roots.size <= 1 ? innerSmiles(ins, ib, attId) : null;
+            /* without a connection point the label is bonded through its first atom: its outer bonds take that atom's hydrogens */
+            const nId = n.getAttribute('id'),
+              outN = roots.size ? 0 : bs.filter(q => q.getAttribute('B') === nId || q.getAttribute('E') === nId).length;
+            const smi = txt && roots.size <= 1 ? innerSmiles(ins, ib, attId, outN) : null;
             if (smi) {
               const a = mkAtom(n, p);
               a.el = 'C';
