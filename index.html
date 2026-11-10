@@ -34025,13 +34025,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ta.value = text;
       document.body.appendChild(ta);
       ta.select();
+      /* execCommand reports a refused copy by returning false, not always by throwing */
+      let ok = false;
       try {
-        document.execCommand('copy');
-        toast(okMsg);
-      } catch (e) {
-        toast('Could not copy. Select the text and copy it manually.', true);
-      }
+        ok = document.execCommand('copy') === true;
+      } catch (e) {}
       ta.remove();
+      if (ok) toast(okMsg);
+      else toast('Could not copy: the clipboard was refused. Select the text and copy it manually.', true);
     };
     try {
       navigator.clipboard.writeText(text).then(() => toast(okMsg), fb);
