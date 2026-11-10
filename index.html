@@ -35021,9 +35021,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           L,
           thin = null;
         for (L = RDNMR.MAXL - 1; L >= 0; L--) {
-          /* missing as it is: the same sphere with its alkyl groups generalised, before a smaller sphere */
+          /* missing as it is: the same sphere with its alkyl groups generalised, before a smaller sphere (1H and 13C, where
+             it was checked on known spectra; 19F and 31P as before) */
           const f =
-            nmrFind(T, L, RDNMR.hash(codes[L])) || (L >= 1 ? nmrGeneral(T, P, i, L + 1, root ? 3 : 2) : null);
+            nmrFind(T, L, RDNMR.hash(codes[L])) || (L >= 1 && nuc !== '19F' && nuc !== '31P' ? nmrGeneral(T, P, i, L + 1, root ? 3 : 2) : null);
           if (!f) continue;
           /* (for 1H, where OH, NH and solvent make single spectra spread; 13C keeps its deepest match; a generalised
              match from a single environment counts as thin too) */
