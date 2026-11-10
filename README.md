@@ -63,7 +63,7 @@ NMR prediction is an estimate from nmrshiftdb2 data, not a measured spectrum; th
 | `data/nmr/` | how the NMR shift tables were built from nmrshiftdb2 |
 | `word-addin/` | the Reactio Draw tab for Word (`Reactio Draw.dotm`) and the script and macros it is built from |
 | `examples/` | `embed.html`: Reactio Draw embedded in another page (see EMBEDDING.md); `Reactio Draw - marks test.docx`: every kind of compound mark in a Word document, to try Number compounds; `Animation - 3D turns and a reaction.cdxml`: two 3D turns and a reaction, to try File → Export as → Animation (the example of cdxmorph, © 2026 Ryan Shenvi, MIT) |
-| `docs/` | the guide `Reactio Draw - Getting started.pdf`, the hotkey chart `Reactio Draw - Hotkeys.reactio` the README picture `overview-1.5.1.png` and the hotkey chart as a picture |
+| `docs/` | the guide `Reactio Draw - Getting started.pdf` (its source, an HTML file with its pictures and build script, is in `docs/guide/`), the hotkey chart `Reactio Draw - Hotkeys.reactio` the README picture `overview-1.5.1.png` and the hotkey chart as a picture |
 | `tools/` | scripts that make the web version, the InChI WebAssembly build, the README picture, the hotkey chart and the Windows resources |
 | `LICENSES/` | the licences of the third-party parts (see THIRD-PARTY-NOTICES.md) |
 

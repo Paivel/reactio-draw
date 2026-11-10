@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+<meta charset="utf-8">
+<title>Getting started with Reactio Draw</title>
+<meta name="author" content="Reactio Draw">
+<!--
+  Source of "docs/Reactio Draw - Getting started.pdf".
+  Edit this file, then run docs/guide/build.sh (see docs/guide/README.md).
+  Page size, margins and the page-number footer are set in build.sh.
+-->
+<style>
+@page { size: A4; }
+html {
+  font-family: "Liberation Sans", Arial, Inter, "DejaVu Sans", "Noto Color Emoji", sans-serif;
+  font-size: 10.5pt; line-height: 1.15; color: #000;
+  text-rendering: geometricPrecision;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+body { margin: 0; background: #fff; }
+p { margin: 6pt 0 0; }
+p, li { orphans: 2; widows: 2; }
+h1, h2, h3 { font-weight: bold; line-height: 1.15; break-after: avoid; }
+h1.title { font-size: 20pt; color: #1f2a44; margin: 12pt 0 0; }
+h1 { font-size: 15pt; color: #2448c4; margin: 18pt 0 0; }
+h1.new-page { break-before: page; margin-top: 0; }
+h2 { font-size: 12.5pt; color: #1f2a44; margin: 12pt 0 0; }
+h3 { font-size: 11pt; color: #1f2a44; margin: 9pt 0 0; }
+a { color: #2448c4; text-decoration: underline; }
+b { font-weight: bold; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 9.5pt; line-height: 0; }
+/* code blocks */
+pre {
+  font-family: "DejaVu Sans Mono", monospace; font-size: 9pt; line-height: 13pt;
+  background: #f2f4f7; margin: 6pt 10pt 3pt; padding: 0;
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+/* bullet lists */
+ul { list-style: none; margin: 0; padding: 0 0 0 27pt; }
+ul > li { position: relative; margin-top: 3pt; }
+ul > li:first-child { margin-top: 6pt; }
+ul > li::before { content: "•"; position: absolute; left: -13.5pt; }
+ul.dash > li::before { content: "–"; }
+ul.dash > li:first-child { margin-top: 3pt; }
+/* pictures: buttons sit in the line, screenshots get a paragraph of their own */
+img { vertical-align: baseline; break-inside: avoid; }
+.center { text-align: center; }
+/* a paragraph that holds only pictures is as high as the pictures */
+p.pic { line-height: 0; }
+p.keep { break-after: avoid; }  /* a picture that stays with the caption under it */
+p.pic img { vertical-align: bottom; }
+p.inset { margin-left: 9pt; }
+/* ruled tables (keys, API, commands) */
+table { border-collapse: collapse; table-layout: fixed; margin: 6pt 0 17.5pt; }
+table.grid th, table.grid td {
+  border: 0.5pt solid #c9d1dc; padding: 2.9pt 5pt; text-align: left; vertical-align: top;
+}
+table.grid th { background: #e8edf5; font-weight: bold; }
+table.grid td code { overflow-wrap: anywhere; }
+table.grid td.code { line-height: 11.05pt; }  /* a cell of code only: lines as high as the code font */
+table.flush-below { margin-bottom: 0; }
+tr { break-inside: avoid; }
+thead { display: table-header-group; }
+/* the two-column table of structure checks: no rules */
+table.layout td { padding: 4pt 5.67pt 3.9pt; vertical-align: top; }
+table.layout td p { margin-top: 0; }
+table.layout p.caption { margin: 0 0 3pt; }
+/* spacing before a paragraph, where it differs from the usual 6 pt */
+.gap-0 { margin-top: 0; }
+.gap-2 { margin-top: 2pt; }
+.gap-3 { margin-top: 3pt; }
+.gap-4 { margin-top: 4pt; }
+.gap-6 { margin-top: 6pt; }
+.gap-8 { margin-top: 8pt; }
+.gap-10 { margin-top: 10pt; }
+</style>
+</head>
+<body>
+<h1 class="title">Getting started with Reactio Draw</h1>
+<p class="gap-10">Reactio Draw is a free editor for chemical structures and reactions, with a reagent table for every reaction. It runs as one web page or as an app for Windows, Mac and Linux.</p>
+<p>It is <b>free and open source</b> (GNU AGPL), works <b>fully offline</b> — nothing is sent anywhere — and is <b>light</b>: the whole editor is one 4.1 MB web page (6.3 MB as a single offline file with the NMR tables), and the apps are about 20–28 MB to download.</p>
+<p>This guide describes every button, key and function of Reactio Draw, each in a few lines. Chapter 6 is about the <b>API</b>, chapter 7 about the Reactio Draw tab in Word, chapter 8 about Reactio Draw in Excel.</p>
+<p>The window has four parts: the <b>document tabs</b> at the top, the <b>main toolbar</b> under them, the <b>left toolbar</b> with the drawing tools, and the <b>right panel</b> with information and settings (tabs Analysis, Characters, Labels, Settings and Info).</p>
+<p class="pic"><img src="img/p01-1.jpg" alt="screenshot - Screenshot" style="width:453.75pt;"></p>
+<h1 id="installation" class="new-page">Installation</h1>
+<h2>Windows 11</h2>
+<ul>
+  <li>Unzip ReactioDraw-Windows-x64.zip (ReactioDraw-Windows-ARM.zip on Windows on ARM, e.g. Parallels on a Mac) and copy the whole “Reactio Draw” folder to your own programs folder, <b>%LOCALAPPDATA%\Programs</b> (Win+R, paste it, Enter; no administrator rights needed). Word remembers where the program is, so choose the place before the first start.</li>
+  <li><b>Then double-click Install Reactio Draw.cmd in that folder</b> — do not start ReactioDraw.exe from the zip or from Downloads: the installer starts the program (Files\ReactioDraw.exe, or ReactioDraw-ARM.exe on ARM) from the folder where it is to stay and offers the Reactio Draw tab in Excel. Keep everything in the folder together.</li>
+  <li>If Windows shows “Windows protected your PC”, click More info → Run anyway: the program has no paid certificate. If Microsoft Defender calls it a threat, it is a false alarm on an unsigned program: allow it in Windows Security → Protection history.</li>
+  <li>On the first start it registers itself for Word and PowerPoint, with no installer, and adds the Reactio Draw tab to Word (restart Word once). Reactio Draw documents (.reactio) then open on double-click. Documents and settings are in %LOCALAPPDATA%\ReactioDraw. To uninstall: “Uninstall Reactio Draw.cmd”, then delete the folder.</li>
+  <li><b>Keep one copy.</b> Word and PowerPoint use the copy of Reactio Draw that was started last; a second unpacked copy (an old one left in Downloads, say) makes them start the wrong one. Delete the other copies and start the one in %LOCALAPPDATA%\Programs once. Updates (Info tab → Check for updates) replace the files of that copy in place: nothing to install again.</li>
+</ul>
+<h2>Mac</h2>
+<ul>
+  <li>Unzip ReactioDraw-Mac.zip and double-click <b>Install Reactio Draw.command</b>. If macOS says it cannot check the file: System Settings → Privacy &amp; Security → Open Anyway (older macOS: right-click → Open).</li>
+  <li>The installer builds the app on your Mac, puts it in Applications and opens it. If Apple’s free Command Line Tools are missing, it offers to install them; then run it again.</li>
+  <li>When Word is on the Mac, the installer also adds the <b>Reactio Draw tab</b> to Word. <b>Install Word tab.command</b> in the folder adds it again (for example after moving the app); run it with --remove to take the tab away.</li>
+</ul>
+<h2>Linux</h2>
+<ul>
+  <li>Unpack ReactioDraw-Linux-x64.tar.gz (or -ARM), put the “Reactio Draw” folder where it should stay and run <b>./install.sh</b> in it: Reactio Draw appears in the applications menu. It needs WebKitGTK, which most desktops have; install.sh says how to get it if not.</li>
+</ul>
+<h2>Browser</h2>
+<ul>
+  <li>Unzip ReactioDraw-Web.zip and open Reactio Draw.html in Chrome, Edge, Safari or Firefox: nothing to install, no internet needed. Documents stay in that browser. Names are read and made in the browser too (Paste name, Alternative name); Name it, the command line and the local API need the apps.</li>
+</ul>
+<h2>AI assistants and scripts (a separate download)</h2>
+<ul>
+  <li>Only for those who want an AI assistant (Claude Desktop, Claude Code, Codex or another MCP client) or their own scripts to draw in Reactio Draw. Everything else works without it.</li>
+  <li>Install the program first, then the add-on for the same system: ReactioDraw-Windows-x64-AI-assistants.zip (-ARM- on ARM), ReactioDraw-Mac-AI-assistants.zip or ReactioDraw-Linux-x64-AI-assistants.tar.gz (-ARM-). Run <b>Install AI assistants</b> in it (Linux: ./install-ai.sh); it puts reactio-mcp beside the program and offers the connection to Claude Desktop. <b>Remove AI assistants</b> takes it away again.</li>
+  <li>Without the add-on the program has no local API and no MCP at all. With it: Info tab → API, tick <b>MCP</b>, and add the folders the assistant may use (chapter 6.1). “Install with AI assistants.txt” in the add-on goes through every step, the skill for the assistant included.</li>
+</ul>
+<h2>Additional software (apps)</h2>
+<ul>
+  <li><b>Paste name</b> for systematic names needs <b>Java 8 or newer</b> (e.g. Eclipse Temurin from adoptium.net; Linux: sudo apt install default-jre). Common names (aspirin, THF, DIPEA…) work without it.</li>
+  <li><b>Name it</b> needs <b>Python 3.11 or newer with openclatura</b>, and Java for the check that reads each name back with OPSIN. Windows: <code>py -m pip install openclatura</code>. Mac: <code>python3.13 -m venv ~/.reactio-python &amp;&amp; ~/.reactio-python/bin/pip install openclatura</code>, then quit and reopen the app. Linux: <code>python3 -m venv ~/.reactio-python &amp;&amp; ~/.reactio-python/bin/pip install openclatura</code>.</li>
+  <li>Everything else — drawing, analysis, names from Paste name and Alternative name, NMR prediction, 3D — needs nothing extra.</li>
+</ul>
+<h1 id="ch1" class="new-page">1. Document tabs</h1>
+<p class="gap-8">Every open document has its own tab. The usual shortcuts work:</p>
+<table class="grid">
+  <colgroup><col style="width:120pt"><col style="width:331.3pt"></colgroup>
+  <thead>
+    <tr><th>Keys</th><th>Action</th></tr>
+  </thead>
+  <tr><td>Ctrl+N</td><td>new document</td></tr>
+  <tr><td>Ctrl+O</td><td>open a file</td></tr>
+  <tr><td>Ctrl+S</td><td>save</td></tr>
+  <tr><td>Ctrl+Shift+S</td><td>save as</td></tr>
+  <tr><td>Ctrl+W</td><td>close the tab (the × next to the name does the same)</td></tr>
+  <tr><td>Ctrl+Shift+T</td><td>reopen a closed tab (the last 10)</td></tr>
+  <tr><td>Ctrl+Tab, Ctrl+Shift+Tab</td><td>next / previous tab (⌃Tab on a Mac too)</td></tr>
+  <tr><td>Alt+1 … Alt+8, Alt+9</td><td>go to that tab; Alt+9 goes to the last one (⌥ on a Mac)</td></tr>
+</table>
+<p class="gap-4">On a Mac use ⌘ instead of Ctrl. <b>In the browser version, be careful with Ctrl+W:</b> the browser may close its own tab rather than the document inside Reactio Draw. The browser also keeps Ctrl+Tab (and, on some systems, Alt+1…9) for its own tabs; in the desktop apps they switch the documents.</p>
+<p>When the tabs do not all fit, the <b>mouse wheel</b> over them scrolls the row.</p>
+<p>A <b>yellow dot</b> next to a name means unsaved changes. Closing such a tab asks whether to save them. Unsaved work is kept in a temporary copy and only written to your file when you save.</p>
+<p><b>When the program starts</b>, only documents left with unsaved changes come back (after a crash, a power cut, or a browser tab closed anyway). Documents that were saved are not reopened; with nothing left, the program starts with one new, empty document.</p>
+<h1 id="ch2">2. Main toolbar</h1>
+<p class="gap-8">All buttons are grouped. A group can be moved, to another place or to the left toolbar, by dragging its grip ⋮; single buttons can be dragged between groups too. <b>Settings → Reset button layout</b> puts everything back. The layout is remembered and can be exported with your settings.</p>
+<p><img src="img/btn-grip.png" alt="grip - Button: grip" style="width:29.25pt;">&nbsp; the grip of a group: drag it to move the group; on the top bar a click folds the group into one named menu, another click unfolds it.</p>
+<p>With <b>Settings → Interface → Top bar → Compact</b>, the top bar keeps the file buttons and puts everything else into four menus in one row: Arrange, Structure, Style and Text.</p>
+<p class="pic"><img src="img/p04-1.jpg" alt="screenshot - Screenshot" style="width:453.75pt;"></p>
+<p class="gap-8"><b>Messages</b> (what was done, what could not be done, warnings) appear in a small box over the bottom of the sheet for a few seconds, or in the line of the stoichiometry grid under the editor when that grid is shown.</p>
+<h2>Files</h2>
+<p><img src="img/btn-filebtns.jpg" alt="filebtns - Button: filebtns" style="width:101.25pt;">&nbsp; <b>New document</b> (Ctrl+N), <b>Open</b> (Ctrl+O), <b>Save</b> (Ctrl+S) and <b>Save as</b> (Ctrl+Shift+S).</p>
+<p>An opened file is shown whole: the view fits the drawing to the window, as <b>Fit to window</b> does.</p>
+<p>Save as asks for the format. Reactio Draw document (.reactio), CDXML and CDX keep everything: drawing, reagent table, roles and conditions; Molfile, SDF and SMILES keep the structures only, RXN the reaction. Pictures placed on the sheet go into CDXML and CDX as pictures other editors show (PNG, JPEG or GIF), and pictures in CDX and CDXML files (also TIFF) open in Reactio Draw. Molfiles and SD files open in both V2000 and V3000; with stereo groups on the sheet they are saved as V3000 (V2000 cannot hold the groups), and SMILES as CXSMILES. CML (Chemical Markup Language, .cml) keeps the structures and a reaction’s reactants and products, and opens too.</p>
+<p class="pic"><img src="img/p05-1.png" alt="image2 - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8"><b>Crystal structures (CIF), test version.</b> Open and drag-and-drop also take .cif files. Every data block goes on the sheet in its measured 3D geometry, drawn ball and stick, captioned with its name. The molecules of one block (a salt with its ions, a solvent) stay where they are in the crystal and are grouped: they move and turn together. X-ray data have no bond orders: they are worked out from the hydrogens in the file and the usual valences, with charges (N+, B−, PF6−) and the charge of a metal that balances its ions, so check them. Reading CIF is a test version, not fully checked yet; the message after opening says so.</p>
+<p class="pic"><img src="img/p05-2.jpg" alt="shot - Screenshot" style="width:201.25pt;"></p>
+<p class="gap-8">A crystal structure keeps its measured shape: moving, turning, 3D rotate, a flip and resizing move it as a whole, and an atom dragged goes back. <b>Clean Up</b> and <b>Clean Up 2D</b> work on a copy put beside it, so the flat formula with wedges comes from the crystal structure while the measured one stays. Atoms, ions and solvent can be deleted; the rest keep their places.</p>
+<p><b>3D Molfiles and SD files</b> keep their z coordinates: they open in their own 3D geometry, so 3D rotate and the 3D styles show the conformer of the file.</p>
+<p>An XYZ file with several geometries (an optimisation, a scan, a trajectory, conformers) asks which to open: a slider, First, Last, Lowest energy (the energies of the comment lines are drawn as a small chart to click on) or Open all. The window shows the geometry picked in 3D, in the sheet’s ball and stick style (All H shows the H on carbon too): drag to rotate it, the wheel zooms, a double-click turns it back; it goes on the sheet rotated as shown.</p>
+<p class="pic inset"><img src="img/p06-1.jpg" alt="" style="width:187.2pt;"></p>
+<p class="gap-8"><img src="img/btn-export.jpg" alt="export - Button: export" style="width:21.75pt;">&nbsp; <b>Export as…</b>: Reactio Draw document (.reactio), CDXML, CDX, Molfile, SDF, RXN, CML, SMILES, Word document with an editable drawing (.docx), Open Reaction Database record (.json), SVG, PNG, EPS, PDF and TIFF, XYZ and a 3D SDF, and an animation.</p>
+<p>Unlike Save as, Export makes a separate file and the document stays tied to its own file. For example, you work in reaction.cdxml and export a PNG for a paper: Ctrl+S still saves to reaction.cdxml.</p>
+<p class="pic"><img src="img/p06-2.png" alt="screenshot - Screenshot" style="width:330.05pt;"></p>
+<p class="gap-8"><b>Pages</b> (the button after Print): the sheets of paper or slides to draw on — A4, A5, A3, US Letter, Slide 4:3, Slide 16:9, a graphic for a table of contents at its published size (ACS 8.25 × 4.45 cm, RSC 8 × 4 cm) or a custom size in mm; portrait or landscape. Dashed outlines show where they fall, at the drawing’s true size, from the top left corner of the sheet on; with Margins ticked (top, bottom, left, right in mm) they are the part inside the margins, so each is smaller, and printing puts it inside them. The choice is kept with the document. For slides, the drawing style ACS for slides draws ACS twice as large (bond 28.8 pt, letters 20 pt). <b>Print</b> (the button at the end of the top row, Ctrl+P) asks for the paper first: fitted to one page, or on those sheets, a page for each one with something drawn on it, in one PDF when the print dialog saves one. Fitted, it prints the drawing alone, no wider than the page; the print dialog can also save it as a PDF. Where a page may not open a print dialog (shown inside another page), the drawing comes as a PDF to print. Scroll bars at the right and bottom of the sheet show where the view is when part of the drawing is out of it; drag them to move. The Print window shows each page to scale before printing, with its part of the drawing and the margins dashed.</p>
+<p><b>Animation</b> (File → Export as → Animation…): each structure of a scheme turns into the next — atoms move to their places, bonds that break or form fade, pieces that leave or join fly as pieces. Draw the structures left to right with reaction arrows between them (A → B → C; rows are read left to right, then top to bottom); several structures before an arrow move together, and reagents over or under an arrow stay out. With no arrows the structures are taken in reading order; with a selection, only the selected ones. The atoms are paired across each arrow by place, label and bonds (after cdxmorph, Ryan Shenvi, MIT); the more alike the two drawings are — the part that does not change in the same place and turn — the better the film.</p>
+<p><b>Turning in 3D.</b> Between two drawings of one molecule put ≡ instead of an arrow (three short parallel lines with no heads, or a text ≡: the ≡ button at the end of the Symbols tools puts one where you click). An example to open and try: examples/Animation - 3D turns and a reaction.cdxml in the repository (the example of cdxmorph, Ryan Shenvi): that step turns the molecule in space instead of reshaping it. The 3D shape is computed; to set it yourself, put the molecule with 3D coordinates (a structure from a crystal file, kept with its depths in CDXML) straight above its drawing: it is not in the film, it only tells how the drawing beneath it turns. Turn such a pose with 3D rotate to change the view: it keeps its own geometry (a new shape is computed only for a structure with no 3D places, or by 3D shape).</p>
+<p>The window lists each step: how many atoms are paired, how many bonds kept, broken and formed, and “turned in 3D” for a turn. Width, Each step (s), Frames a second, Hold at the ends, Pause between steps and There and back (the film played backwards after it, for a looping GIF) set the film; Preview plays it; Save GIF, Save video (MP4 or WebM, where the browser can) and Save frames (PNG files in a zip) save it.</p>
+<p><img src="img/btn-filemenu.jpg" alt="filemenu - Button: filemenu" style="width:21.75pt;">&nbsp; <b>File menu</b>: copy to the clipboard as CDXML, Molfile, RXN, SMILES, InChI and InChIKey, or as a picture for Word / PowerPoint; export and import of your workspace (hotkeys, button layout, labels and templates) as one .json file, to keep it or to give it to a colleague; open a file; insert a picture.</p>
+<p>&nbsp; <b>Copy for LaTeX</b> (File → Copy to clipboard → Figure for LaTeX, the button after Pages; Edit → Copy for LaTeX in the Mac app): the drawing as a LaTeX figure whose compound numbers match the text. Next to a saved scheme.reactio it writes scheme.pdf, the drawing without its [[key]] compound marks, and scheme.tex, which places that PDF and sets each mark over it as \rcmpd{key}, numbered by chemnum in the order the compounds are first mentioned in the paper. The clipboard gets a figure that includes it (\input{figures/scheme}). Pasted into Lattice (from its next release), the figure brings its files and the preamble lines it needs; in another LaTeX editor, copy scheme.pdf and scheme.tex into the project’s figures folder and add the \rcmpd block from docs/latex-marks.md to the preamble. File names are made plain for LaTeX (Схема 1 → Skhema_1). A drawing larger than the page is scaled down to the line width, its numbers staying in place in the size of the text. Refer to a compound in the text with the same mark, \rcmpd{ketone}. A PDF or .tex of another drawing with the same name is never overwritten. It works with pdfLaTeX, LuaLaTeX and XeLaTeX and on Overleaf; docs/latex.md has the details. Ordinary Copy (Ctrl+C) for Word and PowerPoint stays as it is.</p>
+<p><b>Pasting and dropping.</b> Ctrl+V pastes text, SMILES, molfiles, CDXML and pictures at the place of the pointer, screenshots too (Win+Shift+S, Print Screen). A picture can also be dropped onto the sheet or inserted from the File menu. A CDXML or CDX file dropped onto the sheet opens in a new tab; a Word file (.docx) opens with all its drawings on one sheet. What is pasted comes selected, ready to be moved, and the sheet keeps its place and scale (what lands out of sight is brought into view). A reaction SMILES pasted as text (A&gt;&gt;B) is drawn as the reaction.</p>
+<p><b>Reactio Draw documents</b> are saved as <b>.reactio</b> files: the whole document, with the reagent table, roles and conditions. The Windows, Mac and Linux apps open them on double-click. Files saved as .json by earlier versions still open.</p>
+<h3>Word files</h3>
+<p class="gap-4">The last part of the File menu works on a saved Word document (.docx):</p>
+<p class="pic"><img src="img/p08-1.png" alt="screenshot - Screenshot" style="width:331.5pt;"></p>
+<ul>
+  <li class="gap-8"><b>All structures of a Word file on one sheet</b>: every drawing of the file, in the order of the text, goes onto a new sheet one under another, without overlapping: Reactio Draw objects (Windows), Reactio Draw pictures (Mac) and objects of other chemistry editors. Save the sheet as CDXML to have them all in one file.</li>
+  <li><b>Copy of a Word file with plain vector pictures</b>: a copy of the document, “… (plain).docx”, in which every Reactio Draw drawing is a plain vector picture with no Reactio Draw data left in it, nothing embedded and nothing in the alt text. Objects from Windows keep their own vector picture; pictures from a Mac get a vector (SVG) picture, which Word 2016 and later show. Objects of other editors stay as they are.</li>
+</ul>
+<p class="gap-3">The Windows and Mac apps also add a Reactio Draw tab to Word, with these jobs and the editing of single drawings: see <a href="#ch7">7. Reactio Draw tab in Word</a>.</p>
+<h2>Undo, zoom, view and copying</h2>
+<p class="pic"><img src="img/btn-general2.png" alt="general2 - Button: general2" style="width:303pt;"></p>
+<ul>
+  <li class="gap-4"><b>Undo</b> (Ctrl+Z) and <b>Redo</b> (Ctrl+Y).</li>
+  <li><b>Zoom out / zoom in.</b> Ctrl+mouse wheel or a pinch on a trackpad zoom too; the zoom speed is set in Settings.</li>
+  <li><b>Touch screens.</b> On the sheet, fingers and a pen only move it (one finger) and zoom it (two fingers); buttons, menus, keys and the API stay available. Draw with the mouse or trackpad, the keys or the API. Computers with a mouse or a trackpad work as usual.</li>
+  <li><b>Fit to window</b> (Ctrl+0) and <b>show / hide the grid</b> of the sheet.</li>
+  <li><b>Copy as a picture</b> for Word or PowerPoint (Ctrl+Shift+C), and <b>with the background</b> of the sheet (for dark or coloured paper). Pictures leaving the program never carry the on-screen warnings (red valence circles, structure-check marks, boxes of unknown labels).</li>
+</ul>
+<p class="gap-3"><b>Into Word and PowerPoint.</b> Select the drawing (or nothing, for the whole sheet), press Ctrl+C and paste it into Word or PowerPoint with Ctrl+V.</p>
+<ul>
+  <li>Windows: it arrives as a Reactio Draw object with a vector picture. Double-click it in Word to open it in Reactio Draw, in a tab “Word object” of the open window (Reactio Draw starts if it is not open); your edits go back into Word as you work, at once with Ctrl+S, and when you close that tab — the window stays open. The object can also be copied from Word and pasted back into Reactio Draw.</li>
+  <li><b>Mac:</b> ⌘C → ⌘V gives a picture with the Reactio Draw drawing hidden inside it. To edit it, double-click the picture, or select it and press <b>Edit drawing</b> on the Reactio Draw tab in Word: it opens in Reactio Draw, and Save (⌘S) puts the new picture back in its place. Or copy the picture in Word (⌘C) and paste it into Reactio Draw (⌘V): structures, table and conditions come back.</li>
+  <li><b>Linux:</b> it is pasted as a plain picture.</li>
+</ul>
+<h2>Objects</h2>
+<p class="pic"><img src="img/btn-objgroup.jpg" alt="objgroup - Button: objgroup" style="width:374.25pt;"></p>
+<p class="gap-4">Rotate by 90°, 180° or any angle, flip horizontally or vertically, <b>group</b> and <b>ungroup</b> (Ctrl+G), and the order of overlapping objects (to front, to back, forward, backward).</p>
+<p>A <b>group</b> counts as one object everywhere: alignment and distribution use its own edges and centre (what is inside stays as it is), and the alignment guides snap to the group as a whole.</p>
+<h2>Alignment</h2>
+<p class="pic"><img src="img/btn-aligngroup.jpg" alt="aligngroup - Button: aligngroup" style="width:244.5pt;"></p>
+<p class="gap-4">Align the selected objects (left, centre, right, top, middle, bottom) and distribute them evenly. Texts are measured in their own font, so a centred caption or compound number sits exactly under the middle of its structure. While you drag, <b>smart guides</b> show when edges or centres line up with other objects (Alt switches them off). Selected objects can also be moved with the arrow keys.</p>
+<p class="pic"><img src="img/p09-1.png" alt="image10 - Screenshot" style="width:316.5pt;"></p>
+<h2>Structure</h2>
+<p class="pic"><img src="img/btn-structgroup.jpg" alt="structgroup - Button: structgroup" style="width:283.3pt;"></p>
+<p class="gap-4"><img src="img/btn-clean.jpg" alt="clean - Button: clean" style="width:21.75pt;">&nbsp; <b>Clean Up Structure</b> (Ctrl+Shift+K): redraws the selected structures with standard bond lengths and angles; a structure made larger or smaller with the selection handles keeps its size. Fused rings come out as they are usually drawn: regular hexagons on the grid, a five-membered ring between them slightly wide (acenaphthene with its naphthalene flat), symmetric when the system can be (fluorene, carbazole), with the substituents grown from the ring system. The configuration is kept: R/S at every centre with a wedge and E/Z at every double bond are checked after the new layout, and anything that turned over is put back; if that cannot be done, the structure stays as drawn and a message says so.</p>
+<p>Clean Up takes wedges off ring bonds where it can: when a stereocentre can be shown on a group outside the ring, or on an H drawn for it, the wedge or hash goes there. The H stand outside the rings, a whole bond long, clear of each other (into the largest ring only for an atom shared by three); the molecule stays the same.</p>
+<p>When a structure has little room, Clean Up helps itself in three ways. Three or four rings on one atom (BArF−, Ph4C, Ph3SiR) are set out as a cross, and a CF3 or tBu end turns a little out of the next group's way. Labels that cover each other are cleared by turning the whole structure slightly (at most 45°). Groups that still do not fit — their atoms land on others, their bonds cross, or their labels cover each other however the structure is turned — are written as labels: CF3, OMe, tBu, iPr, PCy2, CO2Et and the other groups of Contract Labels (not Ph), and every copy of that group in the structure goes the same way. When a ring has to be bent to make room, every group of the structure is written as its label: XPhos comes out with two regular rings, three iPr and Cy2P. Pressed again on the same structure, not changed since, Clean Up gives another layout (a branch turned over, the structure grown from another atom), each with the configuration kept; the message says which of how many it is. A structure with stereocentres or E/Z double bonds is left drawn out; a structure with room is not changed.</p>
+<p class="pic"><img src="img/p10-1.jpg" alt="shot - Screenshot" style="width:430.85pt;"></p>
+<p class="pic gap-8"><img src="img/p10-2.jpg" alt="shot - Screenshot" style="width:368.5pt;"></p>
+<p class="gap-8">Clean Up is quick also on big structures (a peptide of a hundred residues takes seconds). For a structure of more than 40 atoms, which of its crossing bonds is in front is worked out after the layout, in the background: a bar shows it, the page can be used meanwhile, and <b>Stop</b> ends it.</p>
+<p><b>Long chains</b> (a peptide, PEG: 40 atoms or more in a row) are laid out in rows that turn back at the ends, like lines of text, each side group on the outer side. A carbon with two large branches (CMe2, CEt2) gets them up to either side and the small ones down; two rings with a donor next to it (the N of two oxazolines) turn so the donors face each other, as a ligand is drawn.</p>
+<p><b>Known molecules</b> — some 80 natural products and drugs (strychnine, paclitaxel, morphine, quinine, the steroids, penicillins…) — are drawn from the ChEBI drawing of the same molecule when they come from a name or SMILES, and Clean Up draws them that way again.</p>
+<p>An H drawn on N, O or S goes into the label (NH, OH, SH, with no bond line); an H on carbon or on a wedge stays. A drawn methoxy (O–CH3) and a methyl drawn as a bond end can be written as labels too: <b>Settings → Drawing</b> (see chapter 4).</p>
+<p><img src="img/btn-cleanrxn.jpg" alt="cleanrxn - Button: cleanrxn" style="width:21.75pt;">&nbsp; <b>Clean Up Reaction</b> (Ctrl+Shift+X): lines up the whole scheme — reactants, arrow, products and plus signs. Text written over the arrow (reagents) or under it (solvent, conditions) stays there, centred, and the arrow grows to fit it; reagents written as text left of the arrow line up with the reactants.</p>
+<p><img src="img/btn-clean2d.jpg" alt="clean - Button: clean" style="width:21.75pt;">&nbsp; <b>Clean Up 2D</b>: lays the selected structures out flat. A structure turned in 3D (3D shape, 3D rotation) becomes a flat drawing again, its configuration kept as wedges and hashes. Bridged rings such as norbornane or camphor are drawn flat: a regular hexagon with the bridge inside it. Clean Up Structure keeps such systems in perspective.</p>
+<p><img src="img/btn-expcon.jpg" alt="expcon - Button: expcon" style="width:45.75pt; height:21.75pt;">&nbsp; <b>Expand Label</b> (abbreviation → atoms, e.g. OTBS drawn out) and <b>Contract Labels</b> (known groups drawn as atoms → their label).</p>
+<p><img src="img/btn-tblins.jpg" alt="tblins - Button: tblins" style="width:21.75pt;">&nbsp; <b>Reagent table on the sheet</b>: puts the table of the reaction on the sheet (click again to remove).</p>
+<p><b>Which compounds go into the table</b> depends on Settings → Reagent table → <b>Covers</b>. <b>The whole sheet</b> suits a document with one reaction: every compound drawn on the sheet goes into the table. <b>The selected reaction</b> (the setting a new installation starts with): select the scheme first, then make the table; structures drawn later do not join it, but text written over or under its arrow does. With nothing selected, a sheet with one reaction gets its table all the same.</p>
+<p class="pic"><img src="img/p11-1.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8">A new table is empty, apart from the density of known solvents: the amounts are yours to enter. The usual solvents (THF, DCM, MeCN, DMF, DMSO, toluene, EtOAc, Et2O, dioxane, hexane and the like, drawn or written) start as solvents, so their volume gives the concentration; every other compound starts as a reactant. Change a role by clicking its cell in the first row (AcOH or MeOH written under the arrow, for example, is a reactant until you choose Solvent) (Hide from grid takes a compound out of the table). A reaction copied together with its table pastes with a table of its own, with the same data.</p>
+<p class="pic"><img src="img/p11-2.png" alt="screenshot - Screenshot" style="width:216pt;"></p>
+<ul>
+  <li class="gap-8"><b>Scale:</b> enter the amount of the limiting reagent (mass, volume or moles); everything else is counted from it.</li>
+  <li><b>Solvent:</b> the density fills itself in; enter the volume and the concentration of the limiting reagent is calculated, or enter the concentration and get the volume.</li>
+  <li><b>Catalyst:</b> equivalents are in mol %.</li>
+  <li><b>Equivalents</b> are 1 until you enter others. <b>Solvent:</b> its equivalents (moles per mole of the limiting reagent) set its volume, from the density.</li>
+  <li><b>Reagents:</b> enter the equivalents and the mass is calculated, or the mass and the equivalents are. For a liquid enter its density and then either the equivalents or the volume. Without density or molarity a volume can still be entered: it is kept and follows the amounts (twice the equivalents or twice the limiting reagent, twice the volume); until you enter its equivalents, they, its moles and mass stay empty. Enter the density later and they are calculated from that volume.</li>
+  <li><b>Solutions:</b> enter the molarity; the Solvent row takes the solvent of the solution (not always the reaction solvent).</li>
+  <li><b>Purity</b> of starting materials and products, in %, is taken into the calculations.</li>
+  <li><b>After the reaction</b> enter the mass of the product obtained: the yield is calculated.</li>
+  <li><b>Limiting reagent:</b> the first reactant at first; to choose another, click “No” in the Limiting? row of its column (in the table under the editor: its round button).</li>
+  <li><b>Several steps:</b> with Covers = the whole sheet, a scheme with several arrows gets a table of its own for each step.</li>
+</ul>
+<p class="gap-3"><b>What you actually measured is shown in red.</b> Before the reaction, mark the mass or the volume you will weigh or measure out: Alt+click that value. So it is clear that a liquid was taken by volume and not by mass.</p>
+<p class="pic"><img src="img/p12-1.png" alt="screenshot - Screenshot" style="width:453.75pt;"></p>
+<p class="gap-8">On the right are the <b>conditions</b>: temperature (rt, reflux, 0 °C, −78 °C or any value), time, atmosphere and other (light with its wavelength, microwave, ultrasound…; several can be chosen). Values can be typed as plain numbers, which take the unit already used in that row, or with a unit: 1 g, 1 mL, 10 min, 1 h.</p>
+<p><img src="img/btn-bondsel.jpg" alt="bondsel - Button: bondsel" style="width:21.75pt;">&nbsp; <b>Bond the two selected atoms</b> and clean up the result (Ctrl+Shift+L).</p>
+<p><img src="img/btn-freebond.jpg" alt="freebond - Button: freebond" style="width:21.75pt;">&nbsp; <b>Free bonds</b>: bonds of any length and angle (otherwise they snap to the standard length and 15° steps). Holding Alt while drawing does the same once.</p>
+<p><img src="img/btn-stereogrp.jpg" alt="stereogrp - Button: stereogrp" style="width:22.5pt; height:21.75pt;">&nbsp; <b>Stereo groups.</b> The <b>Stereo group</b> button (Structure group, after Free bonds) marks the selected stereocentres: <b>abs</b> (Absolute configuration) — this enantiomer; <b>&amp;1</b> (Racemate) — both configurations together, e.g. a racemate, the wedges give the relative configuration; <b>or1</b> (Relative configuration) — one of the two, not known which. Centres in one group change together (their configuration relative to each other is as drawn), so usually all the centres of a molecule go into one group; separate groups (&amp;1, &amp;2) are independent, e.g. a mixture of diastereomers. Draw the wedge first. The label stays beside the centre and travels with CDXML/CDX, MOL/SDF (V3000) and SMILES (CXSMILES, e.g. |&amp;1:1|).</p>
+<p>&nbsp; <b>Merge structures</b> (Structure group, before Mirror label): atoms of two structures drawn on top of each other become one atom, and bonds lying on top of each other become one bond (the higher order kept); a labelled or hetero atom is kept over a plain carbon. With two structures selected and nothing overlapping, the second is moved so that their two closest atoms meet, and those merge. With nothing selected it works on the whole sheet.</p>
+<p>&nbsp; <b>Mirror label</b> (the last button of the Structure group): the label of the selected atom is written the other way round, so that its attaching atom stands at the bond — OtBu ↔ ᵗBuO, OTBS ↔ TBSO, CO₂Me ↔ MeO₂C. The chemistry does not change, only the order of the letters and the side the label meets its bond. Labels are also kept off each other by themselves: a group label that would run into the one next to it is written the other way round (OMe as MeO beside a HO), or an H goes to another side clear of the bonds (HO as OH); where that is not enough, Clean Up turns the structure, in 15° steps, to where its labels overlap least. A direction set with Mirror label stays as set.</p>
+<p><b>Enantiomers and diastereomers.</b> With n stereocentres there are up to 2ⁿ stereoisomers. Mirror images are enantiomers; all the other pairs are diastereomers, which differ in physical properties and NMR. The groups say which of these stereoisomers are in the flask.</p>
+<p><b>One group or several?</b> Put centres into one group when you know how they stand to each other — they change together. Use separate groups for centres that vary independently. An enantiopure part stays <b>abs</b>. Examples:</p>
+<p class="pic keep"><img src="img/p13-1.png" alt="screenshot - Screenshot" style="width:93.75pt;"></p>
+<p class="gap-2"><b>Racemate, one group.</b> 2-Methylcyclohexanol has two stereocentres, so four stereoisomers: the trans pair (1R,2R)/(1S,2S) and the cis pair (1R,2S)/(1S,2R). The two members of a pair are enantiomers; trans and cis are diastereomers. Both centres &amp;1: the trans pair only, this compound and its mirror image 1:1, no cis.</p>
+<p class="pic keep"><img src="img/p13-2.png" alt="screenshot - Screenshot" style="width:93.75pt;"></p>
+<p class="gap-2"><b>Relative configuration.</b> Both centres or1: one of the two trans enantiomers, not known which (e.g. one peak from a chiral column); no cis, no mirror image.</p>
+<p class="pic keep"><img src="img/p14-1.png" alt="screenshot - Screenshot" style="width:97.5pt;"></p>
+<p class="gap-2"><b>Two racemic parts, two groups.</b> Amide of racemic 2-phenylpropanoic acid and racemic 1-phenylethylamine: &amp;1 and &amp;2, each centre independently R or S — all four stereoisomers, i.e. two diastereomers, each as a racemate. Both centres in &amp;1 would claim only the drawn diastereomer and its mirror image.</p>
+<p class="pic keep"><img src="img/p14-2.png" alt="screenshot - Screenshot" style="width:97.5pt;"></p>
+<p class="gap-2"><b>Enantiopure + racemic.</b> L-Alanine (abs, S) acylated with racemic 2-phenylpropanoic acid (&amp;1): (S,S) and (R,S), two diastereomers 1:1 — not mirror images of each other, so they usually differ in NMR and can often be separated by ordinary chromatography.</p>
+<p>&nbsp; <b>Newman, sawhorse and Fischer projections</b> (the last three buttons of the Structure group): select a structure and press one. Newman: the structure seen along a bond (two selected atoms, or the bond pointed at; else its central one); the front carbon’s bonds meet in the middle, the back carbon is a circle its bonds start from. Sawhorse: the same bond seen from the side. Fischer: the open chain through the stereocentres upright, the most oxidised end (CHO, CO2H) at the top, at each centre its other two groups left and right, toward you. Each keeps the configuration (it is checked); the groups are written as text, as the drawing had them (Me and Et, or CH3, CH2CH3, CO2H, CHO, CH2OH…). The button again, or Back to the drawing in the right-click menu, brings the drawing back. One compound four ways:</p>
+<p class="pic inset"><img src="img/p14-3.jpg" alt="" style="width:446.4pt;"></p>
+<p class="gap-8">&nbsp; <b>Right-click a projection</b> to turn its back or its front carbon by 30° or 60° (staggered, eclipsed): only the groups of that carbon move, the other carbon and the bond between them stay, and the menu stays open for the next turn. From the same menu it becomes another projection, or the drawing again; a Fischer projection’s menu also adds H–C–OH to the chain below the carbon clicked (glyceraldehyde → erythrose → ribose).</p>
+<p class="pic inset"><img src="img/p15-1.png" alt="" style="width:244.8pt;"></p>
+<p class="gap-8">&nbsp; <b>Blank projections</b>: with nothing selected, the Newman, sawhorse or Fischer button puts an empty projection at each click on the sheet, until you take another tool (or press Esc); under the button, Staggered or Eclipsed. Its bonds are plain sticks to write the groups on (type on a stick’s end, as on any atom); a stick left bare is a methyl, as a line’s end always is. Right-click turns a blank with its groups into another projection or into a drawing with wedges, the configuration kept. One Ctrl+Z takes one blank away. Newman (staggered, eclipsed), sawhorse (staggered, eclipsed) and Fischer blanks:</p>
+<p class="pic inset"><img src="img/p15-2.jpg" alt="" style="width:446.4pt;"></p>
+<p class="gap-8">&nbsp; <b>Rings from blanks</b>: with the Newman button on, point next to a Newman projection already drawn and the ring that a click would make shows where it goes. A blank by a single circle makes cyclohexane in its chair (two circles joined by two CH2); by a circle at the end of a row, another ring fused there, trans to the side (the row goes on: trans-decalin, perhydroanthracene…) or cis above or below; by a circle with two rings already, a third one on its two bare bonds left. What is drawn stays where it is.</p>
+<p class="pic inset"><img src="img/p15-3.jpg" alt="" style="width:360pt;"></p>
+<p class="gap-8"><img src="img/btn-gridshow.jpg" alt="gridshow - Button: gridshow" style="width:21.75pt;">&nbsp; <b>Reagent table under the editor</b>: the same table as a grid below the sheet (scroll the page down to see it) — an alternative to the table on the sheet. Its <b>Copy for Excel</b> button copies the table, ready to paste into Excel.</p>
+<h2>Text</h2>
+<p class="pic"><img src="img/btn-textgroup.jpg" alt="textgroup - Button: textgroup" style="width:313.5pt;"></p>
+<p class="gap-4">Bold, italic, underline, alignment of multi-line text, subscript and superscript.</p>
+<p><img src="img/btn-fs.jpg" alt="fs - Button: fs" style="width:23.25pt;">&nbsp; <b>Formula style</b>: digits in the text are written as subscripts (H2SO4 → H₂SO₄).</p>
+<p><img src="img/btn-chemtxt.jpg" alt="chemtxt - Button: chemtxt" style="width:22.5pt;">&nbsp; <b>Count text as a compound</b>: the selected text (NaHCO3, THF…) gets a column in the reagent table.</p>
+<p><img src="img/btn-txtstruct.jpg" alt="txtstruct - Button: txtstruct" style="width:21.75pt;">&nbsp; <b>Count text as a structure</b>: the text stays as written (MeMgBr, K2CO3, nBuLi), and the structure it stands for goes with it: its formula and mass in the reagent table, and the reagent in the reaction SMILES. Known names and formulas are counted without the button; the button is for the others, and a click again removes the structure. <b>Shift+click</b> draws the structure in place of the text; a salt (K2CO3) stays one compound, its ions kept together.</p>
+<p><b>Single characters.</b> Double-click a text or an atom label to edit it. The editor shows the result itself, not codes. Select some characters and press <b>Ctrl+B</b>, <b>Ctrl+I</b> or <b>Ctrl+U</b> (⌘ on a Mac), <b>Ctrl+=</b> for subscript or <b>Ctrl+Shift+=</b> for superscript, or pick a font — only those characters change, e.g. the t of tBu in italic. Shift+Enter starts a new line, Enter finishes.</p>
+<h2>Style</h2>
+<p class="pic"><img src="img/btn-stylegroup.jpg" alt="stylegroup - Button: stylegroup" style="width:302.25pt;"></p>
+<p class="gap-4"><img src="img/btn-docstyle.jpg" alt="docstyle - Button: docstyle" style="width:69pt;">&nbsp; <b>Drawing style</b> of the selected structures, or of the document: ACS, RSC, Nature, Angewandte, Synthesis / Synlett and more.</p>
+<p><img src="img/btn-styleed.jpg" alt="styleed - Button: styleed" style="width:21.75pt;">&nbsp; <b>Edit the style</b>: font, sizes and widths in pt or mm — make your own style. Settings → New documents makes it the style of every new document.</p>
+<p><img src="img/btn-theme.jpg" alt="theme - Button: theme" style="width:87.75pt;">&nbsp; <b>Colour palette</b> of the document (Reactio colors, Publication, Presentation, Pastel, Jmol, Bright, Neon, Jewel, Color-blind safe and your own). <b>Color-blind safe</b> uses the eight colours of Okabe and Ito (vermillion, orange, yellow, bluish green, sky blue, blue, reddish purple, black), which people with any kind of colour blindness can tell apart; journals such as Nature recommend this palette for figures.</p>
+<p><img src="img/btn-paper.jpg" alt="paper - Button: paper" style="width:21.75pt;">&nbsp; <b>Paper colour</b>: white, grey, dark grey, night blue, black or blueprint. In Settings the interface can follow the paper, so on a dark paper all panels turn dark too.</p>
+<p><img src="img/btn-sizefont.jpg" alt="sizefont - Button: sizefont" style="width:129.75pt;">&nbsp; <b>Size and font</b> of the selected text or labels.</p>
+<h2>Colours</h2>
+<p class="pic"><img src="img/btn-colorsgroup.jpg" alt="colorsgroup - Button: colorsgroup" style="width:348pt;"></p>
+<p class="gap-4"><img src="img/btn-hl.jpg" alt="hl - Button: hl" style="width:21.75pt;">&nbsp; <b>Highlight</b> atoms and bonds.</p>
+<p class="pic"><img src="img/p16-1.png" alt="image29 - Screenshot" style="width:66pt;"></p>
+<p class="gap-8"><img src="img/btn-col.jpg" alt="col - Button: col" style="width:21.75pt;">&nbsp; <b>Colour of lines</b>, labels, arrows and text.</p>
+<p class="pic"><img src="img/p17-1.png" alt="image31 - Screenshot" style="width:63.75pt;"></p>
+<p class="gap-8"><img src="img/btn-linew.jpg" alt="linew - Button: linew" style="width:66.75pt;">&nbsp; <b>Line width</b> of bonds and arrows (wedges and bold bonds follow).</p>
+<p class="pic"><img src="img/p17-2.png" alt="image33 - Screenshot" style="width:86.25pt;"></p>
+<p class="gap-8"><img src="img/btn-ringfill.jpg" alt="ringfill - Button: ringfill" style="width:21.75pt;">&nbsp; <b>Ring fill</b> colour.</p>
+<p class="pic"><img src="img/p17-3.png" alt="image35 - Screenshot" style="width:100.5pt;"></p>
+<p class="gap-8"><img src="img/btn-fill.jpg" alt="fill - Button: fill" style="width:21.75pt;">&nbsp; <b>Fill and outline</b> of shapes (circles, rectangles…) and of mark balls: colour, transparency, solid / dashed / dotted / no outline.</p>
+<p class="pic"><img src="img/p17-4.png" alt="image37 - Screenshot" style="width:100.5pt;"></p>
+<p class="gap-8"><img src="img/btn-mono.jpg" alt="mono - Button: mono" style="width:34.5pt;">&nbsp; <b>Heteroatom colours</b> on or off (the whole document; atoms you coloured by hand keep their colour).</p>
+<p><img src="img/btn-depth.jpg" alt="depth - Button: depth" style="width:45.75pt; height:21.75pt;">&nbsp; <b>Fade</b> by hand (for the selection) and <b>automatic fade</b> (the far side of a 3D structure fades as you turn it). Fade works on 3D structures only.</p>
+<p><img src="img/btn-shape3d.jpg" alt="shape3d - Button: shape3d" style="width:21.75pt;">&nbsp; <b>3D shape</b>: builds a realistic 3D shape (OpenChemLib conformer, then the MMFF94s+ force field). You can also simply start turning a structure with the 3D rotate tool.</p>
+<p class="pic"><img src="img/p18-1.png" alt="image42 - Screenshot" style="width:158.25pt;"></p>
+<p class="gap-8"><img src="img/btn-style3d.jpg" alt="style3d - Button: style3d" style="width:21.75pt;">&nbsp; <b>3D style</b>: Lines (as drawn), Ball and stick, Tubes or Spheres for the selected structures (with nothing selected, for all of them). The same menu opens on a right-click on a structure. A flat structure gets its 3D shape first. The look follows xyzrender by Alister S. Goodfellow: shaded balls with a black outline, double bonds as two lines, an aromatic ring as one solid and one dashed line, η5 and η6 rings with a dot at the centre and a dashed bond to the metal, spheres that cut into each other. Hydrogens on N, O and S and at stereocentres are drawn; the far side fades with depth.</p>
+<p class="pic"><img src="img/p18-2.jpg" alt="shot - Screenshot" style="width:130.4pt;"></p>
+<p class="pic gap-8"><img src="img/p18-3.jpg" alt="shot - Screenshot" style="width:453.55pt;"></p>
+<p class="gap-8">In the same menu: <b>Fade with depth</b> on or off for that structure, and <b>Add atom color legend</b>: a ball and the symbol of every element, beside the structure, as one group. The style stays when the structure is moved, turned, flipped or copied; editing the structure itself (an atom dragged, a bond added) returns it to lines.</p>
+<h1 id="ch3">3. Left toolbar</h1>
+<p class="gap-8"><img src="img/btn-sellasso.jpg" alt="sellasso - Button: sellasso" style="width:47.25pt;">&nbsp; <b>Selection</b> (Space) and <b>Lasso</b>. Switching to either selects the molecule you edited last (or, before any edit, the one under the pointer), with its group.</p>
+<p>A click selects an atom or bond, a <b>double-click the whole molecule</b>, <b>Shift+click</b> adds to the selection (or takes out), a box or the lasso selects an area, <b>Ctrl+A</b> everything. Dragging an atom that is not selected moves just that atom.</p>
+<p>A selection can be restyled with the main toolbar, dragged to move it, and turned, stretched or scaled with the handles around it. Ctrl+drag leaves the original in place and moves a copy; with Shift as well, the copy stays on the same horizontal or vertical line. Press Shift while dragging a selected group that hangs on the rest by one bond: it turns about the atom it hangs on and the bond keeps its length (Ctrl+Shift: 15° steps).</p>
+<p class="pic"><img src="img/p19-1.png" alt="image44 - Screenshot" style="width:158.25pt;"></p>
+<p class="gap-8"><img src="img/btn-arrow.jpg" alt="arrow - Button: arrow" style="width:22.5pt;">&nbsp; <b>Arrows</b> (E). Click the button again to choose the kind of arrow. A reaction arrow fits the texts over and under it, both ways: longer for a longer text, shorter for a shorter one. Right-click it for Length: fits its texts or as drawn (as drawn keeps the length you gave it, and the texts go with the arrow).</p>
+<p class="pic"><img src="img/p19-2.png" alt="image46 - Screenshot" style="width:273.75pt;"></p>
+<p class="gap-8">A selected arrow has handles to move, turn and scale it, plus three of its own: the circles at the ends move the start and the end, and the diamond in the middle bends the arrow. Drag the end of a straight arrow to make it longer; with <b>Shift</b> it turns in 15° steps; with <b>Alt</b> a straight arrow at any angle keeps its direction while you change its length. The end of a curved arrow slides along its own circle or oval (up to a full ring); with <b>Alt</b> it moves freely.</p>
+<p>While you drag, the arrow itself is shown, faint: the same curve and heads as the one you get. A <b>curved (mechanism) arrow</b> starts and ends on an atom or on the middle of a bond: a ring marks the atom or bond it will take. Its ends stay a small gap off the atom or bond (Settings → Drawing → Ends of curved arrows: touching, or a larger gap); at an atom with a label it stops short of the letters.</p>
+<p class="pic"><img src="img/p19-3.png" alt="screenshot - Screenshot" style="width:129.75pt;"></p>
+<p class="gap-8">A curved arrow bent into a full circle can be selected and squeezed into an oval; its length then follows the oval. <b>Ctrl+drag on an end</b> makes a copy of the arrow in the same place — pull its end (without Ctrl) to build, for example, a catalytic cycle.</p>
+<p class="pic"><img src="img/p20-1.png" alt="image47 - Screenshot" style="width:446.25pt;"></p>
+<p class="gap-8">Straight arrows work the same way, for a chain of reactions.</p>
+<p class="pic"><img src="img/p20-2.png" alt="image48 - Screenshot" style="width:331.5pt;"></p>
+<p class="gap-8"><b>Catalytic cycle</b> (in the arrow menu, clockwise or anticlockwise): drag out an oval arrow (Shift: a circle). A structure or text put on it cuts it into arcs, each with its head; the gaps go with the structures when they are moved. Right-click a structure or text next to the cycle: <b>into the cycle</b> draws an arc from it that merges into the cycle, <b>out of the cycle</b> an arc that peels off and points at it; several can join one arc. <b>Remove</b> takes the arc away, <b>Detach</b> leaves it as an ordinary arrow and frees the structure. The arc leaves the cycle in one round bend and ends aimed at the middle of its structure; a structure up to about four bonds from the cycle can join it.</p>
+<p><b>Texts on an arrow.</b> A text typed or dragged just above or below a straight reaction arrow sticks to it: the texts are centred over the arrow with the same gap above and below, the arrow grows as long as the widest text needs (what is to its right moves along), and they go with the arrow when it is moved. Drag a text well away to take it off. Right-click the arrow: <b>Texts: stick to the arrow / free</b>. Drawings opened from files or pasted stay as they were.</p>
+<p><b>Wavy arrow</b> (Wavy group of the arrow menu), for hν and emission, drawn with the wave of the Jablonski diagram; it goes to CDXML as a wavy arrow and comes back. The <b>Long head</b> group has a long narrow head in three sizes. A selected straight arrow has points on its head: drag the back corners (longer or shorter, wider or narrower), the middle of the notch (how deep) and the middle of a side (hollowed or straight); the shape goes to CDXML and comes back.</p>
+<p><img src="img/btn-pen.jpg" alt="pen - Button: pen" style="width:22.5pt;">&nbsp; <b>Pen</b>: arrows of any shape. Each click places a point; drag while placing to bend the curve. The points and their handles can be moved later: click the arrow with the pen again.</p>
+<p class="pic"><img src="img/p20-3.png" alt="image50 - Screenshot" style="width:432pt;"></p>
+<p class="gap-8"><b>Right-click any arrow</b> to change its kind (heads, equilibrium, retrosynthetic, dashed, no reaction…). <b>Double-click an arrow</b> to select the whole reaction with its reactants, products and conditions.</p>
+<p class="pic"><img src="img/p21-1.png" alt="image51 - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8"><img src="img/btn-rplus.jpg" alt="rplus - Button: rplus" style="width:22.5pt;">&nbsp; <b>Reaction plus</b>: a + between compounds of a scheme. It separates compounds and is not a charge.</p>
+<p><img src="img/btn-text.jpg" alt="text - Button: text" style="width:22.5pt;">&nbsp; <b>Text</b> (T): click the sheet to write a caption. Text that is a formula (NaHCO3, Pd(PPh3)4) can become a compound of the reagent table; start or end a bond on it with the bond tool and it becomes a label that takes bonds like any substituent, still counted by its formula. Clicked next to the end of a chain, a group such as OEt goes onto that atom as its label. Select one text and drag a side of its box to make it narrower or wider, lower or higher: the lines flow again (a number keeps its unit); the corners scale the letters. Greek letters and signs by their LaTeX names: \delta, \nu, \Delta, \pm… become δ, ν, Δ, ± at the next space or sign (the space after the name is taken, so \nu h gives νh).</p>
+<p><img src="img/btn-erase.jpg" alt="erase - Button: erase" style="width:22.5pt;">&nbsp; <b>Eraser</b>: a click removes an object (an atom left with no bond goes with it, so no lone CH4 is left behind); dragging with the left button removes everything in the rectangle; dragging with the right button removes everything the pointer touches.</p>
+<p><img src="img/btn-hand.jpg" alt="hand - Button: hand" style="width:22.5pt;">&nbsp; <b>Hand</b>: moves the view. The middle mouse button does the same with any tool. The mouse wheel scrolls the sheet up and down, Shift+wheel scrolls it sideways (on a touchpad: two fingers in any direction); Ctrl+wheel zooms.</p>
+<p><img src="img/btn-rot3d.jpg" alt="rot3d - Button: rot3d" style="width:22.5pt;">&nbsp; <b>3D rotate</b>: turns a structure in space. A flat structure is first given a 3D shape, which may take a few seconds for a large one; 3D structures turn at once. Right-click a structure in 3D for Show all H: every H is written as an atom where the 3D shape has it (on N, O and S too), in lines and in the 3D styles; Hide the H shown takes them away again.</p>
+<p><img src="img/btn-cutrad.jpg" alt="cutrad - Button: cutrad" style="width:22.5pt;">&nbsp; <b>Break bonds into radicals</b>: draw a line across the bonds.</p>
+<p class="pic"><img src="img/p22-1.png" alt="image58 - Screenshot" style="width:403.5pt;"></p>
+<p class="gap-8"><img src="img/btn-cutretro.jpg" alt="cutretro - Button: cutretro" style="width:22.5pt;">&nbsp; <b>Retrosynthetic disconnection</b>: draw a line across the bonds; the pieces become the precursors of a retrosynthetic arrow.</p>
+<p class="pic"><img src="img/p22-2.png" alt="image60 - Screenshot" style="width:432pt;"></p>
+<p class="gap-8"><img src="img/btn-cutfwd.jpg" alt="cutfwd - Button: cutfwd" style="width:22.5pt;">&nbsp; <b>Reaction from a disconnection</b>: the same, as a forward reaction.</p>
+<p class="pic"><img src="img/p22-3.png" alt="image62 - Screenshot" style="width:432pt;"></p>
+<p class="gap-8"><img src="img/btn-bracket.jpg" alt="bracket - Button: bracket" style="width:22.5pt;">&nbsp; <b>Brackets</b> with their symbols (‡, n, charges…). The last one, <b>⌉</b>, is the charge corner for the charge of a whole species: drag from where the top line starts: the corner comes out square, with equal sides; stretch it with Select if needed, and put the charge outside the corner.</p>
+<p class="pic"><img src="img/p22-4.png" alt="screenshot - Screenshot" style="width:259.5pt;"></p>
+<p class="pic"><img src="img/p23-1.png" alt="image64 - Screenshot" style="width:172.5pt;"></p>
+<p class="gap-8"><img src="img/btn-shape.jpg" alt="shape - Button: shape" style="width:22.5pt;">&nbsp; <b>Shapes and lines</b>: circles, ellipses, rectangles, lines and arcs. Click the button again to choose the shape.</p>
+<p class="pic"><img src="img/p23-2.png" alt="image66 - Screenshot" style="width:158.25pt;"></p>
+<p class="gap-8"><img src="img/btn-chart.jpg" alt="chart - Button: chart" style="width:22.5pt;">&nbsp; <b>Charts</b>: product-ratio pie or ring charts and sensitivity screens (the radar diagrams of Glorius and co-workers). Click the button again to choose; double-click a chart to edit it. Jablonski diagrams are there too: energy levels (singlets in one column, triplets in the other, sublevels above each) and absorption, fluorescence, phosphorescence, internal conversion and intersystem crossing between them. Double-click the diagram to edit it: change a level’s energy and its arrows follow. While its window is open, drag its parts on the sheet — a level up, down or sideways (an end stretches it), a name, an arrow sideways, an arrow’s label; the arrows stay on their levels, and Reset positions puts everything back.</p>
+<p>&nbsp; <b>Energy diagrams</b> (Charts → Energy diagram, the last of the charts; click the sheet where it goes): a table of states and their energies, one row a state (R, TS1, INT1…), one column of energies a path. Type it in its window, paste it from Excel (into the first header cell: the whole table), or open an Excel (.xlsx), CSV or tab-separated file; Copy table gives it back for Excel. A column set to (in brackets) is written with the path before it (ΔH beside ΔG), a column set to (names) gives that path names of its own (TS1′, INT1′); an empty cell: the path does not go through that state. ↑↓ beside a row move a state with all its paths; Alt+↑/↓ in a path’s cell moves only that path’s value, so the paths can go through different states. ←→ in a column’s header swap it with its neighbour; + State and + Column add one. Look: levels joined by lines or dashed lines, or a smooth curve; the energies over and under the levels or beside them, the names, the axis and its title, the key. A value ending in ~ is reached through a break of the scale.</p>
+<p class="pic inset"><img src="img/p24-1.jpg" alt="" style="width:403.2pt;"></p>
+<p class="gap-8">&nbsp; The diagram is made of ordinary lines and texts: move, recolour or delete any of them, and put structures beside the levels. A level dragged moves only sideways, as it stands at its energy (an end stretches it), and takes its joins and numbers along; the whole diagram selected moves freely. Changing the table draws it again to scale, what was moved keeping its shift and what was deleted staying away; Reset positions puts them back. Double-click a level or a join for its window:</p>
+<p class="pic inset"><img src="img/p24-2.png" alt="" style="width:446.4pt;"></p>
+<p class="pic"><img src="img/p25-1.png" alt="image69 - Screenshot" style="width:432pt;"></p>
+<p class="pic gap-8"><img src="img/p25-2.png" alt="image70 - Screenshot" style="width:187.5pt;">&nbsp;&nbsp; <img src="img/p25-3.png" alt="image71 - Screenshot" style="width:200.25pt;"></p>
+<p class="pic"><img src="img/p26-1.png" alt="image70 - Screenshot" style="width:206.8pt;">&nbsp;&nbsp; <img src="img/p26-2.jpg" alt="image71 - Screenshot" style="width:122.25pt;"></p>
+<p class="gap-8"><img src="img/btn-table.jpg" alt="chart - Button: chart" style="width:22.5pt;">&nbsp;&nbsp;&nbsp; <b>Tables</b>: click on the sheet to put a table there, ruled as journals rule them, and type in its cells (Tab and Enter go on; the text buttons work on the picked cells). Right-click it for rows and columns (insert, move, delete), the first column numbered by itself, borders, fill, a structure in a cell and footnotes under the table.</p>
+<p class="pic"><img src="img/p26-3.jpg" alt="image69 - Screenshot" style="width:208.8pt;"></p>
+<p class="gap-8"><img src="img/btn-bonds.jpg" alt="bonds - Button: bonds" style="width:95.25pt;">&nbsp; <b>Bonds</b>: a click on the sheet places a bond, dragging pulls it out in 15° steps, a click on a bond with a bond tool makes it that type; a click on a bond that already is that type steps it on (single tool: single ↔ double; double tool: the second line of a double bond steps round, one side → centred → the other side, as the key 2 over it does; triple tool: triple → single). Three buttons with the same set of bond types (single, double, triple, wedges, hashed, bold, dashed, wavy, delocalized). There are three so that you can switch, for example, between wedge and hash with the mouse alone. Over a bond, keys change it: 1, 2, 3 set the order, and <b>F</b> puts the bond in front where bonds cross — the bond behind is cut there.</p>
+<p>More bond types in the same menus: <b>quadruple</b> (four lines), <b>double with E/Z not known</b> (crossed), and <b>dative</b>, an arrow from the donor to the acceptor that does not count in the valence (click it again to turn it round). Dative and quadruple bonds are drawn longer, so they read clearly. An allene gets a dot on its middle carbon, in a small break of the double bonds; right-click it to take it off or put it back. A bond dragged from a metal to the middle of a drawn ring (a Cp, a benzene) ends on the ring’s centre, an η bond: two such bonds from Fe to two Cp rings give ferrocene, C10H10Fe.</p>
+<p><img src="img/btn-atoms.jpg" alt="atoms - Button: atoms" style="width:40.5pt;">&nbsp; <b>Atoms</b> and the periodic table (…). Over an atom, a key sets the element (C, N, O, S, P, F; L for Cl, B for Br…). A <b>double-click on a carbon</b> repeats the last atom or label, however it was put on (typed, by a key or with an element button).</p>
+<p><b>Valence check.</b> After every change the valences are checked: an atom over its normal valence, or left short of it (O instead of OH), gets a <b>red dashed ring</b> unless a charge or a radical explains it. Carbenes, nitrenes, nitrenium ions and similar species pass. The rings show only on screen, never in copies or exports; Settings → Warnings → <b>Mark valence errors on the structure</b> turns them off. Hypervalent atoms follow the usual valence rules: P up to 5 bonds, S and Se up to 6, Cl, Br and I up to 7; a charged atom is checked like the element with the same number of electrons, so PF6−, AsF6−, BF4− and SiF6 2− pass, and neutral P with four bonds takes an H (HP(O)(OH)2, phosphorous acid). A bond can always be added, even past the valence: the atom is then marked.</p>
+<p><b>Structure checks.</b> Run together with the valence check and marked on the structure: <b>red</b> for errors (atoms on top of each other, an atom lying on a bond it does not belong to, a stray atom left inside another structure), <b>orange</b> for stereo warnings (a wedge or hash at an atom that is not a stereocentre, wedges and hashes that contradict each other), <b>grey dashes</b> for hints (an unusually short or long bond, a double bond drawn straight so E/Z cannot be read, two wedges of one kind at a centre with three bonds); orange also marks a wedge between two stereocentres, a wedge on a ring bond where a bond outside the ring could carry it, and a wedge on a double bond (not read as stereo). The stereo rules follow the IUPAC recommendations for drawing stereochemistry (2006, ST-1). A line under Properties counts them; click a count to select the atoms. Settings → Warnings → <b>Mark stereocentres drawn without a wedge or hash</b> adds one more hint (off by default). Like the valence rings, these marks never leave the program.</p>
+<table class="layout">
+  <colgroup><col style="width:234pt"><col style="width:234pt"></colgroup>
+  <tr><td><p class="pic center"><img src="img/p27-1.jpg" alt="screenshot - Screenshot" style="width:86.25pt;"></p><p class="center caption"><b>Atoms on top of each other</b> (red): a second molecule dropped onto the first.</p></td><td><p class="pic center"><img src="img/p27-2.jpg" alt="screenshot - Screenshot" style="width:93.75pt;"></p><p class="center caption"><b>Atom on a bond it does not belong to</b> (red): an O lying on a C–C bond.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p27-3.jpg" alt="screenshot - Screenshot" style="width:86.25pt;"></p><p class="center caption"><b>Stray atom inside another structure</b> (red): a lone carbon left in a ring.</p></td><td><p class="pic center"><img src="img/p27-4.jpg" alt="screenshot - Screenshot" style="width:72pt;"></p><p class="center caption"><b>Valence error</b> (red ring): a carbon with five bonds.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p27-5.jpg" alt="screenshot - Screenshot" style="width:100.5pt;"></p><p class="center caption"><b>Wedge not at a stereocentre</b> (orange): the CH carrying two identical methyl groups is not a stereocentre.</p></td><td><p class="pic center"><img src="img/p27-6.jpg" alt="screenshot - Screenshot" style="width:93.75pt;"></p><p class="center caption"><b>Contradicting wedges</b> (orange): a wedge and a hash at alanine’s centre that give opposite configurations (IUPAC ST-1.2.10: not acceptable). Draw one wedge or one hash.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p28-1.jpg" alt="screenshot - Screenshot" style="width:90pt;"></p><p class="center caption"><b>Two wedges on neighbouring bonds </b>(orange): at a centre drawn with all four bonds, two wedges side by side give different configurations (IUPAC ST-1.1.11: ambiguous, never use).</p></td><td><p class="pic center"><img src="img/p28-2.jpg" alt="screenshot - Screenshot" style="width:90pt;"></p><p class="center caption"><b>The same centre, acceptable:</b> wedges on the two opposite bonds (Br and Cl toward the viewer, the carbons away). No mark. IUPAC accepts this (ST-1.1.3) but prefers one wedge, or one wedge and one hash on neighbouring bonds.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p28-3.jpg" alt="screenshot - Screenshot" style="width:90pt;"></p><p class="center caption"><b>Two hashes at a centre with three bonds </b>(grey hint): clear — both say the H points to the viewer — but IUPAC prefers one (ST-1.2.5).</p></td><td><p class="pic center"><img src="img/p28-4.jpg" alt="screenshot - Screenshot" style="width:90pt;"></p><p class="center caption"><b>Stereo group on an atom that is not a stereocentre</b> (orange): &amp;1 on a carbon with two methyl groups.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p28-5.jpg" alt="screenshot - Screenshot" style="width:93.75pt;"></p><p class="center caption"><b>Wedge between two stereocentres</b> (orange): the wedge joins two stereocentres, so it is unclear which one it describes (IUPAC ST-0.5: avoid).</p></td><td><p class="pic center"><img src="img/p28-6.jpg" alt="screenshot - Screenshot" style="width:93.75pt;"></p><p class="center caption"><b>Wedge on a ring bond</b> (orange): put it on the OH instead (IUPAC ST-0.2: not acceptable when a bond outside the ring could carry it).</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p28-7.jpg" alt="screenshot - Screenshot" style="width:86.25pt;"></p><p class="center caption"><b>Wedge on a double bond</b> (orange): a chiral sulfoxide is fine, but its wedge belongs on a single bond (S–CH₃ or S–Ph; IUPAC ST-1.5). A wedge on S=O is not read as stereo: SMILES, InChI and MOL keep the double bond without configuration.</p></td><td><p class="pic center"><img src="img/p28-8.jpg" alt="screenshot - Screenshot" style="width:144pt;"></p><p class="center caption"><b>Unusually long bond</b> (grey hint): one bond much longer than the others.</p></td></tr>
+  <tr><td><p class="pic center"><img src="img/p28-9.jpg" alt="screenshot - Screenshot" style="width:100.5pt;"></p><p class="center caption"><b>Double bond drawn straight</b> (grey hint): E/Z of but-2-ene cannot be read.</p></td><td></td></tr>
+</table>
+<p><img src="img/btn-symbols.jpg" alt="symbols - Button: symbols" style="width:95.25pt;">&nbsp; <b>Symbols</b>: two buttons with charges, radicals, lone pairs, attachment points, the mark ball and partial charges δ+ / δ− — two, so that + and − are both at hand.</p>
+<p><img src="img/btn-deltap.jpg" alt="deltap - Button: deltap" style="width:22.5pt; height:21.75pt;"> <img src="img/btn-deltam.jpg" alt="deltam - Button: deltam" style="width:22.5pt; height:21.75pt;">&nbsp; <b>Partial charges δ+ and δ−</b>: click an atom, again to remove; drag the symbol to move it. Drawing only: formula and valence do not change.</p>
+<p><img src="img/btn-orbital.jpg" alt="orbital - Button: orbital" style="width:22.5pt; height:21.75pt;">&nbsp; <b>Orbitals</b>: s (empty or filled), dxy, a single lobe (filled or empty), dz² (the ring or the lobes filled), p, and sp³ (the big or the small lobe filled). Click an atom (or drag to set the direction, in 15° steps); click again for the orbital menu. All orbitals are drawn at one size (Alt+drag sets the size too). An orbital put on an atom stays on it when the atom moves. Selected, it has two handles: the <b>round</b> one turns it about its atom (the size stays; Shift for 15° steps), the <b>square</b> one makes it bigger or smaller (the direction stays). With the bond tool, drag from one orbital to another for the overlap line: a line starts and ends at the tip or the middle of a lobe (all four of a d orbital, both of an sp³), or at the centre of an s orbital or anywhere on its circle; the dashed bond tool gives a dashed line. Orbitals go to and come from CDX and CDXML files.</p>
+<p class="pic"><img src="img/p29-1.jpg" alt="screenshot - Screenshot" style="width:216pt;"></p>
+<p class="gap-8"><img src="img/btn-ball.jpg" alt="ball - Button: ball" style="width:22.5pt; height:21.75pt;">&nbsp; <b>Mark ball</b>: a light ball on an atom for highlighting (each click makes it bigger, then removes it). Its fill and outline are set with the fill button.</p>
+<p class="pic"><img src="img/p29-2.png" alt="image75 - Screenshot" style="width:158.25pt;"></p>
+<p class="gap-8"><img src="img/btn-rings.jpg" alt="rings - Button: rings" style="width:67.5pt;">&nbsp; <b>Rings</b> of any size, also your own (for example 18). Click a bond to fuse the ring onto it, an atom to attach it (inside a chain or ring: a spiro ring), or empty sheet for a ring on its own. On a chair, a bond added to a carbon comes axial first (straight up from a high carbon, straight down from a low one), then equatorial.</p>
+<p>Bridged ring systems (norbornane, adamantane, cubane…), and two chair cyclohexanes (after Cubane), drawn as chemists draw them. They dock as the other templates do: clicked on a bond they are fused onto it, on an atom they make a spiro junction (or are bonded to it), also onto a selected structure. Right-click the button (or one of your templates) to choose, on a big drawing, the bond it is fused by and the atom it is put on by.</p>
+<p>After the two chairs come a <b>cyclohexane boat</b> and a <b>twist-boat</b>. A bond drawn from their carbons goes where they have it: on the boat from the raised ends the flagpole straight up, then the bowsprit out; from the front pair straight down, then out and up; from the back pair straight up, then a short one inside; on the twist-boat where its 3D shape has its H, the one nearer upright first. Placed from the template they carry their 3D shape: 3D shape and 3D rotate keep a boat a boat and a twist-boat a twist-boat, with what was drawn on them from there, instead of making chairs of them.</p>
+<p class="pic inset"><img src="img/p30-1.jpg" alt="" style="width:331.2pt;"></p>
+<p class="gap-8"><img src="img/btn-tpl.jpg" alt="tpl - Button: tpl" style="width:71.25pt;">&nbsp; My templates: select a structure and press Add selection in this menu. Templates can be grouped in tabs (make a tab and drag templates onto it). In the Hotkeys tab of the menu, every template can get its own key. A template clicked on a bond is fused onto it, on an atom it is bonded to it; right-click a template to choose, on a big drawing, the bond it is fused by and the atom it is put on by (the choice is kept).</p>
+<p class="pic"><img src="img/p30-2.png" alt="screenshot - Screenshot" style="width:432pt;"></p>
+<p class="gap-8"><b>Import</b> reads two kinds of files. A Reactio Draw templates file (<b>.json</b>, made with Export) brings its templates back as they were saved, in their own tabs. A <b>.cdxml / .cdx</b> file turns every structure in it into a template, scaled to the sheet’s bond length, on a new tab named after the file; a salt (cation and anion drawn together) stays one template.</p>
+<h1 id="ch4">4. Right panel</h1>
+<p class="gap-8">Five tabs: <b>Analysis, Characters, Labels, Settings, Info</b>. The panel can be made wider or narrower by dragging its left edge. The arrow at the left of the tabs folds the panel to a thin strip at the right edge, so the sheet gets the room; the arrow on the strip opens it again.</p>
+<p><b>In a narrow window</b> (up to 1060 px wide) the sheet keeps its room: the left tools go into one column (two compact rows in a window up to 700 px), with Bonds, Symbols, Atoms and Rings as one button each — the tool used last, a second click opens the others — and the top bar is compact. The panel starts folded and opens as a window over the right of the sheet; the arrow folds it again. The left tools scroll when they do not fit the height.</p>
+<h2>Analysis</h2>
+<p>With one structure on the sheet (or one selected) it shows the formula, molecular weight, exact mass, m/z [M+H]⁺, elemental analysis, the isotope pattern, SMILES, InChI and InChIKey. Under InChI comes its CAS number.</p>
+<p class="pic"><img src="img/p31-1.png" alt="image80 - Screenshot" style="width:180pt;"></p>
+<p class="gap-8"><b>HRMS.</b> Type the m/z found in the mass spectrum: the program suggests the ion (for example [M+H]⁺, [M+Na]⁺) and gives the error in ppm; above 10 ppm the line turns red.</p>
+<p class="pic"><img src="img/p31-2.png" alt="image81 - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8">With several structures the tab lists them. Select one, or click its formula in the list, to see its data.</p>
+<p class="pic"><img src="img/p31-3.png" alt="image82 - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8"><b>SMILES, InChI and InChIKey.</b> SMILES is canonical: the same structure gives the same SMILES however it was drawn, with the drawn stereochemistry. InChI and InChIKey come from the official InChI library (InChI Trust / IUPAC), built into the program: they work offline and in the browser. Copy and Copy key put them on the clipboard.</p>
+<p><b>CAS number.</b> It comes from the dictionary of names, found by the InChIKey (in the web version a button first offers to load the dictionary). For a compound not in it, select it (one molecule, or a salt) and press Search PubChem: PubChem is asked for its CAS number, only its InChIKey is sent and only when the button is pressed, and numbers whose check digit is wrong are left out. Copy puts the number on the clipboard.</p>
+<p class="pic"><img src="img/p32-1.png" alt="screenshot - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8"><b>pKa (estimate)</b>: each ionizable group with its pKa (acids) or pKaH and pKb (bases). The groups are found with the table of Dimorphite-DL (Apache-2.0); the value comes from textbook relations — Hammett σ of the ring’s substituents for benzoic acids, phenols, anilines and pyridines, Taft σ* of nearby groups for aliphatic acids and amines, the kind of ring for aromatic N (acetic acid 4.76, p-nitrophenol 7.16, pyridine 5.25, diethylamine 11.0). Against 6800 measured aqueous values half are within 0.7 units and four in five within 2: a guide, not a measurement.</p>
+<p><b>Show R/S and E/Z on the structures</b> writes the descriptors next to the stereocentres and double bonds, and <b>(M)</b> or <b>(P)</b> for an allene drawn with a wedge at one end and for a hindered biaryl (BINOL, BINAP…) drawn with a wedge at its axis (IUPAC 2013, P-93.5.1.3). Drag a label with the selection tool to put it elsewhere: it keeps that place by its atom or bond and goes with the structure. Right-click a label for its colour (or the same colour for all the labels) and to put it, or all of them, back in their own places. Their right-click menu also makes them larger or smaller (A− A+).</p>
+<p><b>Name it</b> (Mac, Windows and Linux apps) makes the IUPAC name with openclatura and checks it by reading it back with OPSIN; a name marked ✓ was read back as the same structure. openclatura names organic structures only: inorganic species (PF₆⁻, BF₄⁻, ClO₄⁻, SO₄²⁻, metal ions and complexes, water) get no name. A salt is named part by part — the organic ion gets its name, the inorganic one shows as “?” (for example “1-methylpyridin-1-ium; ?”) — so a full salt name such as “1-methylpyridinium hexafluorophosphate” has to be written by hand. Trust only names marked ✓.</p>
+<p class="pic"><img src="img/p32-2.png" alt="image83 - Screenshot" style="width:201.75pt;">&nbsp;&nbsp; <img src="img/p32-3.png" alt="image84 - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Alternative name</b>, beside it, names the structure with the namer of Octet Draw (Sam Ellis, Apache-2.0), in the page, the browser included; each name is read back with OPSIN and compared with the drawing (✓ when it matches). It also names coordination compounds by additive nomenclature — chloridotris(triphenylphosphane)rhodium(I), tris(ethane-1,2-diamine-κ2N,N′)cobalt(3+) — with κ, μ, η, cis/trans, fac/mer and Δ/Λ where the drawing fixes them, and gives such a name only when every part of it checks out: each ligand read back by OPSIN, the donor atoms, the metal and the charge. Numbering, at the end of the row, writes the IUPAC numbers (locants) beside the atoms as the name counts them — 1 to 8a on a naphthalene, the parent chain or ring of a substituted structure; press it again to take them off. Change the structure (an atom, a bond, a label) and it is numbered again. By hand numbers atoms in the order you click them (1, 2, 3…; a numbered atom clicked again loses its number); Molfiles, SDF and XYZ files list the atoms in that order. Atom numbers stand clear of the bonds and labels by themselves; drag one where you want it, and right-click it for its colour, size (A− A+), bold, back to its place, or the same look for all the numbers. Numbering again after a change keeps their look.</p>
+<p><b>NMR prediction</b>: ¹H, ¹³C, ¹⁹F and ³¹P shifts from measured spectra (nmrshiftdb2). The shifts appear as a stick spectrum and a table, and can be shown next to the atoms; pointing at an atom lights its row in the table (and a row lights its atoms); <b>Clear</b> takes them off. In the web version the tables (2.2 MB) are downloaded on the first Predict, after asking. <b>Copy</b> gives a line for the supporting information, ending with a sentence naming the data source (nmrshiftdb2 and its licence). It is a prediction, not a measured spectrum.</p>
+<p>¹H signals come with their multiplicity and coupling constants, as in “3.65 (dq, J = 7.0, 1.5 Hz, 1H)”: in open chains from the electronegativity of the substituents, for alkenes cis or trans from the drawing, aromatic ortho and meta couplings, and in rigid rings from the 3D shape by the Karplus equation (dihedral angles). Busy groups are given as m. They are estimates: the coupling constants are usually within 1–2 Hz.</p>
+<p class="pic"><img src="img/p33-1.png" alt="image85 - Screenshot" style="width:187.5pt;"></p>
+<p class="pic gap-8"><img src="img/p33-2.png" alt="image86 - Screenshot" style="width:388.5pt;"></p>
+<p class="gap-8"><b>The spectrum</b> is drawn with Lorentzian lines and first-order multiplets at the frequency chosen (60–800 MHz; ¹³C, ¹⁹F and ³¹P at their own frequencies), with the residual solvent and water peaks of the solvent chosen, a line width in Hz, and colours for the signals (filled peaks, and the same colours at the atoms); the mouse wheel zooms, dragging pans, and the bigger view opens it in a window. <b>Spectrum</b> and <b>Details</b> put the spectrum and the table of signals under the structure as pictures, and <b>Data under structure</b> writes the shifts there as text, as an experimental section gives them — each structure its own.</p>
+<p>A counter-ion written as text (PF6−, BF4−) counts in the formula and masses when it is selected with the structure, or always when it stands beside the only structure on the sheet.</p>
+<p><b>Labels on the sheet.</b> Select a structure, tick the data you want (formula, MW, exact mass, m/z, elemental analysis) and press <b>Paste</b>: the lines go under the structure and update themselves.</p>
+<p class="pic"><img src="img/p33-3.png" alt="image87 - Screenshot" style="width:316.5pt;"></p>
+<p class="pic gap-8"><img src="img/p33-4.png" alt="image88 - Screenshot" style="width:230.25pt;"></p>
+<p class="gap-8"><b>Compound numbers.</b> Select the structures and give a template: {n} gives 1, 2, 3…, {a} gives a, b, c… (4.{n} → 4.1, 4.2; S{n} → S1, S2; 3{a} → 3a, 3b), and the first number. The number is bold; the second box (<b>then, not bold</b>) adds text after it in plain type — 5.{n} with (xx%) gives <b>5.1</b> (xx%), and you only have to replace xx with the yield. Numbering again replaces the numbers. The numbers then <b>keep themselves in order</b>: number a new compound between two others and the later numbers move on; delete a structure and its number goes. Each series (a template with its first number: {n} from 1, 3.{n} from 1) is counted on its own, and a copied structure takes its number along. Type a letter after a number (2a, 2b) and those compounds share one number. \n in either box starts a new line; Paste under the structure (above) on a numbered compound writes its lines under the number, in the same text.</p>
+<p class="pic"><img src="img/p34-1.png" alt="screenshot - Screenshot" style="width:208.5pt;"></p>
+<p class="gap-8"><b>Marks for Word.</b> The template can write marks instead of numbers: <b>[[amine.{n}.letter]]</b> with <b>, xx%</b> puts [[amine.1.letter]], xx%, [[amine.2.letter]], xx%… under the selected structures, in reading order, and Number compounds in Word turns them into 3a, 3b… (see Compound numbers in a Word file). Long marks that run into each other show on the sheet as grey numbers; point at one to see its mark.</p>
+<p>Add a structure from a SMILES or a name. Names are read everywhere, the browser included: systematic (IUPAC) names by OPSIN compiled to JavaScript, about 800 abbreviations, reagents and drugs from the tables of Octet Draw, a dictionary of 28,880 compounds from Wikidata with their common and trade names, CAS numbers (58-08-2) and InChIKeys, and condensed formulas (CH3CH2OH, PhCH2OH, Me3SiCl, (CH3)3COH; a molecular formula such as C2H6O is not read, as it has more than one structure). In the web version the name reader (3 MB) is downloaded on the first name it is needed for, after asking. A condensed formula written as a text on the sheet becomes a structure the same way.</p>
+<p class="pic"><img src="img/p34-2.png" alt="image91 - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Peptide sequence</b> (Add a structure): one-letter codes (YGGFL; lower case for D: cyclo(RGDfK)) or three-letter codes (Ac-Ala-D-Phe-Gly-NH2; also Aib, Sar, Nle, Orn, Abu, Nva, Phg, Cha, Hyp), caps (Ac, Boc, Fmoc, Cbz, Bz), C-terminal ends (OH, NH2, NHMe, OMe, OEt, OtBu, OBn) and Cys–Cys bridges (CYIQNCPLG-NH2 S-S 1-6). The backbone is drawn as a straight zigzag with the side chains up and down in turn, bent at each Pro to give its ring room.</p>
+<p><b>Repeat units.</b> A SMILES with a piece repeated ten times or more (poly-L-alanine, PEG, polystyrene) asks first: one repeat unit in brackets with its n, or the whole chain. Formula, mass, SMILES and InChI are those of the whole chain; n stands at the right bracket and can be typed over. Molfile, SDF, RXN, CDXML and CDX keep the unit as a polymer group. A whole chain of more than 600 atoms is drawn in steps under a bar with <b>Stop</b>.</p>
+<h2>Characters</h2>
+<p>Symbols for text: °, ±, →, ⇌, Δ, Greek letters, sub- and superscript digits, hν, Å and more. A click inserts the symbol into the text being edited, otherwise copies it. <b>Add your own</b> in the box under the table; they stay, with a dashed frame; right-click one to remove it.</p>
+<p class="pic"><img src="img/p35-1.jpg" alt="image92 - Screenshot" style="width:187.5pt;"></p>
+<h2>Labels</h2>
+<p>Labels are read by an algorithm, not looked up in a list: CO2Me, SO2Me, CONH2, Si(iPr)3, SnBu3, (CH2)3OH, P(O)(OEt)2, N(Me)Boc and the like are understood as they are typed, and formula, mass and SMILES count them. Group names (Me, tBu, Ph, Boc, Ts, TBS…) are the only list; it includes the abbreviations of the Beilstein Chemical Lookup Collection (OTES, DMTr, 2-py and about 200 more). A label written as a formula with no single structure (C10H7) is counted by its formula, and so is a label with a metal, however many bonds its atom has (Co(CO)3 in the cobalt complex of an alkyne). A label that cannot be read stays red. When the bond comes from the right, a label is written backwards: OEt → EtO, Si(iPr)3 → (iPr)3Si.</p>
+<p><b>Your own abbreviations.</b> Draw the group and put an attachment point <img src="img/btn-att.jpg" alt="att - Button: att" style="width:19.5pt;"> (Symbols) on the atom where it attaches. Select the group, type the label (for example PMB) and press <b>Save selection</b>. From now on PMB is understood in structures, and Expand Label <img src="img/btn-expand.jpg" alt="expand - Button: expand" style="width:18.75pt;"> draws it out. A label has one attachment point.</p>
+<p class="pic"><img src="img/p35-2.png" alt="image95 - Screenshot" style="width:187.5pt;">&nbsp;&nbsp; <img src="img/p35-3.png" alt="screenshot - Screenshot" style="width:187.5pt;"></p>
+<p class="pic"><img src="img/p36-1.png" alt="image97 - Screenshot" style="width:432pt;"></p>
+<h2>Settings</h2>
+<p>The settings are split into small tabs at the top of the Settings tab, one group shown at a time (the last one opened comes back): Interface, Drawing, Warnings, New documents, Toolbar, Settings file, Reagent table and Hotkeys.</p>
+<p class="pic"><img src="img/p36-2.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Interface</b></p>
+<p class="gap-4"><b>Zoom speed</b>: how fast Ctrl+wheel and a pinch on the trackpad zoom the sheet (6× by default).</p>
+<p class="pic"><img src="img/p36-3.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Theme</b> of the panels and buttons (light at first): as the system (light or dark like your computer), light, dark, or matching the paper (dark panels on a dark paper, light on a light one). The sheet keeps its own paper colour in every theme.</p>
+<p class="pic"><img src="img/p36-4.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p><b>Accent colour</b> of buttons, selection and highlights: Blue, Teal, Green, Violet, Crimson, Amber, Graphite, or your own colour. The drawing keeps its own colours; a colour too light or too dark to read is adjusted for each theme.</p>
+<p class="pic"><img src="img/p37-1.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Esc keeps the typed text</b>: on, Esc finishes a text or an atom label like Enter; off, Esc throws the typing away.</p>
+<p class="pic"><img src="img/p37-2.jpg" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Top bar</b>: Full shows every group of buttons (a click on a group’s grip ⋮ folds that group into one menu); Compact keeps the file buttons and puts the rest into four menus in one row.</p>
+<p class="pic"><img src="img/p37-3.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Drawing</b></p>
+<p class="gap-4"><b>NMe, NBoc, SiMe2 typed on an atom in a chain or ring</b>: one label (the group beside the atom) or the group on a bond of its own. Typing it with a dash (N-Me) always gives the bond.</p>
+<p class="pic"><img src="img/p37-4.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="pic"><img src="img/p38-1.png" alt="image101 - Screenshot" style="width:432pt;"></p>
+<p class="gap-8"><b>t, i, s, n in groups</b> (tBu, iPr, sBu, nBu): plain, italic, or italic superscript. New labels follow the choice; <b>Apply to selection</b> changes the selected structures (or the whole sheet).</p>
+<p class="pic"><img src="img/p38-2.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="pic gap-8"><img src="img/p38-3.png" alt="image103 - Screenshot" style="width:187.5pt;"></p>
+<p class="gap-8"><b>Ends of curved arrows</b>: the ends of a curved arrow stay a small gap off the atom or bond (at first), a larger gap, or touch it. An atom with a label always keeps the arrow clear of its letters.</p>
+<p class="pic"><img src="img/p38-4.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p><b>Clean Up: a methoxy drawn as O–CH3</b>: leave it as drawn (a line, the default), or write it as the label OMe or OCH3 (H3CO on the left). A crowded methoxy that Clean Up has to write as a label follows this choice (OCH3 when it is Leave as drawn).</p>
+<p class="pic"><img src="img/p39-1.png" alt="shot - Screenshot" style="width:201.25pt;"></p>
+<p class="gap-8"><b>Clean Up: a methyl drawn as a line end</b>: leave it as drawn (the default), or write it as Me or CH3 — the methyl of toluene, the CH3 of an ethyl; ethane is left alone. Both choices go into the settings file.</p>
+<p class="pic"><img src="img/p39-2.png" alt="shot - Screenshot" style="width:201.25pt;"></p>
+<p class="pic gap-8"><img src="img/p39-3.jpg" alt="shot - Screenshot" style="width:340.15pt;"></p>
+<p class="gap-10"><b>Warnings</b></p>
+<p class="gap-4"><b>Mark valence errors on the structure</b> (on by default): an atom over or short of its normal valence gets a red dashed ring. Turned off, the rings leave the sheet, but the Analysis tab and the API still report the errors. The rings never appear in copies or exports.</p>
+<p class="pic"><img src="img/p39-4.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>Mark stereocentres drawn without a wedge or hash</b> (off by default, since racemic and unspecified centres are often drawn that way on purpose). The other structure checks show only on screen and are listed in the Analysis tab (see Structure checks in chapter 3). <b>Warnings on the sheet</b> has a box for each kind of warning, also for the dashed frame of a label that is not understood and for a charge that belongs to no atom: untick a kind to stop marking it.</p>
+<p class="pic"><img src="img/p40-1.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="pic gap-8"><img src="img/p40-2.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>New documents</b></p>
+<p class="gap-4">Set the open document the way you like it (drawing style, heteroatom colours, palette, paper, font, grid) and press <b>Use this document’s style</b>: every new document starts that way. <b>Apply to this document</b> gives the open one that look; <b>Reset</b> lets new documents take the look of the one that is open.</p>
+<p class="pic"><img src="img/p41-1.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Toolbar layout</b></p>
+<p class="gap-4">Drag a button to move it, or a group by its grip ⋮ (on the left, by its heading). <b>Reset button layout</b> puts every button back where it was.</p>
+<p class="pic"><img src="img/p41-2.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Settings file</b></p>
+<p class="gap-4"><b>Export hotkeys and settings</b> saves hotkeys, button layout, accent colour, your labels, palettes, symbols and templates in one file, to keep or to move to another computer or colleague; <b>Import…</b> reads it back.</p>
+<p class="pic"><img src="img/p41-3.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Reagent table</b></p>
+<p class="gap-4"><b>Covers</b>: the whole sheet (every compound on the sheet, for a document with one reaction) or the selected reaction (select the scheme, then make the table; structures drawn later are not added). See Reagent table in chapter 2.</p>
+<p class="pic"><img src="img/p41-4.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-10"><b>Hotkeys</b></p>
+<p class="gap-4">Every command, tool and template can have its own key: we do not know which keys you like, so everything can be set. Search by name, or press ⌨ and then the keys to find what they do. Click a key, then press the new one; Esc cancels, Backspace removes the key. <b>Reset hotkeys</b> brings back the original keys.</p>
+<p><b>Keys follow</b> (Settings → Hotkeys): on a keyboard other than the US one (French AZERTY, German QWERTZ…) a hotkey is the key with that letter printed on it, so Ctrl+Z is the key marked Z; choose “their place on a US keyboard” to have the keys where a US keyboard has them. Digits keep their place, and keyboards whose letters are not Latin (Russian, Greek…) always use the place.</p>
+<p class="pic"><img src="img/p42-1.png" alt="screenshot - Screenshot" style="width:201.75pt;"></p>
+<p class="gap-8"><b>A key used twice</b> is caught: a red dot on the Settings tab, a box at the top of the hotkeys list with each pair in red, and a warning. Only the same key in the same place counts — both among the commands, or both while pointing at an atom; a command key and an atom key may be the same.</p>
+<p class="pic"><img src="img/p42-2.png" alt="image108 - Screenshot" style="width:208.5pt;"></p>
+<p class="gap-8">At the end of the tab are two lists that cannot be changed: the <b>fixed keys</b> (Esc, Delete, the arrow keys that walk the hotspot or nudge the selection, Alt+← → to turn it by 15°, Ctrl+C / Ctrl+V…) and what the <b>mouse</b> does (a ring or template on a bond fuses it, Ctrl+drag copies, Shift+drag moves along one axis, the round handle rotates…).</p>
+<h2>Info</h2>
+<p>The coordinates and angles of the selection, the switches of the API (chapter 6) and the folders that AI assistants may use, the version of Reactio Draw with a link to what is new in it, and Check for updates: it asks GitHub for the newest release only when you press it (the program never looks by itself). In the apps for Windows, Mac and Linux, when a newer version is out, it asks whether to download and install it; on <b>Update</b> it downloads it, checks it against the SHA-256 GitHub gives for it, puts it in place and starts again (unsaved documents are asked about first; the Mac app builds the new version, which takes about a minute and needs Apple's Command Line Tools). Then the credits: the components the program uses and their licences.</p>
+<h1 id="ch5">5. Drawing fast from the keyboard</h1>
+<ul>
+  <li class="gap-8"><b>Space</b> switches to Selection and selects the molecule you edited last.</li>
+  <li><b>Ctrl+→</b> with a structure selected draws a reaction: an arrow and a copy of the structure as the product — only the changes are left to draw.</li>
+</ul>
+<p class="pic gap-3"><img src="img/p42-3.png" alt="image109 - Screenshot" style="width:244.5pt;"></p>
+<ul>
+  <li class="gap-8"><b>The hotspot.</b> The atom or bond under the pointer lights up and stays the hotspot (green) when the pointer moves away. The arrow keys move it along the structure (atom → bond → atom); Shift+arrow goes to the last atom that way, along the chain or straight across a ring, Alt+Shift+arrow to the next structure. Enter opens the label of the hotspot atom for typing.</li>
+  <li><b>Keys over an atom</b> add groups (the hotspot moves on to the new group) or change the atom (CH3 → OH…); on a middle carbon they add C=O, two methyls or a spiro ring. <b>Keys over a bond</b> fuse a ring or change the bond (double, wedge…). All of them are in the file Reactio Draw - Hotkeys.reactio, a one-page chart with each key drawn as a keycap beside what it draws (File → Save as turns it into CDXML for other editors).</li>
+</ul>
+<p class="pic"><img src="img/p43-1.jpg" alt="screenshot - Screenshot" style="width:374.25pt;"></p>
+<ul>
+  <li>With two atoms selected, <b>Ctrl+Shift+L</b> bonds them and cleans up the structure.</li>
+  <li><b>,</b> and <b>.</b> take one hydrogen off or add one.</li>
+  <li><b>Ctrl+K</b> (⌘K on a Mac) finds a command: type a few letters of any command of the Hotkeys list or any button of the toolbars and the panel, and Enter runs it (a test).</li>
+</ul>
+<h1 id="ch6" class="new-page">6. Working with the API</h1>
+<p class="gap-8">Reactio Draw can be driven by commands: draw a structure from a SMILES or a name, read the structures back with their formula, masses, SMILES, InChI and NMR shifts, fill the reagent table, export the drawing. The same commands work in three ways:</p>
+<table class="grid">
+  <colgroup><col style="width:100pt"><col style="width:190pt"><col style="width:161.3pt"></colgroup>
+  <thead>
+    <tr><th>Way</th><th>Who uses it</th><th>Where</th></tr>
+  </thead>
+  <tr><td><b>Local API</b></td><td>scripts on your computer (Python, R, curl, an ELN tool)</td><td>Mac, Windows and Linux apps, with the AI assistants add-on; HTTP on 127.0.0.1</td></tr>
+  <tr><td><b>Page API</b></td><td>code running in the page itself (the browser console, a userscript)</td><td>every version: <code>ReactioAPI.run(op, args)</code></td></tr>
+  <tr><td><b>Embedding</b></td><td>a web site that shows the editor in an iframe</td><td>web version with ?embed; postMessage</td></tr>
+  <tr><td><b>Command line</b></td><td>you or a script in a terminal, for files: pictures, conversion, checks</td><td>Mac, Windows and Linux apps: <code>reactio</code>; no window opens</td></tr>
+</table>
+<p class="gap-4">Every command has a name (<code>op</code>) and arguments (<code>args</code>, an object). The answer is a result object, or an error with a message. SMILES in answers are canonical and carry the drawn stereochemistry (@/@@ from wedges and hashes, / and \ for E/Z).</p>
+<h2>6.1 Local API (desktop apps)</h2>
+<ul>
+  <li><b>Turn it on</b>: install the add-on “Reactio Draw — AI assistants” (see Installation), then Info tab → <b>Local API</b>. Without the add-on the switch is not there. It is off until you turn it on; the choice is remembered; turn it off and nothing listens. <b>MCP</b> in the same place lets AI assistants on this computer use it through reactio-mcp (MCP.txt in the add-on says how to connect each assistant).</li>
+  <li><b>Where it listens</b>: http://127.0.0.1:&lt;port&gt;/api — on this computer only, never from the network.</li>
+  <li><b>Port and token</b> are in api.json, which exists while the app runs:
+    <ul class="dash">
+      <li>Windows: <code>%APPDATA%\ReactioDraw\api.json</code></li>
+      <li>Mac: <code>~/Library/Application Support/ReactioDraw/api.json</code></li>
+      <li>Linux: <code>~/.config/ReactioDraw/api.json</code></li>
+      <li>It contains <code>{"url": "http://127.0.0.1:47615/api", "token": "…", "port": 47615}</code>; the token changes at every start.</li>
+    </ul></li>
+  <li><b>Request</b>: <code>POST &lt;url&gt;</code> with the header <code>X-Reactio-Token: &lt;token&gt;</code> and a JSON body <code>{"op": "…", "args": {…}}</code>. <b>Answer</b>: <code>{"ok": true, "result": …}</code> or <code>{"ok": false, "error": "…"}</code>.</li>
+  <li><b>Safety</b>: requests without the right token are refused, and so is anything a web page sends (requests with an Origin header) — a site you visit cannot drive the app. The address must be 127.0.0.1 or localhost with the port from api.json.</li>
+  <li><b>Folders</b>: AI assistants (MCP) read and write files only in the folders listed in the Info tab under “Folders for AI assistants”, and only drawings, pictures and their data — never hidden files, Reactio Draw’s own settings, or the Library of the Mac and the AppData of Windows. The list is empty until you add a folder with <b>Add a folder…</b>; only you can change it, there in the app — nothing that comes through the API or MCP can. The command line (6.4) is yours and is not limited by it.</li>
+</ul>
+<h3>Python (no extra packages)</h3>
+<pre class="gap-4">import json, os, pathlib, urllib.request
+ 
+p = pathlib.Path(os.environ["APPDATA"]) / "ReactioDraw" / "api.json"              # Windows
+# p = pathlib.Path.home() / "Library/Application Support/ReactioDraw/api.json"   # Mac
+# p = pathlib.Path.home() / ".config/ReactioDraw/api.json"                         # Linux
+info = json.loads(p.read_text())
+ 
+def rd(op, **args):
+    req = urllib.request.Request(info["url"], json.dumps({"op": op, "args": args}).encode(),
+                                 {"X-Reactio-Token": info["token"], "Content-Type": "application/json"})
+    answer = json.load(urllib.request.urlopen(req))
+    if not answer["ok"]:
+        raise RuntimeError(answer["error"])
+    return answer["result"]
+ 
+print(rd("calc", smiles="CC(=O)Oc1ccccc1C(=O)O"))     # aspirin: C9H8O4, 180.159 …
+rd("addName", name="(2S)-2-aminopropanoic acid")      # draws L-alanine
+print(rd("inchi", index=0))                            # InChI and InChIKey
+print(rd("nmr", nucleus="13C", index=0))               # predicted 13C shifts
+open("drawing.cdxml", "w").write(rd("export", format="cdxml")["cdxml"])</pre>
+<h3>curl</h3>
+<pre class="gap-4">curl -s -X POST http://127.0.0.1:47615/api \
+     -H "X-Reactio-Token: &lt;token from api.json&gt;" -H "Content-Type: application/json" \
+     -d '{"op": "addSmiles", "args": {"smiles": "c1ccccc1O"}}'</pre>
+<h3>R</h3>
+<pre class="gap-4">library(httr); library(jsonlite)
+info &lt;- fromJSON(file.path(Sys.getenv("APPDATA"), "ReactioDraw", "api.json"))
+rd &lt;- function(op, args = list()) {
+  r &lt;- POST(info$url, add_headers("X-Reactio-Token" = info$token),
+            body = list(op = op, args = args), encode = "json")
+  content(r)$result
+}
+rd("list")</pre>
+<h2>6.2 Page API</h2>
+<p>In every version — the apps, the downloaded page and the web site — the page has <code>window.ReactioAPI</code>. Open the browser’s developer console (F12) on the Reactio Draw page, or run code in the page, and call:</p>
+<pre>await ReactioAPI.run("addSmiles", {smiles: "CCO"})
+await ReactioAPI.run("list")
+ReactioAPI.ops()            // the names of all commands</pre>
+<p class="gap-8">Commands that take time (names, NMR, InChI) return a Promise, so use await.</p>
+<h2>6.3 Embedding in a web page</h2>
+<p>A site — an electronic lab notebook, a course page, a database search form — can show the editor and talk to it:</p>
+<pre>&lt;iframe id="rd" src="https://paivel.github.io/reactio-draw/web/index.html?embed&amp;origin=https://my-site.org"
+        style="width:100%;height:640px;border:0"&gt;&lt;/iframe&gt;</pre>
+<ul>
+  <li class="gap-8"><code>?embed</code> shows the editor without its title bar and tabs, always starting with a blank sheet; the site never sees the drawings the visitor saved elsewhere.</li>
+  <li><code>origin=</code> names the sites allowed to send commands (several, separated by commas). Without it the editor answers only the page that embeds it.</li>
+  <li>Send <code>{reactio: 1, id, op, args}</code> with postMessage; the answer comes back as <code>{reactio: 1, id, ok, result}</code> or <code>{reactio: 1, id, ok: false, error}</code>.</li>
+  <li>The editor also sends <code>{reactio: 1, event: "ready", ops: […]}</code> when it has loaded, <code>{reactio: 1, event: "change"}</code> each time the drawing changes and <code>{reactio: 1, event: "selection"}</code> each time the selection changes.</li>
+  <li><code>?embed&amp;readonly</code> only shows the drawing: toolbars and panels are hidden, the visitor can move, zoom and copy it but not change it (the command <code>readOnly</code> switches this on and off).</li>
+</ul>
+<pre class="gap-3">const frame = document.getElementById('rd');
+let next = 0; const waiting = {};
+addEventListener('message', e =&gt; {
+  if (e.source !== frame.contentWindow || !e.data || e.data.reactio !== 1) return;
+  const d = e.data;
+  if (d.id &amp;&amp; waiting[d.id]) { waiting[d.id](d); delete waiting[d.id]; }
+});
+function rd(op, args) {
+  return new Promise((resolve, reject) =&gt; {
+    const id = ++next;
+    waiting[id] = d =&gt; d.ok ? resolve(d.result) : reject(new Error(d.error));
+    frame.contentWindow.postMessage({reactio: 1, id, op, args}, 'https://paivel.github.io');
+  });
+}
+// show a structure, let the user edit it, read it back as a molfile
+await rd('set', {text: 'CC(=O)Oc1ccccc1C(=O)O'});
+const molfile = (await rd('export', {format: 'mol'})).mol;</pre>
+<p class="gap-8">You can also host the editor yourself: copy the web/ folder (the page and its NMR tables file) to your server and point the iframe at that copy. The details are in EMBEDDING.md with the source code.</p>
+<h2>6.4 Command line</h2>
+<p><b>reactio</b> runs Reactio Draw without a window: it reads the files you name, does the job and quits. The app must be installed, but it need not be open, and your open documents are not touched. Where it is: on Windows <b>reactio.exe</b> in the folder Files of the program; on Mac inside the app (the installer links it as reactio when it can, or prints the command that does it); on Linux <b>./reactio</b> in the program folder (install.sh links it into ~/.local/bin). The input is a file (.reactio, .mol, .sdf, .rxn, .smi, .cdxml, .cdx, .json, .docx) or a SMILES in quotes.</p>
+<table class="grid flush-below">
+  <colgroup><col style="width:150pt"><col style="width:301.3pt"></colgroup>
+  <thead>
+    <tr><th>Command</th><th>What it does</th></tr>
+  </thead>
+  <tr><td class="code"><code>render &lt;input…&gt; -o out.png</code></td><td>a picture (.svg, .png, .eps, .tiff); <code>--scale</code> for PNG size, <code>--dpi</code> for TIFF, <code>--style ACS</code> and the other drawing styles</td></tr>
+  <tr><td class="code"><code>convert &lt;input…&gt; -o out.cdx</code></td><td>another format (.reactio, .mol, .sdf, .rxn, .smi, .cdxml, .cdx, .json or a picture); without -o, text formats go to the screen: <code>--format smi</code>. A Word file as input gives all its drawings, one under another</td></tr>
+  <tr><td class="code"><code>word-clean paper.docx [-o out.docx]</code></td><td>the Word file with plain vector pictures, without Reactio Draw data</td></tr>
+  <tr><td><code>calc</code>, <code>inchi</code>, <code>nmr [--nucleus 1H]</code>, <code>name</code></td><td>properties, InChI, predicted shifts or the IUPAC name of every structure in the input</td></tr>
+  <tr><td class="code"><code>check &lt;input…&gt;</code></td><td>valence and drawing problems; exit code 3 when there are errors or warnings</td></tr>
+  <tr><td class="code"><code>smiles "name"</code></td><td>SMILES from a name</td></tr>
+  <tr><td class="code"><code>op &lt;command&gt; '{json}' [-i input]</code></td><td>any command of 6.5</td></tr>
+</table>
+<pre class="gap-0">reactio render scheme.cdxml -o scheme.png --scale 4
+reactio render *.mol -o pictures/ --format svg
+reactio convert reaction.cdx -o reaction.rxn
+reactio convert paper.docx -o paper.cdxml
+reactio calc compounds.sdf --json &gt; properties.json
+reactio check scheme.cdxml</pre>
+<p class="gap-8">With several inputs, -o names a folder: one file per input. Only the file or folder after -o is written; answers go to the screen as text, or as JSON with <code>--json</code>. <code>reactio --help</code> and <b>Command line.txt</b> list every option; <code>reactio --version</code> gives the version.</p>
+<h2>6.5 Commands</h2>
+<table class="grid">
+  <colgroup><col style="width:94.95pt"><col style="width:185pt"><col style="width:171.35pt"></colgroup>
+  <thead>
+    <tr><th>Command</th><th>Arguments</th><th>Result</th></tr>
+  </thead>
+  <tr><td class="code"><code>help</code></td><td>—</td><td>the names of all commands</td></tr>
+  <tr><td class="code"><code>version</code></td><td>—</td><td>the name and version of Reactio Draw</td></tr>
+  <tr><td class="code"><code>list</code></td><td>—</td><td>every structure on the sheet: index, canonical SMILES, formula, MW, exact mass, role</td></tr>
+  <tr><td class="code"><code>properties</code></td><td class="code"><code>{index}</code></td><td>one structure in detail: formula, masses, m/z, elemental analysis, isotope pattern, SMILES</td></tr>
+  <tr><td class="code"><code>calc</code></td><td class="code"><code>{smiles}</code></td><td>formula, charge, MW, exact mass, [M+H]⁺ — nothing is drawn</td></tr>
+  <tr><td class="code"><code>inchi</code></td><td><code>{index}</code> or <code>{smiles}</code></td><td>InChI and InChIKey</td></tr>
+  <tr><td class="code"><code>nmr</code></td><td><code>{nucleus: "1H"|"13C"|"19F"|"31P", index}</code> or <code>{nucleus, smiles}</code></td><td>predicted shifts with typical errors</td></tr>
+  <tr><td class="code"><code>name</code></td><td><code>{index}</code> or <code>{smiles}</code></td><td>IUPAC name; checkedByOpsin tells if it reads back as the same structure (apps only)</td></tr>
+  <tr><td class="code"><code>smilesFromName</code></td><td class="code"><code>{name}</code></td><td>SMILES from a common or systematic name (systematic: apps only)</td></tr>
+  <tr><td class="code"><code>addSmiles</code></td><td class="code"><code>{smiles, x, y}</code></td><td>draws the structure; @/@@ become wedges</td></tr>
+  <tr><td class="code"><code>addName</code></td><td class="code"><code>{name, x, y}</code></td><td>draws the structure for a name</td></tr>
+  <tr><td class="code"><code>addReaction</code></td><td><code>{smiles: "A.B&gt;&gt;C"}</code> or <code>{reactants: […], products: […], above: […]}</code></td><td>draws a reaction with its arrow and conditions</td></tr>
+  <tr><td class="code"><code>addText</code></td><td class="code"><code>{text, x, y, size}</code></td><td>a caption on the sheet</td></tr>
+  <tr><td class="code"><code>addChart</code></td><td class="code"><code>{slices: [{label, value, color}], x, y, size, legend, hole}</code></td><td>a product-ratio chart</td></tr>
+  <tr><td class="code"><code>addRadar</code></td><td class="code"><code>{axes: [{label, value}], x, y, size, min, max, step, shape, zones}</code></td><td>a sensitivity screen</td></tr>
+  <tr><td class="code"><code>import</code></td><td class="code"><code>{format: "smiles"|"mol"|"rxn"|"sdf"|"cdxml"|"cif", text}</code></td><td>adds the structures of the text</td></tr>
+  <tr><td class="code"><code>export</code></td><td class="code"><code>{format: "smiles"|"mol"|"sdf"|"rxn"|"cdxml"|"svg"|"json"}</code></td><td>the drawing in that format</td></tr>
+  <tr><td class="code"><code>picture</code></td><td class="code"><code>{scale}</code></td><td>the drawing as a PNG picture (base64); scale 1 = screen size</td></tr>
+  <tr><td class="code"><code>set</code></td><td class="code"><code>{text, format}</code></td><td>replaces the whole drawing; the format (smiles, mol, sdf, rxn, cdxml, json) is found from the text when left out</td></tr>
+  <tr><td class="code"><code>image</code></td><td class="code"><code>{text, format, output: "svg"|"png", scale}</code></td><td>a picture of any structure or reaction, without touching the sheet</td></tr>
+  <tr><td class="code"><code>selection</code></td><td>—</td><td>what is selected: structure indices, counts, SMILES</td></tr>
+  <tr><td class="code"><code>select</code></td><td><code>{index}</code>, <code>{indices}</code>, <code>{all: true}</code> or —</td><td>selects structures, everything, or nothing</td></tr>
+  <tr><td class="code"><code>atoms</code></td><td class="code"><code>{index}</code></td><td>the atoms of a structure, numbered from 1</td></tr>
+  <tr><td class="code"><code>highlight</code></td><td><code>{index, atoms, color}</code> or <code>{index, clear: true}</code></td><td>colours atoms and the bonds between them (the whole structure without atoms)</td></tr>
+  <tr><td class="code"><code>check</code></td><td>—</td><td>valence errors, unreadable labels and structure checks per structure, each with a level (<code>err</code>, <code>warn</code>, <code>hint</code>)</td></tr>
+  <tr><td><code>saved</code>, <code>markSaved</code></td><td>—</td><td>whether there are unsaved changes; mark the drawing as saved</td></tr>
+  <tr><td class="code"><code>zoom</code></td><td><code>{value}</code> (1 = 100 %) or <code>{fit: true}</code></td><td>zoom, or fit the drawing in the window</td></tr>
+  <tr><td class="code"><code>readOnly</code></td><td class="code"><code>{on}</code></td><td>view only: toolbars and panels hidden, nothing can be changed</td></tr>
+  <tr><td class="code"><code>scheme</code></td><td>—</td><td>the reaction: reactants, products, reaction SMILES</td></tr>
+  <tr><td class="code"><code>table</code></td><td>—</td><td>the reagent table: equivalents, amounts, masses, volumes, yield</td></tr>
+  <tr><td class="code"><code>setAmount</code></td><td class="code"><code>{formula|name|id, field, value, limiting}</code></td><td>fills a cell: field = mass, volume, moles, equivalents, measured, purity, density or molarity</td></tr>
+  <tr><td class="code"><code>setRole</code></td><td class="code"><code>{formula|name|id, kind}</code></td><td>the role of a column: reactant, catalyst, solvent or product</td></tr>
+  <tr><td class="code"><code>setStyle</code></td><td class="code"><code>{style, theme}</code></td><td>drawing style and colour palette by their names in the program: style ACS, Large, Nature, RSC, Angewandte, Synthesis or Custom; theme Reactio colors, Publication, Pastel…</td></tr>
+  <tr><td class="code"><code>prefixStyle</code></td><td class="code"><code>{mode: "plain"|"italic"|"sup"}</code></td><td>t, i, s, n of tBu, iPr…</td></tr>
+  <tr><td class="code"><code>clean</code></td><td class="code"><code>{what: "reaction"}, {flat: true} or —</code></td><td>Clean Up Reaction, Clean Up 2D, or Clean Up Structure</td></tr>
+  <tr><td class="code"><code>delete</code></td><td class="code"><code>{index}</code></td><td>removes a structure</td></tr>
+  <tr><td><code>undo</code>, <code>redo</code>, <code>clear</code></td><td>—</td><td>editing</td></tr>
+</table>
+<h2>6.6 Good to know</h2>
+<ul>
+  <li>Structures are numbered from 0 in reading order, as <code>list</code> gives them.</li>
+  <li>Names need the apps: OPSIN (needs Java) reads names, openclatura (needs Python with openclatura) makes them. In the web version these commands answer with an error; the ~600 built-in names and abbreviations work everywhere.</li>
+  <li>In the web version, <code>nmr</code> asks the visitor once before downloading the tables (2.2 MB).</li>
+  <li>Every command that changes the drawing or the reagent table can be undone with Ctrl+Z, like a change made by hand.</li>
+</ul>
+<h1 id="ch7" class="new-page">7. Reactio Draw tab in Word</h1>
+<p class="gap-8">The Windows and Mac apps add a Reactio Draw tab to Word, as reference managers do. Its buttons work on the open document after saving it (a .docx on this computer):</p>
+<p><img src="img/btn-w_rdPlain.png" alt="w_rdPlain - Button: w_rdPlain" style="width:28.5pt;">&nbsp; <b>Plain pictures</b>: makes the copy with plain vector pictures next to the document and opens it.</p>
+<p><img src="img/btn-w_rdCdxml.png" alt="w_rdCdxml - Button: w_rdCdxml" style="width:28.5pt;">&nbsp; <b>Export to CDXML</b>: saves all structures of the document in one CDXML file next to it, one under another.</p>
+<p><img src="img/btn-w_rdOpen.png" alt="w_rdOpen - Button: w_rdOpen" style="width:28.5pt;">&nbsp; <b>Open in Reactio Draw</b>: opens all structures of the document on one sheet in Reactio Draw.</p>
+<p>The Drawing group of the tab works on one picture:</p>
+<p><img src="img/btn-w_rdEdit.png" alt="w_rdEdit - Button: w_rdEdit" style="width:28.5pt;">&nbsp; <b>Edit drawing</b>: click a Reactio Draw picture once, then press it: the drawing opens in Reactio Draw. On a Mac, Save there (Cmd+S) puts the new picture back in Word, in the same place and at the same scale. A double-click on the picture does the same; if Word does not respond to the double-click, use the Edit drawing button. To give it keys: Tools → Customize Keyboard → Categories: Macros → ReactioDrawEdit. On Windows, double-click the object instead.</p>
+<p><img src="img/btn-w_rdUpdate.png" alt="w_rdUpdate - Button: w_rdUpdate" style="width:28.5pt;">&nbsp; <b>Update</b>: puts back drawings saved in Reactio Draw if Word did not take them by itself (Mac). The first time, the Mac asks whether Reactio Draw may control Word: allow it.</p>
+<p><img src="img/btn-w_rdMark.png" alt="w_rdMark - Button: w_rdMark" style="width:28.5pt;">&nbsp; <b>Mark drawings</b>: a small blue mark “⌬ Reactio” after every picture with Reactio Draw data. The mark is hidden text: the button turns on Word’s display of hidden text, so it shows on screen, and it is never printed. The button stays pressed while the marks are on; press it again to take them away. Plain pictures removes them too.</p>
+<p>A drawing put into Word on Windows is a Word object, and one put in on a Mac is a picture: on the other system Edit drawing and the double-click do not open it. There, copy it in Word and paste it into Reactio Draw, or press Open in Reactio Draw to get all structures of the document on one sheet.</p>
+<p>A Reactio Draw drawing wider than the text between the page margins, pasted or grown after editing, is scaled down to fit within a few seconds, keeping its proportions (Windows and Mac).</p>
+<p><b>Compound numbers in a Word file.</b> Write a mark where a number goes, in the text and under the structures in Reactio Draw drawings; the same key is the same number everywhere. <b>[[aldehyde]]</b> gives 1, 2, 3…; <b>[[aldehyde.OMe]]</b> or <b>[[aldehyde.OMe.letter]]</b> 1a, 1b…; <b>[[aldehyde.OMe.num]]</b> 1.1; <b>[[aldehyde.OMe.dash]]</b> 1-1. <b>[[A:catalyst]]</b> starts a series of its own, A, B, C… (<b>[[a:…]]</b> a, b, c; <b>[[I:…]]</b> I, II, III; <b>[[i:…]]</b> i, ii, iii), apart from 1, 2, 3. Keys: letters, digits, _ and -. A range is two marks with a dash: [[first]]–[[last]].</p>
+<p><b>Order:</b> the drawings first, in their order in the document, each read line by line; then the compounds that are only in the text. A mark in the text takes the number its compound got in a drawing. To set the order on a drawing by hand (round a catalytic cycle), press the button at the end of the Text group (Ctrl+Shift+O) and click the marks in turn.</p>
+<p><b>Style and first number:</b> the Style and From boxes and the Bold in text / Bold in drawings ticks on the Word tab, kept in the document; or lines <b>[[#format S{n}]]</b> and <b>[[#start 5]]</b> in the text (both together give S5, S6…; each its own mark). <b>Chapters:</b> <b>[[#format 2-{n}]]</b> at the start of chapter 2 numbers its new compounds 2-1, 2-2…, each chapter on its own; a compound met in an earlier chapter keeps its number. After numbering a setting line is hidden text: it does not print, leaves no empty line, and goes in the copies below; Show marks shows it again to read or change it (as does ¶, Ctrl+Shift+8, in Word).</p>
+<p><b>Number compounds</b> on the tab numbers the open document in place; one Undo takes it back. The marks stay inside: press it again after any change. <b>Show marks</b> shows the marks instead of the numbers, to see which key is which. <b>Remove marks</b> makes a copy with the numbers as plain text and no marks; <b>Final copy</b> the same with plain vector pictures too, the copy to send. File → Word files → How to write the [[key]] marks shows all of this in the program.</p>
+<p>Without the tab: File → Word files → Number the compounds of a Word file, in Reactio Draw (also Show the marks, and Remove the marks for a copy with plain numbers), or reactio word-number on the command line (--strip: numbers as plain text, no marks; reactio word-clean --strip also makes the pictures plain).</p>
+<p>The tab is the template “Reactio Draw.dotm” in Word’s Startup folder. Word may ask once whether to enable its macros: the buttons work only with them on. On a Mac, Word starts other programs only through a script in its own scripts folder, so the installer puts a small helper script there too.</p>
+<p>Install: on Windows, ReactioDraw.exe adds the tab when it starts (restart Word once); on a Mac, Install Reactio Draw.command adds it when Word is on the Mac, and “Install Word tab.command” in the Reactio Draw folder adds it again (with --remove it takes it away).</p>
+<h1 id="ch8" class="new-page">8. Reactio Draw in Excel</h1>
+<p class="gap-8">Reactio Draw turns a column of SMILES in Excel into structure pictures and properties, on this computer: nothing is sent anywhere. One run handles the whole column: on a test computer 1000 SMILES took about 20 seconds for the properties and under a minute for the pictures.</p>
+<h2>8.1 Setting up</h2>
+<ul>
+  <li><b>Mac</b>: run <b>Install Reactio Draw.command</b>, then <b>Install Excel tab.command</b> from the Reactio Draw folder, and restart Excel. Excel starts other programs only through a script in its own scripts folder, so the second installer puts a small helper script there (with --remove it takes it away).</li>
+  <li><b>Windows</b>: start ReactioDraw.exe once; it records where it is.</li>
+  <li>In Excel: Tools → Macro → Visual Basic Editor (Windows: Alt+F11), then File → Import File → <b>ReactioExcel.bas</b> (in the Reactio Draw folder). The macros work in that workbook; save it as .xlsm to keep them. To have them in every workbook, import the file into an empty workbook, save it as an <b>Excel Add-in (.xlam)</b> and tick it in Tools → Excel Add-ins → Browse.</li>
+  <li>Keep the data in an .xlsx or .xlsm workbook: a .csv or .tsv file keeps no pictures.</li>
+</ul>
+<h2>8.2 Pictures and properties of a column</h2>
+<p>Select the cells with SMILES (one column, without its header) and run a macro (Tools → Macro → Macros):</p>
+<ul>
+  <li><b>DrawStructures</b>: a picture of each structure, in its row. Excel 365 takes the picture into the cell itself, so it grows and shrinks with the cell and moves along when the rows are sorted or filtered; older Excel puts it over the cell. The row and the column grow to the size of the drawings.</li>
+  <li><b>CalculateProperties</b>: formula, Mol. Wt., exact mass, cLogP, TPSA, H-bond donors and acceptors, rotatable bonds and InChIKey.</li>
+</ul>
+<p class="gap-3">The headers in the row above the SMILES decide where everything goes:</p>
+<ul>
+  <li>a column headed <b>Structure</b> gets the pictures;</li>
+  <li>columns headed <b>MW</b>, <b>cLogP</b>, <b>TPSA</b>, <b>formula</b>, <b>InChIKey</b> and so on get only those properties. Case, spaces and dots do not matter (“Mol. Wt.” is “MW”), nor does the order of the columns. The name and the predicted NMR shifts come only when a header asks for them: <b>name</b>, <b>1H NMR</b>, <b>13C NMR</b>;</li>
+  <li>with no such headers, everything goes into the first free columns to the right and the headers are written above, so the next run fills the same columns again.</li>
+</ul>
+<p class="pic"><img src="img/p53-1.jpg" alt="A sheet with SMILES, structure pictures and properties" style="width:374.4pt;"></p>
+<p class="gap-8">Empty cells and text with spaces are skipped. A SMILES that cannot be read gets “(not read …)” instead of its values.</p>
+<h2>8.3 The REACTIO formula</h2>
+<p>For one property in any cell, without running a macro:</p>
+<pre>=REACTIO(B2, "MW")</pre>
+<p class="gap-8">The second argument is one of: <b>MW</b> (the default), <b>formula</b>, <b>exact mass</b>, <b>cLogP</b>, <b>TPSA</b>, <b>HBD</b>, <b>HBA</b>, <b>rotatable bonds</b>, <b>InChIKey</b>, <b>name</b>, <b>1H NMR</b>, <b>13C NMR</b>. NMR shifts are listed from the most downfield, as “7.17 (2H)” for ¹H and “129.7 (2C)” for ¹³C.</p>
+<ul>
+  <li>A new SMILES shows “...” for a moment: right after Excel calculates, all new SMILES of the workbook go to Reactio Draw in one run, and the values appear. A formula filled down a thousand rows makes one run, not a thousand.</li>
+  <li>The answers are kept while Excel is open, and the cells keep their values in the saved file. A SMILES that cannot be read gives #N/A, an unknown property #VALUE!.</li>
+  <li>The formula works in the workbook that holds the macros, or in every workbook when they are in an add-in; anywhere else Excel shows #NAME?.</li>
+  <li>The fx button (Insert Function) describes REACTIO and its arguments under the category Reactio Draw.</li>
+</ul>
+<p class="pic"><img src="img/p54-1.jpg" alt="REACTIO formulas: molecular weight, formula and predicted 1H NMR shifts" style="width:453.6pt;"></p>
+<h2>8.4 Notes</h2>
+<ul>
+  <li>Pictures are drawn in the ACS 1996 style, in black.</li>
+  <li>Predicted NMR shifts come from nmrshiftdb2 data (https://nmrshiftdb.nmr.uni-koeln.de, nmrshiftdb2 Database License). Names are made on this computer by openclatura, which needs Python with openclatura (see Installation).</li>
+  <li>If a message says Excel is not connected to Reactio Draw, run Install Excel tab.command again and restart Excel.</li>
+  <li>Without Excel, the same table comes from the command line: <code>reactio table smiles.tsv -o out --png --props --inchikey --name --nmr</code> (see Command line.txt).</li>
+</ul>
+</body>
+</html>
