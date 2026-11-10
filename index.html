@@ -75467,11 +75467,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         throw new Error(
           (f ? f.name : inp) + ': nothing could be read' + (errs.length ? ' (' + errs[0] + ')' : '')
         );
-      if (opt.style) ReactioAPI.run('setStyle', { style: opt.style });
+      if (opt.style) await ReactioAPI.run('setStyle', { style: opt.style });
     };
     if (opt.style)
       try {
-        ReactioAPI.run('setStyle', { style: opt.style });
+        await ReactioAPI.run('setStyle', { style: opt.style });
       } catch (e) {
         return fail('reactio: --style ' + opt.style + '? ' + e.message, 2);
       }
