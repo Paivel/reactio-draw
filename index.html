@@ -48370,83 +48370,92 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           ffOk = false;
           ffErr = String((err && err.message) || err).replace(/^[^:]*:\s*/, '');
         }
-      if (!best || (e != null && (best.e == null || e < best.e))) best = { e, c: c.getCompactCopy() };
-      if (prog) prog(n, maxConfs);
+      let better = false;
+      if (!best || (e != null && (best.e == null || e < best.e))) {
+        best = { e, c: c.getCompactCopy() };
+        better = true;
+      }
+      /* o.partial (in the worker): the best shape so far goes with the progress, so the page has it if the search is
+         stopped at its time limit */
+      if (prog) prog(n, maxConfs, o.partial && better ? bestShape() : undefined);
       if (!ffOk && best) break;
     }
     if (!best) throw new Error('no 3D shape could be built');
-    const c = best.c,
-      atoms = [];
-    let q = 0,
-      unp = 0,
-      elec = 0;
-    for (let i = 0; i < c.getAllAtoms(); i++) {
-      const z = c.getAtomicNo(i);
-      atoms.push({ el: z === 1 ? 'H' : c.getAtomLabel(i), x: c.getAtomX(i), y: c.getAtomY(i), z: c.getAtomZ(i) });
-      if (c.getAtomCharge(i)) atoms[i].chg = c.getAtomCharge(i);
-      if (c.getAtomRadical(i)) atoms[i].rad = c.getAtomRadical(i) === M.cAtomRadicalStateD ? 2 : c.getAtomRadical(i) === M.cAtomRadicalStateT ? 3 : 1;
-      q += c.getAtomCharge(i);
-      elec += z;
-      const r = c.getAtomRadical(i);
-      unp += r === M.cAtomRadicalStateD ? 1 : r === M.cAtomRadicalStateT ? 2 : 0;
-    }
-    elec -= q;
-    const notes = [];
-    if ((elec - unp) % 2) {
-      unp++;
-      notes.push('odd number of electrons: taken as a doublet');
-    }
-    /* the 3D shape read back: its stereo comes from the coordinates */
-    const b = M.fromMolfile(c.toMolfile());
-    b.ensureHelperArrays(M.cHelperParities);
-    let ok = true;
-    const at = new Map();
-    for (let i = 0; i < b.getAllAtoms(); i++) {
-      const k = b.getAtomMapNo(i);
-      if (k) at.set(k - 1, i);
-    }
-    if (at.size !== nh) ok = null;
-    else {
-      for (let i = 0; i < aPar.length; i++)
-        if ((aPar[i] === 1 || aPar[i] === 2) && b.getAtomParity(at.get(i)) !== aPar[i]) ok = false;
-      for (let i = 0; i < bPar.length; i++) {
-        if (!(bPar[i] === 1 || bPar[i] === 2)) continue;
-        const k = b.getBond(at.get(m.getBondAtom(0, i)), at.get(m.getBondAtom(1, i)));
-        if (k < 0 || b.getBondParity(k) !== bPar[i]) ok = false;
+    return bestShape();
+    function bestShape() {
+      const c = best.c,
+        atoms = [];
+      let q = 0,
+        unp = 0,
+        elec = 0;
+      for (let i = 0; i < c.getAllAtoms(); i++) {
+        const z = c.getAtomicNo(i);
+        atoms.push({ el: z === 1 ? 'H' : c.getAtomLabel(i), x: c.getAtomX(i), y: c.getAtomY(i), z: c.getAtomZ(i) });
+        if (c.getAtomCharge(i)) atoms[i].chg = c.getAtomCharge(i);
+        if (c.getAtomRadical(i)) atoms[i].rad = c.getAtomRadical(i) === M.cAtomRadicalStateD ? 2 : c.getAtomRadical(i) === M.cAtomRadicalStateT ? 3 : 1;
+        q += c.getAtomCharge(i);
+        elec += z;
+        const r = c.getAtomRadical(i);
+        unp += r === M.cAtomRadicalStateD ? 1 : r === M.cAtomRadicalStateT ? 2 : 0;
       }
-    }
-    if (unspec) notes.push(unspec + ' stereo element' + (unspec > 1 ? 's' : '') + ' not drawn: one was picked');
-    if (!ffOk) {
-      const el = (ffErr.match(/\(([A-Z][a-z]?)\)\s*$/) || [])[1];
-      notes.push(
-        'not minimised: MMFF94 has no parameters for ' +
-          (el || 'this structure') +
-          ', so the shape is a rough guess; refine it with xtb or DFT'
-      );
-    }
-    /* atoms closer than 0.7 Å: the shape is broken */
-    let close = 1e9;
-    for (let i = 0; i < atoms.length; i++)
-      for (let j = i + 1; j < atoms.length; j++) {
-        const A = atoms[i],
-          B = atoms[j];
-        close = Math.min(close, Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z));
+      elec -= q;
+      const notes = [];
+      if ((elec - unp) % 2) {
+        unp++;
+        notes.push('odd number of electrons: taken as a doublet');
       }
-    if (close < 0.7) notes.push('atoms closer than 0.7 Å');
-    /* the bonds, for an SDF with the 3D shape (Molfile atom numbers, from 1) */
-    const bonds = [];
-    for (let i = 0; i < c.getAllBonds(); i++) bonds.push([c.getBondAtom(0, i) + 1, c.getBondAtom(1, i) + 1, c.getBondOrder(i) || 1]);
-    return {
-      atoms,
-      bonds,
-      charge: q,
-      multiplicity: unp + 1,
-      energy: best.e,
-      forceField: ffOk ? 'MMFF94s+' : null,
-      conformers: n,
-      stereoKept: ok,
-      notes
-    };
+      /* the 3D shape read back: its stereo comes from the coordinates */
+      const b = M.fromMolfile(c.toMolfile());
+      b.ensureHelperArrays(M.cHelperParities);
+      let ok = true;
+      const at = new Map();
+      for (let i = 0; i < b.getAllAtoms(); i++) {
+        const k = b.getAtomMapNo(i);
+        if (k) at.set(k - 1, i);
+      }
+      if (at.size !== nh) ok = null;
+      else {
+        for (let i = 0; i < aPar.length; i++)
+          if ((aPar[i] === 1 || aPar[i] === 2) && b.getAtomParity(at.get(i)) !== aPar[i]) ok = false;
+        for (let i = 0; i < bPar.length; i++) {
+          if (!(bPar[i] === 1 || bPar[i] === 2)) continue;
+          const k = b.getBond(at.get(m.getBondAtom(0, i)), at.get(m.getBondAtom(1, i)));
+          if (k < 0 || b.getBondParity(k) !== bPar[i]) ok = false;
+        }
+      }
+      if (unspec) notes.push(unspec + ' stereo element' + (unspec > 1 ? 's' : '') + ' not drawn: one was picked');
+      if (!ffOk) {
+        const el = (ffErr.match(/\(([A-Z][a-z]?)\)\s*$/) || [])[1];
+        notes.push(
+          'not minimised: MMFF94 has no parameters for ' +
+            (el || 'this structure') +
+            ', so the shape is a rough guess; refine it with xtb or DFT'
+        );
+      }
+      /* atoms closer than 0.7 Å: the shape is broken */
+      let close = 1e9;
+      for (let i = 0; i < atoms.length; i++)
+        for (let j = i + 1; j < atoms.length; j++) {
+          const A = atoms[i],
+            B = atoms[j];
+          close = Math.min(close, Math.hypot(A.x - B.x, A.y - B.y, A.z - B.z));
+        }
+      if (close < 0.7) notes.push('atoms closer than 0.7 Å');
+      /* the bonds, for an SDF with the 3D shape (Molfile atom numbers, from 1) */
+      const bonds = [];
+      for (let i = 0; i < c.getAllBonds(); i++) bonds.push([c.getBondAtom(0, i) + 1, c.getBondAtom(1, i) + 1, c.getBondOrder(i) || 1]);
+      return {
+        atoms,
+        bonds,
+        charge: q,
+        multiplicity: unp + 1,
+        energy: best.e,
+        forceField: ffOk ? 'MMFF94s+' : null,
+        conformers: n,
+        stereoKept: ok,
+        notes
+      };
+    }
   }
   function xyzFrame(r, title) {
     const f = v => v.toFixed(6).padStart(14);
@@ -48592,24 +48601,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         ');\n' +
         xyz3D.toString() +
         '\n' +
-        'onmessage=e=>{const d=e.data;try{postMessage({id:d.id,ok:true,r:xyz3D(OCL,d.mb,d.o,(n,of)=>postMessage({id:d.id,progress:n,of}))});}catch(err){postMessage({id:d.id,ok:false,error:String(err&&err.message||err)});}};';
+        'onmessage=e=>{const d=e.data;postMessage({id:d.id,started:true});try{postMessage({id:d.id,ok:true,r:xyz3D(OCL,d.mb,{...d.o,partial:true},(n,of,best)=>postMessage({id:d.id,progress:n,of,best}))});}catch(err){postMessage({id:d.id,ok:false,error:String(err&&err.message||err)});}};';
       const w = new Worker(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
       w.onmessage = e => {
         const d = e.data,
           p = xyzWait.get(d.id);
         if (!p) return;
+        if (d.started) {
+          if (p.started) p.started();
+          return;
+        }
         if (d.progress != null) {
+          if (d.best) p.best = d.best;
           if (p.prog) p.prog(d.progress, d.of);
           return;
         }
         xyzWait.delete(d.id);
+        clearTimeout(p.timer);
         if (d.ok) p.ok(d.r);
         else p.no(new Error(d.error));
       };
       w.onerror = e => {
         if (e.preventDefault) e.preventDefault();
         XYZW = false;
-        for (const p of xyzWait.values()) p.no(null);
+        for (const p of xyzWait.values()) {
+          clearTimeout(p.timer);
+          p.no(null);
+        }
         xyzWait.clear();
       };
       XYZW = w;
@@ -48626,9 +48644,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const id = ++xyzSeq;
       /* the worker died (no e): the job runs in the page instead, after the worker's error handler has returned, and
          rejects with its own message when that cannot run either (OpenChemLib did not start) */
-      xyzWait.set(id, { ok, prog, no: e => (e ? no(e) : Promise.resolve().then(inPage).then(ok, no)) });
+      const p = { ok, prog, no: e => (e ? no(e) : Promise.resolve().then(inPage).then(ok, no)) };
+      /* the time limit (o.maxMs) is checked between conformers, but one step of OpenChemLib (setting up a large ring,
+         minimising a long chain) can take far longer: once the job has run a while past its limit, the worker is
+         stopped and the best shape found so far is the answer (an error when there is none yet). A new worker starts
+         with the next job */
+      p.started = () => {
+        const lim = (o && o.maxMs) || 8000;
+        p.timer = setTimeout(() => xyzOverTime(w, id), lim + Math.max(2000, lim / 2));
+      };
+      xyzWait.set(id, p);
       w.postMessage({ id, mb, o });
     });
+  }
+  function xyzOverTime(w, id) {
+    if (XYZW !== w) return;
+    w.terminate();
+    XYZW = null;
+    for (const [k, p] of [...xyzWait]) {
+      xyzWait.delete(k);
+      clearTimeout(p.timer);
+      if (k !== id) p.no(new Error('stopped with another 3D job that went over its time limit'));
+      else if (p.best) {
+        const r = p.best;
+        r.notes = [...(r.notes || []), 'the search was stopped at its time limit after ' + r.conformers + ' conformer' + (r.conformers === 1 ? '' : 's')];
+        p.ok(r);
+      } else p.no(new Error('no 3D shape within the time limit: this structure needs more time (maxSeconds)'));
+    }
   }
   /* Cancel: the worker is stopped (a new one starts on the next export) */
   function xyzStop() {
