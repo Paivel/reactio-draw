@@ -13,6 +13,8 @@ by `postMessage`. These are the same commands as the desktop apps' local API (`L
 
 `?embed` gives the editor without its title bar and document tabs. It always starts with a blank sheet,
 and the embedding site never sees the drawings the visitor saved while using Reactio Draw directly.
+The same holds for the visitor's own labels and skeleton templates: embedded, the editor starts with none, and
+what `saveTemplate` keeps there lasts only until the page is closed.
 
 To make sure only your site can send commands, name it:
 `index.html?embed&origin=https://my-eln.example.org`. Several sites are separated by commas.

@@ -33849,12 +33849,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   };
 
   /* ===== your abbreviations (Labels tab) ===== */
+  /* embedded in another site (?embed) the library is an unsaved one: the site's commands (listTemplates,
+     saveTemplate, deleteTemplate) must not see or change the visitor's own labels and templates */
   let LIB = null;
   try {
-    LIB = JSON.parse(localStorage.getItem('rd-labels') || 'null');
+    if (!EMBED) LIB = JSON.parse(localStorage.getItem('rd-labels') || 'null');
   } catch (e) {}
   if (!LIB || !LIB.nicks) LIB = { nicks: {} };
   function saveLib() {
+    if (EMBED) return;
     try {
       localStorage.setItem('rd-labels', JSON.stringify(LIB));
     } catch (e) {
