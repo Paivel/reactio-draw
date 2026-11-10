@@ -3750,8 +3750,7 @@ function kdOf(st) {
             ? data
             : new Uint8Array(data);
       return call('save', { name, b64: b64(u) });
-    },
-    onOpenFile: () => {}
+    }
   };
   /* a link to a web site (Credits, what is new, the project page) opens in the computer's own browser: the app's window
      shows only the editor */
@@ -11701,142 +11700,6 @@ function kdOf(st) {
         }
       }
     return r;
-  }
-  /* a four-membered ring fused on one bond of a larger ring (the oxetane of a taxane) drawn as a square on that bond,
-     outside the larger ring; what else hangs on the two shared atoms (OAc) stays, or turns to the middle of the room left
-     when the square comes too close. Kept only if the molecule (its configuration) reads the same */
-  function squareFused4(f) {
-    const ids = new Set(f.map(a => a.id)),
-      rings = molRings(f).filter(r => r.every(a => ids.has(a.id)));
-    const r4 = rings.filter(r => r.length === 4);
-    if (!r4.length) return;
-    const before = fragSmilesS(f);
-    const keep = f.map(a => [a, a.x, a.y]);
-    let changed = false;
-    for (const R of r4) {
-      const inR = new Set(R.map(a => a.id));
-      /* the bond shared with exactly one other ring */
-      let shared = null,
-        big = null;
-      for (const Q of rings) {
-        if (Q === R || Q.length < 5) continue;
-        const common = Q.filter(a => inR.has(a.id));
-        if (common.length === 2) {
-          if (shared) {
-            shared = null;
-            break;
-          }
-          shared = common;
-          big = Q;
-        }
-      }
-      if (!shared) continue;
-      const [u, v] = shared,
-        others = R.filter(a => a !== u && a !== v);
-      /* the two other atoms: each on one of u, v, in no other ring */
-      const onU = others.find(a => neighbors(a).includes(u)),
-        onV = others.find(a => neighbors(a).includes(v) && a !== onU);
-      if (!onU || !onV || rings.some(Q => Q !== R && Q.some(a => a === onU || a === onV))) continue;
-      const len = Math.hypot(v.x - u.x, v.y - u.y) || L,
-        cx = big.reduce((t, a) => t + a.x, 0) / big.length,
-        cy = big.reduce((t, a) => t + a.y, 0) / big.length,
-        mx = (u.x + v.x) / 2,
-        my = (u.y + v.y) / 2;
-      let nx = -(v.y - u.y) / len,
-        ny = (v.x - u.x) / len;
-      if (nx * (mx - cx) + ny * (my - cy) < 0) ((nx = -nx), (ny = -ny));
-      /* what hangs on onU and onV (an H, a methyl) goes along */
-      const carry = (a, dx, dy) => {
-        const seen = new Set([a.id, u.id, v.id, onU.id, onV.id]),
-          st = [a];
-        a.x += dx;
-        a.y += dy;
-        while (st.length) {
-          const x = st.pop();
-          for (const n of neighbors(x))
-            if (!seen.has(n.id)) {
-              seen.add(n.id);
-              n.x += dx;
-              n.y += dy;
-              st.push(n);
-            }
-        }
-      };
-      carry(onU, u.x + nx * len - onU.x, u.y + ny * len - onU.y);
-      carry(onV, v.x + nx * len - onV.x, v.y + ny * len - onV.y);
-      /* the other groups on u and v: into the middle of the widest gap left */
-      for (const c of [u, v]) {
-        const ring = new Set([...R, ...big].map(a => a.id));
-        const subs = neighbors(c).filter(n => !ring.has(n.id));
-        if (subs.length !== 1) continue;
-        const s0 = subs[0],
-          angs = neighbors(c)
-            .filter(n => n !== s0)
-            .map(n => Math.atan2(n.y - c.y, n.x - c.x))
-            .sort((p, q) => p - q);
-        let best = -1,
-          dir = 0;
-        angs.forEach((p, i) => {
-          const q = i + 1 < angs.length ? angs[i + 1] : angs[0] + 2 * Math.PI;
-          if (q - p > best) ((best = q - p), (dir = (p + q) / 2));
-        });
-        const cur = Math.atan2(s0.y - c.y, s0.x - c.x),
-          gap = Math.min(...angs.map(t => Math.abs(Math.atan2(Math.sin(t - cur), Math.cos(t - cur)))));
-        /* left as it is unless the square came within 40° of it */
-        if (gap >= (40 * Math.PI) / 180) continue;
-        const seen = new Set([c.id]),
-          st = [s0],
-          br = [s0];
-        seen.add(s0.id);
-        while (st.length) {
-          const x = st.pop();
-          for (const n of neighbors(x))
-            if (!seen.has(n.id)) {
-              seen.add(n.id);
-              st.push(n);
-              br.push(n);
-            }
-        }
-        if (br.some(a => ring.has(a.id))) continue;
-        const P0 = br.map(a => [a.x, a.y]),
-          inBr = new Set(br.map(a => a.id)),
-          rest = f.filter(a => !inBr.has(a.id) && a !== c);
-        /* the turn, within the widest gap, that keeps the group furthest from the rest (labels count wider) */
-        const place = th => {
-          const d = th - cur,
-            co = Math.cos(d),
-            sn = Math.sin(d);
-          br.forEach((a, k) => {
-            const x = P0[k][0] - c.x,
-              y = P0[k][1] - c.y;
-            a.x = c.x + x * co - y * sn;
-            a.y = c.y + x * sn + y * co;
-          });
-        };
-        const clear = () => {
-          let m = Infinity;
-          for (const a of br)
-            for (const o of rest) {
-              const d = Math.hypot(a.x - o.x, a.y - o.y) - (labeled(a) ? L * 0.25 : 0) - (labeled(o) ? L * 0.25 : 0);
-              if (d < m) m = d;
-            }
-          return m;
-        };
-        let bt = cur,
-          bc = -Infinity;
-        for (let k = 1; k < 12; k++) {
-          const th = dir - best / 2 + (best * k) / 12;
-          place(th);
-          const cl = clear();
-          if (cl > bc + 0.5) ((bc = cl), (bt = th));
-        }
-        place(bt);
-      }
-      changed = true;
-    }
-    if (!changed) return;
-    SSMI.clear();
-    if (fragSmilesS(f) !== before) for (const [a, x, y] of keep) ((a.x = x), (a.y = y));
   }
   /* a wedge or hash on a ring bond at a centre that a wedge or hash outside the rings already shows (the oxetane CH2 of
      a taxane beside its OAc): the ring one is taken off when the molecule reads the same without it */
@@ -26364,116 +26227,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return null;
   }
   function runTool(id) {
-    const T = {
-      select: () => setTool('select'),
-      lasso: () => setTool('lasso'),
-      bond1: () => {
-        curBond = '1';
-        setTool('bond');
-      },
-      chain: () => setTool('chain'),
-      arrow: () => setTool('arrow'),
-      pen: () => setTool('pen'),
-      text: () => setTool('text'),
-      benzene: () => {
-        ringAnyOn = false;
-        ringN = 6;
-        ringArom = true;
-        setTool('ring');
-      },
-      cpd: () => {
-        ringAnyOn = false;
-        ringN = 5;
-        ringArom = true;
-        setTool('ring');
-      },
-      erase: () => setTool('erase'),
-      hand: () => setTool('hand'),
-      rot3d: () => setTool('rot3d'),
-      bond2: () => {
-        curBond = '2';
-        setTool('bond');
-      },
-      bond3: () => {
-        curBond = '3';
-        setTool('bond');
-      },
-      wedge: () => {
-        curBond = 'wedge';
-        setTool('bond');
-      },
-      hash: () => {
-        curBond = 'hash';
-        setTool('bond');
-      },
-      ring6: () => {
-        ringAnyOn = false;
-        ringN = 6;
-        ringArom = false;
-        setTool('ring');
-      },
-      ring5: () => {
-        ringAnyOn = false;
-        ringN = 5;
-        ringArom = false;
-        setTool('ring');
-      },
-      chgP: () => {
-        chgMode = '1';
-        setTool('chg');
-      },
-      chgM: () => {
-        chgMode = '-1';
-        setTool('chg');
-      },
-      rad: () => {
-        chgMode = 'rad';
-        setTool('chg');
-      },
-      clean: () => doClean(),
-      fit: () => fitAll(),
-      bondBold: () => {
-        curBond = 'bold';
-        setTool('bond');
-      },
-      bondDash: () => {
-        curBond = 'dash';
-        setTool('bond');
-      },
-      bondWavy: () => {
-        curBond = 'wavy';
-        setTool('bond');
-      },
-      bondHashPlain: () => {
-        curBond = 'hashplain';
-        setTool('bond');
-      },
-      ring3: () => {
-        ringAnyOn = false;
-        ringN = 3;
-        ringArom = false;
-        setTool('ring');
-      },
-      ring4: () => {
-        ringAnyOn = false;
-        ringN = 4;
-        ringArom = false;
-        setTool('ring');
-      },
-      ring7: () => {
-        ringAnyOn = false;
-        ringN = 7;
-        ringArom = false;
-        setTool('ring');
-      },
-      ring8: () => {
-        ringAnyOn = false;
-        ringN = 8;
-        ringArom = false;
-        setTool('ring');
-      },
-      ringN: () => askRingN()
-    };
     if (id.startsWith('tpl:')) return armTpl(id.slice(4));
     if (CMD[id]) return CMD[id]();
     if (id === 'act:tabNew') return newTab();
@@ -26498,7 +26251,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (b) b.click();
       return;
     }
-    (T[id] || (() => {}))();
+    /* any other id: nothing to do */
   }
   const ATOM_EL = {
     KeyC: 'C',
@@ -32666,15 +32419,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     pickElement(b.dataset.pel);
     $('ptpop').hidden = true;
   });
-  $('ptable').addEventListener('click', e => {
-    const b = e.target.closest('[data-pel]');
-    if (!b) return;
-    const el = b.dataset.pel;
-    $('elInfo').innerHTML =
-      `<dt>Element</dt><dd>${el}</dd><dt>Atomic weight</dt><dd>${AW[el]}</dd><dt>Monoisotopic</dt><dd>${MONO[el] !== undefined ? MONO[el] : '—'}</dd><dt>Default valence</dt><dd>${valenceOf(el, 0) !== undefined ? valenceOf(el, 0) : 'none (no implicit H)'}</dd>`;
-    pickElement(el);
-    syncTools();
-  });
   const CHARS = [
     '°',
     '±',
@@ -33383,8 +33127,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     S.manual.forEach(m => {
       if (!m.kind) m.kind = m.solv ? 'solvent' : 'reactant';
     });
-    const all = [...sch, ...S.manual],
-      K = k => all.filter(r => kindOf(r) === k);
     /* columns follow the drawing: left to right along the arrow, whatever the role; manual entries after them */
     const isP = r => kindOf(r) === 'product';
     rows = [
@@ -39069,13 +38811,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     /* a page shown inside another one without the right to open dialogs (a preview in a chat, some embeddings): the
        browser ignores print() without a word, so the drawing comes as a PDF to print instead */
-    const embedded = (() => {
-      try {
-        return window.top !== window.self;
-      } catch (e) {
-        return true;
-      }
-    })();
+    const embedded = window.top !== window.self;
     const asPdf = async why => {
       try {
         const body = await pdfOf(svgs),
@@ -40874,7 +40610,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     String((tex && tex.line) || '').trim() === figSrcLine(name) || (!(tex && tex.exists) && !(pdf && pdf.exists));
   /* the LaTeX figure of a drawing kept in a .reactio file: its .pdf and .tex, written next to that file */
   const siblingDir = t => t.file.path.slice(0, Math.max(t.file.path.lastIndexOf('/'), t.file.path.lastIndexOf('\\')) + 1);
-  const siblingStem = t => siblingDir(t) + texStem(t.file.name);
   /* the stem of the figure beside this drawing: an older figure of it keeps its name, so documents that include it go on working */
   async function besideStem(t) {
     const now = texStem(t.file.name),
@@ -43245,19 +42980,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       mol = saved;
     }
   }
-  async function pngSized(onlyTables) {
+  async function pngSized() {
     const saved = mol,
       ss = [[...sel], [...selArr], [...selTxt]];
     clearSel();
-    if (onlyTables) {
-      mol = Object.assign({}, saved, {
-        atoms: [],
-        bonds: [],
-        texts: [],
-        fills: [],
-        arrows: saved.arrows.filter(r => r.kind === 'tbl')
-      });
-    }
     let blob, s;
     try {
       s = svgOf(true);
@@ -43290,8 +43016,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return { png: new Uint8Array(await blob.arrayBuffer()), wPt: W / ptPx, hPt: H / ptPx };
   }
   async function docxOf(contentsVariant) {
-    const chem = mol.atoms.length || mol.texts.length || mol.arrows.length,
-      tbl = false;
+    const chem = mol.atoms.length || mol.texts.length || mol.arrows.length;
     const files = [],
       rels = [],
       parts = [];
@@ -43320,18 +43045,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       );
       parts.push(
         `<w:p><w:r><w:object w:dxaOrig="${Math.round(w * 20)}" w:dyaOrig="${Math.round(h * 20)}">${shapetype}<v:shape id="_x0000_i1025" type="#_x0000_t75" style="width:${w.toFixed(2)}pt;height:${h.toFixed(2)}pt" o:ole=""><v:imagedata r:id="${ri}" o:title=""/></v:shape><o:OLEObject Type="Embed" ProgID="ReactioDraw.Drawing.1" ShapeID="_x0000_i1025" DrawAspect="Content" ObjectID="_1000000001" r:id="${ro}"/></w:object></w:r></w:p>`
-      );
-    }
-    if (tbl) {
-      const pic = await pngSized(true),
-        [w, h] = fit(pic.wPt, pic.hPt),
-        ri = 'rId' + rid++;
-      files.push(['word/media/image2.png', pic.png]);
-      rels.push(
-        `<Relationship Id="${ri}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image2.png"/>`
-      );
-      parts.push(
-        `<w:p><w:r><w:pict><v:shape id="_x0000_i1026" type="#_x0000_t75" style="width:${w.toFixed(2)}pt;height:${h.toFixed(2)}pt"><v:imagedata r:id="${ri}" o:title=""/></v:shape></w:pict></w:r></w:p>`
       );
     }
     const ct =
@@ -50377,24 +50090,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     importText(f[0], f[1]);
   }
-  /* desktop app: files opened from Explorer / Finder, the command line or the File menu */
-  if (window.rdDesktop) {
-    window.rdDesktop.onOpenFile(f => {
-      /* a file opened from outside gets its own tab (whole Reactio Draw documents make one themselves) */
-      if (f.bytes && /\.docx$/i.test(f.name)) {
-        openExternal(f.name, new Uint8Array(f.bytes), '');
-        return;
-      }
-      const whole = f.text && (/\.(json|reactio)$/i.test(f.name) || CMTRX.test(f.text));
-      openInFileTab(f.name, whole, () => {
-        if (f.bytes && /\.cdx$/i.test(f.name)) importCdxBytes(new Uint8Array(f.bytes), f.name);
-        else if (f.bytes) openZip(new Uint8Array(f.bytes).buffer, f.name);
-        else importText(f.name, f.text);
-      });
-      fitOnOpen();
-    });
-    document.documentElement.classList.add('desktop');
-  }
+  /* desktop app */
+  if (window.rdDesktop) document.documentElement.classList.add('desktop');
   /* Reactio Draw.app / ReactioDraw.exe: a file opened from Finder or Explorer (double-click, Open With) */
   /* a drawing sent from Word on a Mac (Reactio Draw tab → Edit in Reactio Draw): the picture's alt text, with the drawing in it.
    The tab remembers which picture it came from; Save (Ctrl+S) sends the drawing back to that picture in Word */
@@ -51986,7 +51683,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* pair flags in one n*n table: 1 = bonded or 1-3 (no repulsion), 2 = 1-4 (soft repulsion) */
     const NF = new Uint8Array(n * n),
       BL = new Float64Array(n * n),
-      fl = (i, j) => NF[i * n + j],
       setF = (i, j, v) => {
         NF[i * n + j] = v;
         NF[j * n + i] = v;
@@ -58258,11 +57954,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     projSpin(X, best.w - projDihedral(X));
   }
-  /* the turn now away from eclipsed, measured the same way as d was */
-  function projDihedralSigned(X, d0) {
-    const d = projDihedral(X);
-    return d === null ? 0 : d;
-  }
   /* where a label's letters are: a group label as the sheet measures it; O, N, S with their H on the side it is written */
   function projLabBox(a) {
     const b = fragBox([a]);
@@ -59044,22 +58735,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return null;
   }
   function projTargets() {
-    let frs = fragments().filter(f => f.length > 1);
-    if (sel.size) frs = frs.filter(f => f.some(a => sel.has(a.id)));
-    else {
-      const H = hotNow(),
-        a = H && (H.atom || atomById(H.bond.a));
-      frs = a ? frs.filter(f => f.includes(a)) : frs.length === 1 ? frs : [];
-    }
-    return frs;
+    return fragments()
+      .filter(f => f.length > 1)
+      .filter(f => f.some(a => sel.has(a.id)));
   }
   function projAct(kind, shift, frs0, turnBy, front) {
     let frs = frs0 || projTargets();
     let ax = null;
-    if (!sel.size && !frs0) {
-      const H = hotNow();
-      if (H && H.bond && H.bond.order === 1) ax = H.bond;
-    }
     if (!frs.length) {
       toast('Select a structure (or point at one; for Newman, at the bond to look along)', true);
       return;
@@ -59570,20 +59252,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     const T0 = projDockTpl(PJ_DOCK[best.k]);
     if (!T0 || T0.cs.length !== best.k + 1) return null;
-    /* the circles drawn stay where they are: one circle, the new one on the side pointed at; two (cyclohexane), the
-       decalin turned in the sheet so two of its circles fall on them, the third on the side pointed at */
-    let a, b, A, B;
-    if (best.k === 1) {
-      A = best.cs[0];
-      a = p.x >= A.x ? 0 : 1;
-    } else {
-      const mid = (best.cs[0].x + best.cs[1].x) / 2,
-        [P, Q] = best.cs;
-      /* decalin: upper left, upper right, middle; cyclohexane-wide pairs: (upper left, middle), (middle, upper right) */
-      [a, b] = p.x >= mid ? [0, 2] : [2, 1];
-      [A, B] = [P, Q];
-    }
-    const th = b === undefined ? 0 : Math.atan2(B.y - A.y, B.x - A.x) - Math.atan2(T0.cs[b].y - T0.cs[a].y, T0.cs[b].x - T0.cs[a].x),
+    /* the circle drawn stays where it is, the new one on the side pointed at */
+    const A = best.cs[0],
+      a = p.x >= A.x ? 0 : 1,
+      th = 0,
       T = projDockTpl(PJ_DOCK[best.k], a, th);
     if (!T) return null;
     const dx = A.x - T.cs[a].x,
@@ -59682,7 +59354,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     projDeclutter(f);
     commit();
     if (undoSt.length > u0 + 1) undoSt.length = u0 + 1;
-    toast(D.k === 1 ? 'Cyclohexane in Newman projection' : 'trans-Decalin in Newman projection');
+    toast('Cyclohexane in Newman projection');
   }
   /* staggered or eclipsed blanks (Newman, sawhorse), chosen under the button and remembered */
   let PJCONF = 'st';
@@ -60260,11 +59932,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return p;
   }
   $('seBase').onchange = () => seFill(STYLE_PT[$('seBase').value]);
-  $('seUnit').onchange = () => {
-    const p = seRead();
-    $('seUnit').dataset.prev = $('seUnit').value;
-    if (p) seFill(p);
-  };
   let seUnitPrev = 'pt';
   $('seUnit').addEventListener('focus', () => {
     seUnitPrev = $('seUnit').value;
@@ -77010,10 +76677,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         .filter(Boolean)
         .join(', ');
     if (k === 'atm') return c.atm === 'custom' ? c.atmC || '' : ATM_L[c.atm] || '';
-    if (k === 'oth')
-      return [...COND_O.filter(([v]) => c.oth.includes(v)).map(([, l]) => l), c.othC || '']
-        .filter(Boolean)
-        .join(', ');
     return c[k] || '';
   }
   /* temperature presets in the list: they are ordinary typed temperatures (0 °C, −78 °C), shown by name in the list */
@@ -80462,9 +80125,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     distributeUnits,
     doGroup,
     tplsFromCdxml,
-    get tplMine() {
-      return tplMine;
-    },
     NICK,
     idOf,
     grpInfo,
