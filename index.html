@@ -27576,7 +27576,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       vy -= (o.y - A.y) / d;
     }
     const t0 = Math.hypot(vx, vy) > 0.2 ? Math.atan2(vy, vx) : -Math.PI / 2,
-      near = mol.atoms.filter(o => o !== A && Math.hypot(o.x - A.x, o.y - A.y) < L * 2.5);
+      near = mol.atoms.filter(o => o !== A && Math.hypot(o.x - A.x, o.y - A.y) < L * 2.5),
+      /* the bonds near, not A's own (an H drawn just before on the next atom must not be crossed) */
+      segs = mol.bonds
+        .map(b => [atomById(b.a), atomById(b.b)])
+        .filter(([p, q]) => p && q && p !== A && q !== A && (near.includes(p) || near.includes(q))),
+      dseg = (x, y, p, q) => {
+        const dx = q.x - p.x,
+          dy = q.y - p.y,
+          t = Math.max(0, Math.min(1, ((x - p.x) * dx + (y - p.y) * dy) / (dx * dx + dy * dy || 1)));
+        return Math.hypot(x - p.x - t * dx, y - p.y - t * dy);
+      };
     /* among the free directions outside the rings: the one with most room from the atoms near (other H drawn just
        before included), not far from straight out */
     let best = null;
@@ -27591,6 +27601,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           y = A.y + Math.sin(a) * L * len;
         let room = L * 1.2;
         for (const o of near) room = Math.min(room, Math.hypot(o.x - x, o.y - y) * (o.el === 'H' ? 0.8 : 1));
+        for (const [p, q] of segs) room = Math.min(room, dseg(x, y, p, q) * 1.2);
         const dev = Math.abs(Math.atan2(Math.sin(a - t0), Math.cos(a - t0))),
           sc = Math.min(room, L * 0.9) - dev * L * 0.15 - (len < 0.8 ? L * 0.08 : 0);
         if (!best || sc > best.sc) best = { sc, x, y };
@@ -27610,7 +27621,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const tx = A.x + Math.cos(mid) * L * 0.5,
         ty = A.y + Math.sin(mid) * L * 0.5;
       if (!inPoly({ x: tx, y: ty }, big)) mid += Math.PI;
-      return { x: A.x + Math.cos(mid) * L, y: A.y + Math.sin(mid) * L };
+      const p = { x: A.x + Math.cos(mid) * L, y: A.y + Math.sin(mid) * L };
+      /* not onto another atom or bond (the middle of the two ring bonds can be the line of A's third bond) */
+      if (near.every(o => Math.hypot(o.x - p.x, o.y - p.y) > L * 0.55) && segs.every(([a, b]) => dseg(p.x, p.y, a, b) > L * 0.3))
+        return p;
     }
     return hPlace(A);
   }
