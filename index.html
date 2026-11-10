@@ -72706,11 +72706,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     selection: () => {
       const frs = fragments(),
         idx = frs.map((f, i) => (f.some(x => sel.has(x.id)) ? i : -1)).filter(i => i >= 0);
-      let smi = '';
+      let smi = '',
+        note;
       try {
-        smi = sel.size ? stereoSmilesList(new Set(sel)).join('.') : '';
+        /* a large selection: the sheet's own SMILES, as OpenChemLib's isomeric SMILES of some thousand atoms took tens of
+           seconds (select answers with this, so selecting held the page) */
+        if (sel.size > SMI_STEREO_MAX) {
+          smi = currentSmiles(true);
+          note = 'over ' + SMI_STEREO_MAX + ' atoms: the SMILES as the sheet writes it';
+        } else smi = sel.size ? stereoSmilesList(new Set(sel)).join('.') : '';
       } catch (e) {}
-      return { structures: idx, atoms: sel.size, arrows: selArr.size, texts: selTxt.size, smiles: smi };
+      return Object.assign({ structures: idx, atoms: sel.size, arrows: selArr.size, texts: selTxt.size, smiles: smi }, note ? { note } : {});
     },
     select: a => {
       clearSel();
