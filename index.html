@@ -69642,6 +69642,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const A = fr[+o.bond[0] - 1],
         B = fr[+o.bond[1] - 1];
       if (!A || !B) throw new Error(what + ': bond [n1, n2] of two atoms');
+      if (!bondBetween(A, B)) throw new Error(what + ': atoms ' + o.bond[0] + ' and ' + o.bond[1] + ' are not bonded');
       return { x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, bond: [A, B] };
     }
     throw new Error(what + ': give atom or bond with index or id');
