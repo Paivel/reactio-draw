@@ -40611,7 +40611,36 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function figSrcLine(name) {
     return '% editable-figure source: ' + String(name).replace(/[\r\n\u0085\u2028\u2029^\\]/g, '_');
   }
-  async function latexFigureOf(name, src) {
+  /* only: the selection when Copy for LaTeX was given (the first paste takes just that part); a Save afterwards makes
+     the figure of the whole drawing again (refreshLatexFigure) */
+  async function latexFigureOf(name, src, only) {
+    const saved = mol;
+    if (only) mol = only;
+    try {
+      return await latexFigureOf0(name, src);
+    } finally {
+      mol = saved;
+      render();
+    }
+  }
+  /* the selected part of the drawing as a drawing of its own (as a picture of the selection is made): its atoms and
+     bonds, arrows, texts, and the texts that number or label selected structures; null with nothing selected */
+  function selectionMol() {
+    const ids = new Set(sel);
+    if (!ids.size && !selArr.size && !selTxt.size) return null;
+    return Object.assign({}, mol, {
+      atoms: mol.atoms.filter(a => ids.has(a.id)),
+      bonds: mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b)),
+      arrows: mol.arrows.filter(r => selArr.has(r.id)),
+      texts: mol.texts.filter(
+        t =>
+          selTxt.has(t.id) ||
+          ((t.cnum || t.ana) && ids.size && (t.cnum || t.ana).atoms.length && (t.cnum || t.ana).atoms.every(i => ids.has(i)))
+      ),
+      fills: (mol.fills || []).filter(f => f.ids.every(x => ids.has(x)))
+    });
+  }
+  async function latexFigureOf0(name, src) {
     const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
     let svg;
     texHide = new Set(T.map(t => t.id));
@@ -40718,9 +40747,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const h = await window.rdNative.call('texHead', { path: siblingDir(t) + old + '.tex' });
     return h && String(h.line || '').trim() === figSrcLine(t.file.name) ? old : now;
   }
-  async function writeFigureBeside(t) {
+  async function writeFigureBeside(t, only) {
     const stem = await besideStem(t),
-      f = await latexFigureOf(stem, t.file.name);
+      f = await latexFigureOf(stem, t.file.name, only);
     for (const [ext, body] of [['pdf', f.pdf], ['tex', f.tex]]) {
       const path = siblingDir(t) + stem + '.' + ext,
         r = await window.rdNative.call('write', { path, b64: b64of(body) });
@@ -40745,7 +40774,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   async function latexClip() {
     if (!mol.atoms.length && !mol.arrows.length && !mol.texts.length) throw new Error('Nothing to copy');
     let man;
-    const t0 = curTab();
+    const t0 = curTab(),
+      /* the selection, taken before anything else: with something selected, only that part goes into the figure */
+      only = selectionMol();
     /* a drawing kept in a .reactio file: saved, and the figure written next to it; any other (new, unsaved, or kept as
        CDXML…) goes only in the manifest, and the LaTeX editor keeps the .reactio it gets */
     if (NATIVE_FILES() && t0 && t0.file && /\.reactio$/i.test(t0.file.path || '')) {
@@ -40760,7 +40791,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!free)
         throw new Error(texStem(t.file.name) + '.tex or .pdf already exists next to the drawing and is not its figure');
       /* the files themselves, never paths: a LaTeX editor must not read local paths named on a clipboard */
-      const { stem, f } = await writeFigureBeside(t);
+      const { stem, f } = await writeFigureBeside(t, only);
       /* the copy in the LaTeX project goes by a plain name (a file called Схема (1).reactio stays as it is here), and its .tex says so */
       const name = texStem(t.file.name),
         source = name + '.reactio',
@@ -40780,7 +40811,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else {
       const t = curTab(),
         stem = texStem((t && t.file && t.file.name) || (t && t.name) || docName()),
-        f = await latexFigureOf(stem, stem + '.reactio');
+        f = await latexFigureOf(stem, stem + '.reactio', only);
       man = {
         version: 1,
         name: stem,
@@ -80576,6 +80607,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     get sel() {
       return sel;
+    },
+    get selTxt() {
+      return selTxt;
     },
     get selArr() {
       return selArr;
