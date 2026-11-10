@@ -60573,6 +60573,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   document.addEventListener('pointerdown', e => {
     if (!pieEd.hidden && !e.target.closest('#pieed')) pieEd.hidden = true;
   });
+  /* Escape closes these menus and editors too, as a click outside them does (also with focus in one of their fields) */
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    for (const p of [filePop, fillPop, v3Pop, styleEd, arrEd, pieEd]) if (!p.hidden) p.hidden = true;
+  });
   /* ===== radar charts (e.g. a sensitivity assessment of reaction conditions): one axis per condition, coloured zones of the scale, the result as a line =====
    The default layout follows the condition-based sensitivity screen of F. Glorius and co-workers (L. Pitzer, F. Schäfers, F. Glorius, Angew. Chem. Int. Ed. 2019, 58, 8572; https://doi.org/10.1002/anie.201901935): the deviation of the yield from the standard conditions, −100% at the edge, +50% at the centre.
    kind 'radar': x1,y1–x2,y2 is the square of the chart; ax = axes {t: label (**bold**, *italic*), v: value}; min = value at the edge, max = value at the centre,
