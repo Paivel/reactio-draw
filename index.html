@@ -44427,19 +44427,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* the places of both scenes at time t during a turn */
   function animTurnPlaces(SA, SB, m, T, t) {
-    const R = v3.mm(v3.rot(T.ax, T.th * t), T.VA.R),
-      s = T.VA.s + (T.VB.s - T.VA.s) * t,
-      pc = [T.VA.pc[0] + (T.VB.pc[0] - T.VA.pc[0]) * t, T.VA.pc[1] + (T.VB.pc[1] - T.VA.pc[1]) * t];
-    const dA = SA.A.map(() => null),
-      PA = SA.A.map(p => [p.x, p.y]);
-    for (let i = 0; i < SA.A.length; i++) {
-      if (!T.Xc[i]) continue;
-      const y = v3.mul(R, T.Xc[i]),
-        rA = T.resA[i],
-        rB = T.resB[i] || rA;
-      PA[i] = [pc[0] + s * y[0] + (1 - t) * rA[0] + t * rB[0], pc[1] + s * y[1] + (1 - t) * rA[1] + t * rB[1]];
-      dA[i] = [PA[i][0] - SA.A[i].x, PA[i][1] - SA.A[i].y];
-    }
     const carry = (S, d) => {
       for (let it = 0; it < 8; it++)
         for (let i = 0; i < S.A.length; i++) {
@@ -44448,8 +44435,37 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (v.length) d[i] = [v.reduce((q, w) => q + w[0], 0) / v.length, v.reduce((q, w) => q + w[1], 0) / v.length];
         }
     };
-    carry(SA, dA);
-    for (let i = 0; i < SA.A.length; i++) if (!T.Xc[i] && dA[i]) PA[i] = [SA.A[i].x + dA[i][0], SA.A[i].y + dA[i][1]];
+    /* the shifts of the first drawing's atoms at time tt: those of the pose turned, the others carried by them */
+    const shifts = tt => {
+      const R = v3.mm(v3.rot(T.ax, T.th * tt), T.VA.R),
+        s = T.VA.s + (T.VB.s - T.VA.s) * tt,
+        pc = [T.VA.pc[0] + (T.VB.pc[0] - T.VA.pc[0]) * tt, T.VA.pc[1] + (T.VB.pc[1] - T.VA.pc[1]) * tt],
+        d = SA.A.map(() => null);
+      for (let i = 0; i < SA.A.length; i++) {
+        if (!T.Xc[i]) continue;
+        const y = v3.mul(R, T.Xc[i]),
+          rA = T.resA[i],
+          rB = T.resB[i] || rA;
+        d[i] = [
+          pc[0] + s * y[0] + (1 - tt) * rA[0] + tt * rB[0] - SA.A[i].x,
+          pc[1] + s * y[1] + (1 - tt) * rA[1] + tt * rB[1] - SA.A[i].y
+        ];
+      }
+      carry(SA, d);
+      return d;
+    };
+    const dA = shifts(t),
+      PA = SA.A.map((p, i) => (dA[i] ? [p.x + dA[i][0], p.y + dA[i][1]] : [p.x, p.y]));
+    /* a paired atom with no place in the pose (an H the crystal file left out) rides with its neighbours and is brought
+       along the way to its place in the second drawing, so it ends there instead of jumping in the last frame */
+    let d1 = null;
+    for (const [a, b] of m) {
+      if (T.Xc[a]) continue;
+      d1 = d1 || shifts(1);
+      const e = d1[a] || [0, 0];
+      PA[a][0] += t * (SB.A[b].x - SA.A[a].x - e[0]);
+      PA[a][1] += t * (SB.A[b].y - SA.A[a].y - e[1]);
+    }
     const dB = SB.A.map(() => null);
     for (const [a, b] of m) dB[b] = [PA[a][0] - SB.A[b].x, PA[a][1] - SB.A[b].y];
     carry(SB, dB);
