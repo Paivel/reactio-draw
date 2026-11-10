@@ -69473,6 +69473,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       syncTable();
       fitView();
       render();
+      /* the style menus show the document's style again, not the one the scratch drawing was made in */
+      try {
+        syncStyle();
+      } catch (e) {}
     }
   }
   /* a grid of structures (a page of compounds, an exam question): rows of columns sized to the biggest, a label under each
