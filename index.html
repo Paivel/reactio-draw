@@ -71330,7 +71330,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
                 h0 = b0.y1 - b0.y0,
                 w1 = b1.x1 - b1.x0 || 1,
                 h1 = b1.y1 - b1.y0 || 1,
-                k = Math.min(w0 / w1, h0 / h1);
+                /* the atoms are scaled, the labels' margins round them are not: k so the whole box fits */
+                aw = Math.max(...at.map(q => q.x)) - Math.min(...at.map(q => q.x)),
+                ah = Math.max(...at.map(q => q.y)) - Math.min(...at.map(q => q.y)),
+                kOf = (s0, s1, sa) => (sa > 1 && s1 - sa < s0 ? (s0 - (s1 - sa)) / sa : s0 / s1),
+                k = Math.min(kOf(w0, w1, aw), kOf(h0, h1, ah));
               if (k > 0 && k < 1) {
                 const cx = (b1.x0 + b1.x1) / 2,
                   cy = (b1.y0 + b1.y1) / 2,
