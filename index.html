@@ -37833,6 +37833,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const i = colIdx(c);
       return i ? ` ${attr}="${i}"` : '';
     };
+    /* a label with no structure of its own (R, X, Ar, *, Cp* on a metal) says so, so readers keep the label, not a carbon */
+    const labNodeType = a =>
+      !a.label || a.grp || labMetalF(a.label)
+        ? ''
+        : genericLab(a.label)
+          ? ` NodeType="GenericNickname" GenericNickname="${xmlEsc(a.label)}"`
+          : ' NodeType="Unspecified"';
     const frags = fragments();
     const fragIds = [],
       bnid = new Map();
@@ -37841,7 +37848,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fragIds.push([fr, fid]);
       let s = `<fragment id="${fid}">`;
       const nodeX = (a, i, inner) =>
-        `<n id="${i}" p="${P(a.x, a.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(a.x, a.y)} ${(a.d3 * k).toFixed(2)}"` : ''}${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : ''}${a.anum && a.anum.t != null && a.anum.t !== '' ? ` AtomNumber="${xmlEsc(String(a.anum.t))}" ShowAtomNumber="yes"` : ''}>${inner}</n>`;
+        `<n id="${i}" p="${P(a.x, a.y)}"${a.d3 != null && isFinite(a.d3) ? ` xyz="${P(a.x, a.y)} ${(a.d3 * k).toFixed(2)}"` : ''}${colAt(a.col, 'color')}${colAt(a.hl && onWhite(a.hl, HL_A), 'highlightColor')}${a.el !== 'C' ? ` Element="${ZOF(a.el)}" NumHydrogens="${a.label ? 0 : implicitH(a)}"` : ''}${a.chg ? ` Charge="${a.chg}"` : ''}${a.rad ? ` Radical="${a.rad === 2 ? 'Triplet' : 'Doublet'}"` : ''}${a.el === 'D' ? ' Isotope="2"' : a.iso ? ` Isotope="${a.iso}"` : ''}${esrOk(a.esr) ? ` EnhancedStereoType="${a.esr === 'abs' ? 'Absolute' : a.esr[0] === '&' ? 'And' : 'Or'}"` + (a.esr === 'abs' ? '' : ` EnhancedStereoGroupNum="${esrNum(a.esr)}"`) : ''}${a.multi ? ` NodeType="MultiAttachment" Attachments="@@${a.id}@@"` : labNodeType(a)}${a.anum && a.anum.t != null && a.anum.t !== '' ? ` AtomNumber="${xmlEsc(String(a.anum.t))}" ShowAtomNumber="yes"` : ''}>${inner}</n>`;
       const bondX = (b, B, E) => {
         const d =
           b.stereo === 'wedge'
@@ -37889,7 +37896,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           const o = m.atoms.find(q => q.id === (gs.has(b.a) ? b.b : b.a)),
             e = id++,
             at = gs.has(b.a) ? b.a : b.b;
-          inner += `<n id="${e}" p="${P(o.x, o.y)}" NodeType="ExternalConnectionPoint"/><b id="${id++}" B="${im.get(at)}" E="${e}"/>`;
+          /* the bond to the connection point has the outer bond's order (an allene's centre: two double bonds) */
+          inner += `<n id="${e}" p="${P(o.x, o.y)}" NodeType="ExternalConnectionPoint"/><b id="${id++}" B="${im.get(at)}" E="${e}"${b.order > 1 && b.order <= 3 ? ` Order="${b.order}"` : ''}/>`;
         });
         for (const b of fb) if (gs.has(b.a) && gs.has(b.b)) inner += bondX(b, im.get(b.a), im.get(b.b));
         const onb = outB.map(b => m.atoms.find(q => q.id === (gs.has(b.a) ? b.b : b.a))),
@@ -49075,7 +49083,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (ns.length === 1 && !bs.length && LABELED.test(ns[0].getAttribute('NodeType') || '')) {
         const lab = ns[0].querySelector(':scope > t');
         const txt = lab ? lab.textContent.trim() : '';
-        if (txt) {
+        /* a substituent label holding its structure (Boc, C2H5 drawn on its own) stays a labelled atom */
+        const grp = txt && ns[0].querySelector(':scope > fragment > n') && !/[+-]$/.test(txt) && resolveLabel(txt);
+        if (txt && !grp) {
           /* with its size, styles, colour and alignment, as a caption (a table's cells are often such labels) */
           const t = cdxText(lab, true) || { id: mol.next++, x: pt(ns[0].getAttribute('p')).x + ox, y: pt(ns[0].getAttribute('p')).y, text: txt, size: textDef.size, fs: true };
           mol.texts.push(t);
