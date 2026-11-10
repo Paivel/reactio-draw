@@ -80,7 +80,7 @@ Lattice adds this block by itself. In any other LaTeX editor, put it in the prea
 \ExplSyntaxOn
 \ProvideDocumentCommand \rcmpd { m }
   {
-    \regex_match:nnTF { \A [A-Za-z0-9_-] } {#1}
+    \regex_match:nnTF { \A [A-Za-z0-9_\-] } {#1}
       {
         \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq
           { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }

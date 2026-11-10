@@ -40546,7 +40546,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* one definition, robust, with nothing else at the top level: a LaTeX editor adds that without asking */
     String.raw`\ProvideDocumentCommand \rcmpd { m }`,
     String.raw`  {`,
-    String.raw`    \regex_match:nnTF { \A [A-Za-z0-9_-] } {#1}`,
+    String.raw`    \regex_match:nnTF { \A [A-Za-z0-9_\-] } {#1}`,
     String.raw`      {`,
     String.raw`        \regex_extract_once:nnNTF { \A ([AaIi]) \: (.*) \Z } {#1} \l_tmpa_seq`,
     String.raw`          { \use:c { rcmpd@series } { \seq_item:Nn \l_tmpa_seq { 2 } } { \seq_item:Nn \l_tmpa_seq { 3 } } }`,
