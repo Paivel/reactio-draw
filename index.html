@@ -50587,8 +50587,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* files opened with the app that it could not read (too large, no permission): "a.mol: too large (70 MB, at most 64)" */
   if (Array.isArray(window.__rdFileErrors) && window.__rdFileErrors.length) {
-    const E = window.__rdFileErrors.splice(0);
-    setTimeout(() => toast('Could not open ' + E.join('; '), true), 400);
+    const E = window.__rdFileErrors.splice(0),
+      show = () => setTimeout(() => toast('Could not open ' + E.join('; '), true, 8000), 300);
+    /* once the page has started, so no message of its start takes its place */
+    if (document.readyState === 'complete') show();
+    else window.addEventListener('load', show, { once: true });
   }
   fileIn.addEventListener('change', () => {
     const f = fileIn.files && fileIn.files[0];
