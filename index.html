@@ -49292,6 +49292,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           );
       }
     }
+    /* a charged ring carbon between two 1.5 bonds (cyclopentadienide C−, tropylium C+) has the H of its Kekulé form, one
+       as a neutral ring carbon has; files write it without NumHydrogens */
+    for (const a of mol.atoms) {
+      if (a.el !== 'C' || a.label || Math.abs(a.chg || 0) !== 1 || hPend.some(([q]) => q === a)) continue;
+      const ab = mol.bonds.filter(b => b.a === a.id || b.b === a.id);
+      if (ab.filter(b => b.stereo === 'deloc').length !== 2) continue;
+      const rest = ab.reduce((t, b) => t + (b.stereo === 'deloc' || isDative(b) ? 0 : b.order), 0);
+      if (rest < 1) hPend.push([a, 1]);
+    }
     /* hydrogens as the file counted them (kept until the atom's bonds change) */
     for (const [a, nh] of hPend) {
       if (nh !== implicitH(a)) {
