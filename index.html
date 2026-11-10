@@ -32827,6 +32827,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!NO_RENDER) renderSteps();
     const { list } = schemeOrder();
     const seen = {};
+    /* a document or step saved without its table (a .reactio written by hand or by another program) */
+    if (!S.memo) S.memo = {};
+    if (!S.manual) S.manual = [];
     if (!S.fmap) S.fmap = [];
     if (!S.fNext) S.fNext = 1;
     const used = new Set(),
