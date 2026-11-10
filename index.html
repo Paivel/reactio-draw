@@ -24290,7 +24290,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       snap();
       if (h && h.bond && !h.atom)
         fuseRing(h.bond, ringN, ringArom); /* click on a bond: fused (annulated) ring */
-      else addRing(ringN, ringArom, h && h.atom, p);
+      else if (h && h.atom && neighbors(h.atom).length && freeVal(h.atom) < 2) {
+        /* an atom with one free bond (an aromatic or a branched one) cannot join the ring: the ring hangs from it */
+        const r = graft(h.atom, 'C1' + 'C'.repeat(ringN - 1) + '1', { order: 1 });
+        if (r && ringArom) kekulizeRing(r);
+      } else addRing(ringN, ringArom, h && h.atom, p);
       commit();
       return;
     }
