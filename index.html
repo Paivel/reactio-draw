@@ -15427,6 +15427,8 @@ function kdOf(st) {
     gr.setAttribute('y', view.y);
     gr.setAttribute('width', view.w);
     gr.setAttribute('height', view.h);
+    /* squares under 3 pixels are only a grey haze, and many of them (millions at 1%) cost drawing time */
+    gr.style.display = (20 * (svg.clientWidth || BW)) / view.w < 3 ? 'none' : '';
     $('zoomv').textContent = Math.round(((svg.clientWidth || BW) / view.w / PX1) * 100) + '%';
     try {
       scrollBars();
@@ -15541,9 +15543,12 @@ function kdOf(st) {
     if (live) SB.lastExt = E;
     if (SB.h.tr.matches(':active') || SB.v.tr.matches(':active')) SB.ext = SB.ext || E;
   }
+  const ZOOM_MIN = 0.01;
   function setZoom(s, anchor, quick) {
     if (!zoom) zoom = { cx: view.x + view.w / 2, cy: view.y + view.h / 2, s: BW / view.w };
-    s = Math.max(0.25, Math.min(16, s));
+    /* zoomed out far enough for a very large drawing (or room around one about to be pasted): down to 1% of the sheet's
+       scale; the background squares are left out once they are too small to see */
+    s = Math.max(ZOOM_MIN, Math.min(16, s));
     const p = anchor || { x: zoom.cx, y: zoom.cy };
     /* keep the point under the cursor in place: the new view has the window's proportions, not the sheet's */
     const vr = svg.clientWidth && svg.clientHeight ? svg.clientWidth / svg.clientHeight : BW / BH,
