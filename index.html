@@ -4796,6 +4796,25 @@ function kdOf(st) {
      longer fits there must not come back empty when its tab is shown again */
   const DOCS_MEM = new Map();
   let storageWarned = 0;
+  /* one item written to the browser storage: false when the storage is full or blocked. With `what` the user is told
+     that it was not kept (it works in this window, but is gone after a restart) */
+  function storeItem(k, v, what) {
+    try {
+      localStorage.setItem(k, v);
+      return true;
+    } catch (e) {
+      if (what) storageRefused(what);
+      return false;
+    }
+  }
+  function storageRefused(what, note) {
+    try {
+      toast(
+        'Could not keep ' + what + ": the browser's storage is full or blocked; " + (note || 'it works until this window closes'),
+        true
+      );
+    } catch (e) {}
+  }
   function storageFull() {
     if (Date.now() - storageWarned < 60000) return;
     storageWarned = Date.now();
@@ -13986,10 +14005,8 @@ function kdOf(st) {
   try {
     MYPAL = cleanState(JSON.parse(localStorage.getItem('rd-palettes') || '{}') || {});
   } catch (e) {}
-  function saveMyPal() {
-    try {
-      localStorage.setItem('rd-palettes', JSON.stringify(MYPAL));
-    } catch (e) {}
+  function saveMyPal(quiet) {
+    return storeItem('rd-palettes', JSON.stringify(MYPAL), quiet ? '' : 'your palettes');
   }
   /* paper: the sheet's background (white by default); dark papers switch themes to their dark variant */
   const PAPERS = {
@@ -32321,9 +32338,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             );
         }
       }
-      try {
-        localStorage.setItem('rd-keys', JSON.stringify(KEYS));
-      } catch (err) {}
+      storeItem('rd-keys', JSON.stringify(KEYS), 'your hotkeys');
       capturing = null;
       renderKeys();
       if (!$('tplpop').hidden) tplPopFill();
@@ -32501,11 +32516,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   try {
     MYCH = JSON.parse(localStorage.getItem('rd-chars') || '[]').filter(c => typeof c === 'string' && c);
   } catch (e) {}
-  const saveMyCh = () => {
-    try {
-      localStorage.setItem('rd-chars', JSON.stringify(MYCH));
-    } catch (e) {}
-  };
+  const saveMyCh = quiet => storeItem('rd-chars', JSON.stringify(MYCH), quiet ? '' : 'your symbols');
   function renderChars() {
     $('charmap').innerHTML =
       CHARS.map(c => `<button data-ch="${c}" title="${c}">${c}</button>`).join('') +
@@ -32526,7 +32537,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       MYCH.push(c);
       n++;
     }
-    saveMyCh();
+    addChars.kept = saveMyCh(true);
     renderChars();
     return n;
   }
@@ -32534,7 +32545,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const i = $('charAdd'),
       n = addChars(i.value);
     i.value = '';
-    toast(n ? n + ' symbol' + (n > 1 ? 's' : '') + ' added' : 'Nothing new to add', !n);
+    if (n && !addChars.kept) storageRefused(n > 1 ? 'the new symbols' : 'the new symbol');
+    else toast(n ? n + ' symbol' + (n > 1 ? 's' : '') + ' added' : 'Nothing new to add', !n);
   };
   $('charAdd').addEventListener('keydown', e => {
     if (e.key === 'Enter') {
@@ -34076,13 +34088,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!EMBED) LIB = JSON.parse(localStorage.getItem('rd-labels') || 'null');
   } catch (e) {}
   if (!LIB || !LIB.nicks) LIB = { nicks: {} };
-  function saveLib() {
-    if (EMBED) return;
-    try {
-      localStorage.setItem('rd-labels', JSON.stringify(LIB));
-    } catch (e) {
-      toast('This browser blocked saving your labels', true);
-    }
+  function saveLib(quiet) {
+    if (EMBED) return true;
+    return storeItem('rd-labels', JSON.stringify(LIB), quiet ? '' : 'your labels');
   }
   function libNick(t) {
     if (LIB.nicks[t]) return LIB.nicks[t];
@@ -34153,12 +34161,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     LIB.nicks[k] = smi;
     TOK = null;
-    saveLib();
+    const kept = saveLib(true);
     renderLib();
     for (const a of mol.atoms) if (a.label === k) a.grp = smi;
     commit();
     $('libNickName').value = '';
     $('libNickSmi').value = '';
+    if (!kept) {
+      storageRefused('the abbreviation "' + k + '"');
+      return;
+    }
     toast(
       'Abbreviation "' +
         k +
@@ -34227,12 +34239,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     LIB.nicks[k] = smi;
     TOK = null;
     GC_reset();
-    saveLib();
+    const kept = saveLib(true);
     renderLib();
     for (const a of mol.atoms) if (a.label === k) a.grp = smi;
     commit();
     $('libNickName').value = '';
-    toast('Saved "' + k + '". Point at an atom, press Enter and type ' + k + '.');
+    if (kept) toast('Saved "' + k + '". Point at an atom, press Enter and type ' + k + '.');
+    else storageRefused('the abbreviation "' + k + '"');
   };
   $('libNicks').addEventListener('click', e => {
     const d = e.target.closest('[data-nickdel]');
@@ -50472,13 +50485,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         renderKeys();
       } catch (e) {}
   }
-  const saveMine = () => {
-    try {
-      localStorage.setItem('rd-tpl-mine', JSON.stringify(tplMine));
-    } catch (e) {
-      toast('Could not save the template list in this browser', true);
-    }
+  /* false (after the message, unless quiet) when the browser storage would not take the list */
+  const saveMine = quiet => {
+    const ok = storeItem('rd-tpl-mine', JSON.stringify(tplMine), quiet ? '' : 'your templates');
     syncTplActions();
+    return ok;
   };
   /* a key given to a template takes it up for placing, as a click on its picture does */
   function armTpl(id) {
@@ -50499,10 +50510,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   } catch (e) {
     tplTabs = [];
   }
-  const saveTplTabs = () => {
-    try {
-      localStorage.setItem('rd-tpl-tabs', JSON.stringify(tplTabs));
-    } catch (e) {}
+  const saveTplTabs = quiet => storeItem('rd-tpl-tabs', JSON.stringify(tplTabs), quiet ? '' : 'your template tabs');
+  /* the templates and their tabs, as one: false (after one message) when either was not kept */
+  const saveMineAll = quiet => {
+    const a = saveTplTabs(true),
+      b = saveMine(true);
+    if (!(a && b) && !quiet) storageRefused('your templates');
+    return a && b;
   };
   const tabList = () => {
     const l = [HOTTAB, ...tplTabs.filter(g => g !== HOTTAB)];
@@ -50571,8 +50585,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (tplTab) t.g = tplTab;
     tplMine.push(t);
-    saveMine();
+    const kept = saveMine(true);
     tplPopFill();
+    if (!kept) {
+      storageRefused('the template ' + t.n);
+      return;
+    }
     toast(
       'Added to My templates' +
         (tplTab ? ' (' + tplTab + ')' : '') +
@@ -50686,10 +50704,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           if (!got.length) throw new Error('no structures in it');
           tplMine.push(...got);
           if (!tplTabs.includes(tab)) tplTabs.push(tab);
-          saveTplTabs();
-          saveMine();
+          const kept = saveMineAll();
           tplPopFill();
-          toast(
+          if (kept)
+            toast(
             'Imported ' +
               got.length +
               ' template' +
@@ -50721,10 +50739,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           }
         if (Array.isArray(d.tabs))
           for (const g of d.tabs) if (typeof g === 'string' && g && !tplTabs.includes(g)) tplTabs.push(g);
-        saveTplTabs();
-        saveMine();
+        const kept = saveMineAll();
         tplPopFill();
-        toast('Imported ' + n + ' template' + (n === 1 ? '' : 's'));
+        if (kept) toast('Imported ' + n + ' template' + (n === 1 ? '' : 's'));
       } catch (e) {
         toast('Could not read that file: ' + e.message, true);
       }
@@ -51226,9 +51243,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const g = t.dataset.tpltab;
     if (g) tp.g = g;
     else delete tp.g;
-    saveMine();
+    const kept = saveMine();
     tplPopFill();
-    toast(tp.n + (g ? ' moved to ' + g : ' taken out of its tab'));
+    if (kept) toast(tp.n + (g ? ' moved to ' + g : ' taken out of its tab'));
   });
   function openTplPop(btn) {
     const pp = $('tplpop');
@@ -51280,8 +51297,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         else tplTabs.push(v);
         tplTabs = tplTabs.filter((x, k) => tplTabs.indexOf(x) === k);
         for (const t of tplMine) if (t.g === old) t.g = v;
-        saveTplTabs();
-        saveMine();
+        saveMineAll();
         tplTab = v;
         tplPopFill();
       });
@@ -51296,11 +51312,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           delete t.g;
           n++;
         }
-      saveTplTabs();
-      saveMine();
+      const kept = saveMineAll();
       tplTab = '';
       tplPopFill();
-      toast(
+      if (kept)
+        toast(
         'Tab ' +
           old +
           ' removed' +
@@ -51326,9 +51342,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const i = +del.dataset.tpldel,
         t = tplMine[i];
       tplMine.splice(i, 1);
-      saveMine();
+      const kept = saveMine();
       tplPopFill();
-      toast('Removed ' + (t ? t.n : 'the template'));
+      if (kept) toast('Removed ' + (t ? t.n : 'the template'));
       return;
     }
     const b = e.target.closest('[data-tpli]');
@@ -63523,28 +63539,29 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     let n = [];
+    /* what the browser storage would not take: the import then works in this window only, and the user is told */
+    let lost = false;
+    const put = (k, v) => storeItem(k, v) || ((lost = true), false),
+      kept = ok => ok || ((lost = true), false);
     if (typeof d.accent === 'string' && (ACC_PRESETS.some(p => p[0] === d.accent) || accHex(d.accent))) {
       setAccent(d.accent);
+      put('rd-accent', d.accent);
       n.push('accent colour');
     }
     if (d.hotkeys && typeof d.hotkeys === 'object') {
       KEYS = d.hotkeys;
-      try {
-        localStorage.setItem('rd-keys', JSON.stringify(KEYS));
-      } catch (e) {}
+      put('rd-keys', JSON.stringify(KEYS));
       renderKeys();
       n.push('hotkeys');
     }
     if (d.checks && typeof d.checks === 'object') {
-      try {
-        localStorage.setItem('rd-valmarks', d.checks.valenceMarks === false ? 'off' : 'on');
-        localStorage.setItem('rd-chk-nowedge', d.checks.noWedge === true ? 'on' : 'off');
-        if (Array.isArray(d.checks.off)) {
-          WARN_OFF = new Set(d.checks.off.filter(x => typeof x === 'string'));
-          localStorage.setItem('rd-warn-off', JSON.stringify([...WARN_OFF]));
-          syncWarnBoxes();
-        }
-      } catch (e) {}
+      put('rd-valmarks', d.checks.valenceMarks === false ? 'off' : 'on');
+      put('rd-chk-nowedge', d.checks.noWedge === true ? 'on' : 'off');
+      if (Array.isArray(d.checks.off)) {
+        WARN_OFF = new Set(d.checks.off.filter(x => typeof x === 'string'));
+        put('rd-warn-off', JSON.stringify([...WARN_OFF]));
+        syncWarnBoxes();
+      }
       const v = $('valMarks'),
         w = $('chkNoWedge');
       if (v) v.checked = valMarksOn();
@@ -63553,16 +63570,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       n.push('structure checks');
     }
     if (d.layout) {
-      try {
-        localStorage.setItem('rd-layout', JSON.stringify(d.layout));
-      } catch (e) {}
+      put('rd-layout', JSON.stringify(d.layout));
       applyLayout(d.layout);
       n.push('button layout');
     }
     if (d.labels && d.labels.nicks) {
       /* merged: same names are replaced, everything else kept */
       Object.assign(LIB.nicks, d.labels.nicks);
-      saveLib();
+      kept(saveLib(true));
       renderLib();
       n.push(Object.keys(d.labels.nicks).length + ' abbreviations');
     }
@@ -63578,25 +63593,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (Array.isArray(d.templateTabs))
         for (const g of d.templateTabs)
           if (typeof g === 'string' && g && !tplTabs.includes(g)) tplTabs.push(g);
-      saveTplTabs();
-      saveMine();
+      kept(saveMineAll(true));
       n.push(k + ' templates');
     }
     if (d.palettes && typeof d.palettes === 'object' && Object.keys(d.palettes).length) {
       Object.assign(MYPAL, d.palettes);
-      saveMyPal();
+      kept(saveMyPal(true));
       fillThemeSelect();
       n.push(Object.keys(d.palettes).length + ' palettes');
     }
     if (d.docDefault && typeof d.docDefault === 'object') {
-      try {
-        localStorage.setItem('rd-docdef', JSON.stringify(d.docDefault));
-      } catch (e) {}
+      put('rd-docdef', JSON.stringify(d.docDefault));
       docDefSummary();
       n.push('style of new documents');
     }
     if (Array.isArray(d.chars) && d.chars.length) {
       const k = addChars(d.chars.filter(c => typeof c === 'string').join(''));
+      kept(addChars.kept);
       n.push(k + ' symbols');
     }
     setTimeout(() => {
@@ -63611,9 +63624,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         );
     }, 400);
     if (['plain', 'italic', 'sup'].includes(d.prefixStyle)) {
-      try {
-        localStorage.setItem('rd-pfx', d.prefixStyle);
-      } catch (e) {}
+      put('rd-pfx', d.prefixStyle);
       const e = $('pfxSel');
       if (e) e.value = d.prefixStyle;
       n.push('prefix style');
@@ -63625,9 +63636,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         ['methyl', 'rd-cu-me', 'cuMe', ['line', 'Me', 'CH3']]
       ])
         if (ok.includes(d.cleanUp[k])) {
-          try {
-            localStorage.setItem(key, d.cleanUp[k]);
-          } catch (e) {}
+          put(key, d.cleanUp[k]);
           const e = $(id);
           if (e) e.value = d.cleanUp[k];
           got = true;
@@ -63635,22 +63644,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (got) n.push('Clean Up labels');
     }
     if (['ask', 'scale', 'keep'].includes(d.resizeText)) {
-      try {
-        localStorage.setItem('rd-resize-text', d.resizeText);
-      } catch (e) {}
+      put('rd-resize-text', d.resizeText);
       const e = $('rsText');
       if (e) e.value = d.resizeText;
       n.push('text size on resizing');
     }
     if (['ask', 'scale', 'keep'].includes(d.resizeLines)) {
-      try {
-        localStorage.setItem('rd-resize-lines', d.resizeLines);
-      } catch (e) {}
+      put('rd-resize-lines', d.resizeLines);
       const e = $('rsLines');
       if (e) e.value = d.resizeLines;
       n.push('energy diagram lines on resizing');
     }
-    toast(n.length ? 'Imported: ' + n.join(', ') : 'Nothing to import in that file', !n.length);
+    if (n.length && lost)
+      storageRefused('the imported settings', 'they are used until this window closes (' + n.join(', ') + ')');
+    else toast(n.length ? 'Imported: ' + n.join(', ') : 'Nothing to import in that file', !n.length);
   }
   {
     const e = $('pfxSel');
@@ -63722,10 +63729,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     el.textContent = parts.join(' · ');
   }
   $('docDefSave').onclick = () => {
-    try {
-      localStorage.setItem('rd-docdef', JSON.stringify(S.doc || { style: 'journal' }));
-    } catch (e) {
-      toast('Could not save in this browser', true);
+    if (!storeItem('rd-docdef', JSON.stringify(S.doc || { style: 'journal' }))) {
+      storageRefused('this style for new documents', 'new documents start with the usual style');
       return;
     }
     docDefSummary();
@@ -74373,8 +74378,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       const T = { k: name, e, xy: pick.map(q => [+(q.x / L).toFixed(4), +(q.y / L).toFixed(4)]), bold, stereo, els: pick.map(q => q.el), user: true };
       LIB.fitTpl = (LIB.fitTpl || []).filter(t => t.k !== name).concat([T]);
-      saveLib();
-      return { ok: true, name, atoms: pick.length, bonds: e.length, bold: bold.length, wedges: stereo.filter(x => x[2] === 'wedge').length, hashes: stereo.filter(x => x[2] === 'hash').length };
+      const kept = saveLib(true);
+      return { ok: true, ...(kept ? {} : { warning: "not kept after a restart: the browser's storage is full or blocked" }), name, atoms: pick.length, bonds: e.length, bold: bold.length, wedges: stereo.filter(x => x[2] === 'wedge').length, hashes: stereo.filter(x => x[2] === 'hash').length };
     },
     listTemplates: () => apiFitTemplates('auto').map(t => ({ name: t.k, atoms: t.xy.length, user: !!t.user })),
     deleteTemplate: a => {
@@ -76744,7 +76749,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (id === 'palDel') {
       delete MYPAL[palDraft.name];
-      saveMyPal();
+      const kept = saveMyPal();
       if (S.doc && S.doc.theme === 'u:' + palDraft.name) {
         S.doc.theme = undefined;
         applyTheme();
@@ -76752,7 +76757,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       palEd.hidden = true;
       fillThemeSelect();
-      toast('Palette deleted');
+      if (kept) toast('Palette deleted');
       return;
     }
     if (id === 'palSave') {
@@ -76767,7 +76772,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         light: L,
         dark: { ...L, ink: L.paper === '#ffffff' ? '#ffffff' : L.ink, paper: '#000000' }
       };
-      saveMyPal();
+      const kept = saveMyPal(true);
       if (!S.doc) S.doc = {};
       snap();
       S.doc.theme = 'u:' + nm;
@@ -76776,7 +76781,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       applyTheme();
       commit();
       palEd.hidden = true;
-      toast('Palette "' + nm + '" saved and applied');
+      if (kept) toast('Palette "' + nm + '" saved and applied');
+      else storageRefused('the palette "' + nm + '"', 'it is applied to this document');
     }
   });
   document.addEventListener('pointerdown', e => {
