@@ -21297,6 +21297,7 @@ function kdOf(st) {
             if (Math.abs(mx) < 0.01 && Math.abs(my) < 0.01) {
               t.x += dx;
               t.y += dy;
+              t.gp = { x: t.x, y: t.y };
             }
           }
       }
@@ -21306,8 +21307,12 @@ function kdOf(st) {
       r.gl = (r.gl || []).filter(g => {
         const t = tById(g.t);
         if (!t || !glueText(t)) return false;
+        /* a text left where it was put and only retyped keeps its left end, so a longer one has its middle far to the
+           right: it stays while it still reaches over the arrow */
         const c = t.x + textW(t) / 2,
-          far = c < x0 - 30 || c > x1 + 30 || top(t) > cy + sz(t) * 4.5 || bot(t) < cy - sz(t) * 4.5;
+          still = t.gp && Math.abs(t.x - t.gp.x) < 0.01 && Math.abs(t.y - t.gp.y) < 0.01,
+          off = still ? t.x > x1 + 30 || t.x + textW(t) < x0 - 30 : c < x0 - 30 || c > x1 + 30,
+          far = off || top(t) > cy + sz(t) * 4.5 || bot(t) < cy - sz(t) * 4.5;
         if (far) delete t.gp;
         return !far;
       });
