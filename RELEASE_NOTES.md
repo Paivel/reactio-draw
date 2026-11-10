@@ -14,12 +14,30 @@
 - **A paste comes selected.** A pasted structure, reaction or scheme is selected, ready to be moved, and the sheet no longer jumps or changes its scale to fit the whole drawing; what lands out of sight is brought into view. A reaction SMILES pasted as text (A>>B) is drawn as the reaction.
 - **A centred double bond meets the bonds beside it** (a ketone's C=O, C=CH2), with no gap under its lines.
 - **The developer tools are off in the apps** (F12 and Inspect in Windows, Inspect Element on the Mac and in Linux): they are for finding faults, and come back when the app is started with `--devtools` or with `REACTIO_DEVTOOLS=1`.
+- **SMILES and InChI in Properties are made when asked for**: Show for the selection (or for the whole sheet), or Copy; they are no longer worked out after every change. A shown value stays until the drawing or the selection changes. A structure too large to do here (InChI: more than 1023 atoms; SMILES with stereo: more than 1000; any SMILES: more than 20 000) gets a message instead of holding the page. The CAS number follows the InChI.
+- **Drug-likeness numbers** (cLogP, TPSA, H-bond donors and acceptors, rotatable bonds, rule of five, pKa) **only for a selected structure**, of up to 1000 atoms: on a large drawing they held the page after every change.
+- **Zoom out down to 1%** (it stopped at about a quarter), to make room for something large before pasting it; the background squares are hidden while too small to see.
+- **Resizing with the handles asks about the text**: whether labels and texts take the new size or keep theirs; for an energy diagram, two check boxes, Text size and Line width. "Always do this" remembers it; Settings → Drawing has both choices.
+- **NMR prediction**: N-methylpyrrole and other rare alkyl environments, and the far ring carbons of parent compounds (phenol, aniline, benzaldehyde and pyridine para carbons), are predicted from their nearest analogues instead of falling back to benzene's values. Checked on 41 compounds against published spectra: mean error 13C 1.5 → 0.74 ppm, 1H 0.19 → 0.11 ppm.
+- **Save replaces the file in one step** in the apps, reactio-mcp and the command line: a write that fails (a full disk) leaves the old file whole.
 
 ## Fixed
 
 - **Ctrl+Z after a change sometimes seemed to do nothing the first time**: the reaction table filling in a row for a structure just drawn made a step of its own when it came a moment after the change. It is now part of the change.
 - **Closing or quitting with Save left the LaTeX figure out of date**: the drawing was closed before its .pdf and .tex were written (on quitting with several drawings, the figure could even be written from the next one). The save now waits for the figure.
 - **Clean Up of a sandwich complex drawn by hand** (ferrocene from two η bonds): it now lays it out, Fe between the two rings above and below; one drawn in perspective (J key) is kept at the first press and laid out at the second, which used to stop with an error.
+- **An energy diagram resized whole came apart**: its levels, joins, numbers and axis now stay together and it is drawn again at the new size.
+- **A document that could not be read took over the current one** (renamed, linked to the bad file and marked saved, so Save would overwrite that file); it now leaves the current document as it was, and a failed open leaves no empty tab.
+- **A save that failed** in the browser's Save dialog, or in the Linux and Mac apps, no longer says Saved or marks the document saved; the reason is shown.
+- **With the browser's storage full or blocked**, adding a template, saving a label or palette and importing settings say they are kept only until the window closes, instead of claiming success; Ctrl+Shift+T still brings back a closed document.
+- **Copy that the browser refused** says so instead of "copied"; a CDXML file that cannot be read says so instead of "Opened".
+- **Clear messages instead of silence or a wait**: a file too large or unreadable opened with the app, a Python or Java helper that crashes (not "not installed"), a missing clipboard tool on Linux, folders and the local API whose files cannot be written, a reply between the page and the app that cannot be read, OpenChemLib or the shape workers failing to start.
+- **The 3D conformer search keeps to its time limit** (a large ring or a peptide ran for a minute and more).
+- **InChI of structures of about 900 atoms and more** no longer crashes the page.
+- **File formats**: Molfile, SDF and RXN keep isotopes, unusual H counts, the file's valence, η-rings and a double bond of unknown geometry (crossed); SDF opens every record, V2000 and V3000 mixed; CDX and CDXML keep crossed double bonds, enhanced stereo, ring fills and highlights, pen and head-less curved arrows, *, Cp*, R/X labels, PF6 and other lone labels, variable attachments, a charged Cp carbon's H and a configuration known only from 3D; CIF puts molecules on symmetry elements together.
+- **Drawing**: (E)-cyclooctene and larger E ring double bonds drawn E; Clean Up of morphine, codeine and camphor keeps their stereo; a ring clicked on an aromatic atom hangs from it; ring fills survive copy and paste; a reaction arrow grows again with its text; Escape closes the popups; the selection's handles keep their size when zoomed.
+- **Security**: Save never writes through a link left beside the file; a LaTeX figure takes no commands from the file name; the app windows show only the app's own page; AI assistants write plain data files only as new files.
+- **Copy for LaTeX**: Unicode charge signs (Fe³⁺) compile with pdfLaTeX.
 
 # Reactio Draw 1.13
 
