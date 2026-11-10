@@ -48899,10 +48899,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* a carbon gets its hydrogens from the file only when it is drawn with a label (a lone "C" with none) */
       const nh = n.getAttribute('NumHydrogens');
       {
-        /* the H written above or below the symbol stays there */
+        /* the H written above or below the symbol stays there, and a label aligned on its right end keeps its H on the left (HN) */
         const la = el !== 'C' && (n.querySelector(':scope > t') || { getAttribute: () => '' }).getAttribute('LabelAlignment');
         if (la === 'Above') a.hPos = 'u';
         else if (la === 'Below') a.hPos = 'd';
+        else if (la === 'Right' && +nh > 0) a.hPos = 'l';
       }
       if (nh != null && (el !== 'C' || /^C$/.test((n.querySelector(':scope > t') || {}).textContent || '')))
         hPend.push([a, +nh]);
