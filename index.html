@@ -78552,6 +78552,32 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     closeDocNow();
   }
+  /* the closed documents are kept in the browser storage (rd-closed, shared by the windows) and here as well: when the
+     storage is blocked or full, this window's list is the one that counts, so Ctrl+Shift+T still works in this session */
+  let CLOSED_MEM = [],
+    closedOwn = false;
+  function closedList() {
+    if (!closedOwn)
+      try {
+        const C = JSON.parse(localStorage.getItem('rd-closed') || '[]');
+        if (Array.isArray(C)) return C;
+      } catch (e) {}
+    return CLOSED_MEM.slice();
+  }
+  function keepClosed(C) {
+    CLOSED_MEM = C;
+    closedOwn = true;
+    try {
+      localStorage.setItem('rd-closed', JSON.stringify(C));
+      closedOwn = false;
+      return;
+    } catch (e) {}
+    /* full: without the oldest one it may fit (this window keeps all of them) */
+    if (C.length > 1)
+      try {
+        localStorage.setItem('rd-closed', JSON.stringify(C.slice(1)));
+      } catch (e) {}
+  }
   function closeDocNow() {
     /* a drawing opened from Word: Ctrl+W hands it back to Word and closes the window, as closing the window does */
     if (window.__rdWin && window.__rdWin.embed && TABS.cur === 'main' && window.__rdFlush) {
@@ -78560,38 +78586,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     save();
     const t = TABS.list.find(x => x.id === TABS.cur);
-    let C = [];
-    try {
-      C = JSON.parse(localStorage.getItem('rd-closed') || '[]') || [];
-    } catch (e) {}
     if (mol.atoms.length || mol.texts.length || mol.arrows.length) {
+      const C = closedList();
       C.push({ name: t ? t.name : 'Document', state: JSON.parse(JSON.stringify(S)) });
       if (C.length > 10) C.shift();
-      try {
-        localStorage.setItem('rd-closed', JSON.stringify(C));
-      } catch (e) {
-        C.shift();
-        try {
-          localStorage.setItem('rd-closed', JSON.stringify(C));
-        } catch (e2) {}
-      }
+      keepClosed(C);
     }
     closeTab(TABS.cur);
     toast('Document closed');
   }
   function reopenDoc() {
-    let C = [];
-    try {
-      C = JSON.parse(localStorage.getItem('rd-closed') || '[]') || [];
-    } catch (e) {}
-    const d = C.pop();
-    if (!d) {
-      toast('No closed documents to reopen', true);
+    const C = closedList(),
+      d = C.pop();
+    if (!d || !d.state || !docStateOk(d.state)) {
+      if (d) keepClosed(C);
+      toast(d ? 'The last closed document could not be read' : 'No closed documents to reopen', true);
       return;
     }
-    try {
-      localStorage.setItem('rd-closed', JSON.stringify(C));
-    } catch (e) {}
+    keepClosed(C);
     openInTab(d.state, d.name);
     toast('Reopened ' + d.name);
   }
