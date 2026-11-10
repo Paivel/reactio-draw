@@ -49103,6 +49103,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const lab = n.querySelector(':scope > t');
         const txt = lab ? lab.textContent.trim() : '';
         if (nt === 'ExternalConnectionPoint') continue;
+        /* an alternative group ([OMe,OPh]) has no one structure: it is kept as its label */
+        if (/AlternativeGroup$/.test(nt)) {
+          const a = mkAtom(n, p);
+          setLabel(a, txt || n.getAttribute('GenericNickname') || '?');
+          nodeMap.set(n.getAttribute('id'), a);
+          made.push(a);
+          continue;
+        }
         /* "Ar" for an aryl group: files keep it as an argon atom with that label; it is the generic label Ar here */
         if (n.getAttribute('Element') === '18' && txt === 'Ar') {
           const a = mkAtom(n, p);
@@ -49227,6 +49235,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         made.push(a);
       }
       for (const b of bs) mkBond(b, nodeMap);
+      /* a variable attachment (a group on some ring position) is not an atom: its group is bonded to the ring atom
+         nearest to it, so the compound keeps its formula */
+      for (const n of ns) {
+        if (n.getAttribute('NodeType') !== 'VariableAttachment') continue;
+        const v = nodeMap.get(n.getAttribute('id')),
+          R = (n.getAttribute('Attachments') || '')
+            .trim()
+            .split(/\s+/)
+            .map(id => nodeMap.get(id))
+            .filter(Boolean);
+        const vb = v ? mol.bonds.filter(b => b.a === v.id || b.b === v.id) : [];
+        if (!R.length || vb.length !== 1) continue;
+        const o = mol.atoms.find(q => q.id === (vb[0].a === v.id ? vb[0].b : vb[0].a)),
+          r = R.reduce((t, q) => (Math.hypot(q.x - o.x, q.y - o.y) < Math.hypot(t.x - o.x, t.y - o.y) ? q : t));
+        if (vb[0].a === v.id) vb[0].a = r.id;
+        else vb[0].b = r.id;
+        mol.atoms.splice(mol.atoms.indexOf(v), 1);
+        made.splice(made.indexOf(v), 1);
+        nodeMap.set(n.getAttribute('id'), r);
+      }
       for (const ca of fr.querySelectorAll(':scope > ColoredMolecularArea')) {
         const c = colOf(ca.getAttribute('bgcolor')) && offWhite(colOf(ca.getAttribute('bgcolor')), FILL_A);
         const E = (ca.getAttribute('BasisObjects') || '')
