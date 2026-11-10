@@ -37721,9 +37721,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const v = rgb01(c);
     return v ? hexOf(v.map(x => 1 - al + al * x)) : c;
   };
+  /* only a colour as pale as one written that way is undone; a darker one (as other programs store a fill) is kept as it is */
   const offWhite = (c, al) => {
     const v = rgb01(c);
-    return v ? hexOf(v.map(x => (x - (1 - al)) / al)) : c;
+    if (!v || v.some(x => x < 1 - al - 0.01)) return c;
+    return hexOf(v.map(x => (x - (1 - al)) / al));
   };
   /* where an atom's charge sits: where the sheet drew it, or (an atom made only for export) the freest side, upper right first */
   function cdxChgSpot(m, a, fb) {
