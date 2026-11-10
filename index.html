@@ -21932,7 +21932,11 @@ function kdOf(st) {
   function ovlCmd(cmd, arg) {
     if (ovl.hidden) return false;
     ovl.focus();
-    if (ovlRange && !ovlHasSel()) {
+    /* the selection or caret from before the focus left the box comes back; a caret still in the box stays (the one noted
+       last may be a step behind the typing, and would move it) */
+    const s0 = getSelection(),
+      inBox = s0.rangeCount && ovl.contains(s0.anchorNode);
+    if (ovlRange && !ovlHasSel() && (!inBox || !ovlRange.collapsed)) {
       const s = getSelection();
       s.removeAllRanges();
       s.addRange(ovlRange);
@@ -21948,9 +21952,24 @@ function kdOf(st) {
     return true;
   }
   ovl.addEventListener('paste', e => {
+    /* pasted into the box only, not also onto the sheet by the document's paste handler */
     e.preventDefault();
+    e.stopPropagation();
     const t = (e.clipboardData || window.clipboardData).getData('text/plain');
+    const s = getSelection(),
+      at = s.rangeCount && ovl.contains(s.anchorNode) ? s.getRangeAt(0).cloneRange() : null;
+    if (at) at.collapse(true);
     document.execCommand('insertText', false, t);
+    /* plain: the pasted part does not take on the bold, italic or other style of the characters around the caret */
+    if (at && t && s.rangeCount && ovl.contains(s.focusNode)) {
+      const r = s.getRangeAt(0).cloneRange();
+      r.setStart(at.startContainer, at.startOffset);
+      if (r.collapsed) return;
+      s.removeAllRanges();
+      s.addRange(r);
+      document.execCommand('removeFormat');
+      s.collapseToEnd();
+    }
   });
   /* \delta, \nu, \Delta… typed in a text turn into δ, ν, Δ at the next character that is not a letter (the LaTeX names);
      a space right after the name is taken by it, as in LaTeX, so \nu h gives νh and \delta+ gives δ+ */
@@ -29311,6 +29330,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => (pasteMark = null), true);
   document.addEventListener('paste', e => {
     if (e.target.closest && e.target.closest('input,textarea')) return;
+    /* a paste into an editable text (the text box on the sheet) is that text's own */
+    if (e.target.isContentEditable) return;
     pasteMark = { n0: mol.next, m: mol, t: Date.now(), z0: zoom ? { ...zoom } : null };
     /* ReactioDraw.exe for Windows: a Reactio Draw object copied from Word sits on the clipboard as an OLE storage, which only the app can read */
     /* (Reactio Draw.app for Mac does the same: Word on Mac copies the object as com.microsoft.Embedded-Object) */
