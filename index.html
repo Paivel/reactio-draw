@@ -71043,7 +71043,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const fmt = String(a.format || 'smiles').toLowerCase(),
         name = 'api.' + (fmt === 'smiles' ? 'smi' : fmt);
       if (fmt === 'xyz') importXyz(String(a.text || ''), name, { api: true, frame: a.frame });
-      else importText(name, String(a.text || ''));
+      else {
+        /* a long repeat drawn whole, without the question asked when pasting */
+        const skip0 = REP_SKIP;
+        REP_SKIP = true;
+        try {
+          importText(name, String(a.text || ''));
+        } finally {
+          REP_SKIP = skip0;
+        }
+      }
       return { structures: fragments().length };
     },
     /* a structure (index, or the id of any of its atoms), an arrow or a text (id), or several (ids) */
@@ -74742,8 +74751,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function apiImport(t, f) {
     if (!['smiles', 'mol', 'sdf', 'rxn', 'cdxml'].includes(f))
       throw new Error('Formats: smiles, mol, sdf, rxn, cdxml, json');
-    const n0 = mol.atoms.length + mol.arrows.length;
-    importText('api.' + (f === 'smiles' ? 'smi' : f), t);
+    const n0 = mol.atoms.length + mol.arrows.length,
+      skip0 = REP_SKIP;
+    /* a long repeat is drawn whole, as addSmiles draws it: the "repeat unit or whole chain?" question is for pasting */
+    REP_SKIP = true;
+    try {
+      importText('api.' + (f === 'smiles' ? 'smi' : f), t);
+    } finally {
+      REP_SKIP = skip0;
+    }
     if (mol.atoms.length + mol.arrows.length === n0) throw new Error('Nothing could be read from the text');
   }
   /* a SMILES written the way list and properties write it (the same structure always gives the same text), without touching the sheet */
