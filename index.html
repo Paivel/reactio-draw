@@ -63712,6 +63712,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (t.fsym) {
         const c = fsymCentre(t),
           o = { type: 'symbol', id: t.id, symbol: FSYM_NAME[t.fsym], at: [+c.x.toFixed(1), +c.y.toFixed(1)], angle: +(t.ang || 0), box: apiTextBox(t) };
+        /* a symbol drawn bigger (size): its box as much bigger about its centre */
+        if (t.fk && t.fk !== 1) {
+          const b = o.box,
+            k = t.fk;
+          o.box = { x0: c.x + (b.x0 - c.x) * k, y0: c.y + (b.y0 - c.y) * k, x1: c.x + (b.x1 - c.x) * k, y1: c.y + (b.y1 - c.y) * k };
+        }
         if (t.orb) Object.assign(o, { orbital: t.orb.id, lobe: t.orb.lobe || 1, along: t.orb.along });
         if (t.color) o.color = t.color;
         out.push(o);
