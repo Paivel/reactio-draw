@@ -40,6 +40,12 @@ var (
 	webkit_user_script_new                      func(src string, frames, when int32, allow, block uintptr) uintptr
 	webkit_web_view_new_with_ucm                func(ucm uintptr) uintptr
 	webkit_web_view_load_uri                    func(v uintptr, uri string)
+	webkit_web_view_get_uri                     func(v uintptr) uintptr
+	webkit_nav_decision_get_action              func(d uintptr) uintptr
+	webkit_navigation_action_get_request        func(a uintptr) uintptr
+	webkit_navigation_action_get_type           func(a uintptr) int32
+	webkit_uri_request_get_uri                  func(r uintptr) uintptr
+	webkit_policy_decision_ignore               func(d uintptr)
 	webkit_web_view_get_settings                func(v uintptr) uintptr
 	webkit_settings_set_dev_extras              func(s uintptr, on bool)
 	webkit_settings_set_js_clipboard            func(s uintptr, on bool)
@@ -108,6 +114,12 @@ func loadGTK() error {
 	r(&webkit_user_script_new, wk, "webkit_user_script_new")
 	r(&webkit_web_view_new_with_ucm, wk, "webkit_web_view_new_with_user_content_manager")
 	r(&webkit_web_view_load_uri, wk, "webkit_web_view_load_uri")
+	r(&webkit_web_view_get_uri, wk, "webkit_web_view_get_uri")
+	r(&webkit_nav_decision_get_action, wk, "webkit_navigation_policy_decision_get_navigation_action")
+	r(&webkit_navigation_action_get_request, wk, "webkit_navigation_action_get_request")
+	r(&webkit_navigation_action_get_type, wk, "webkit_navigation_action_get_navigation_type")
+	r(&webkit_uri_request_get_uri, wk, "webkit_uri_request_get_uri")
+	r(&webkit_policy_decision_ignore, wk, "webkit_policy_decision_ignore")
 	r(&webkit_web_view_get_settings, wk, "webkit_web_view_get_settings")
 	r(&webkit_settings_set_dev_extras, wk, "webkit_settings_set_enable_developer_extras")
 	r(&webkit_settings_set_js_clipboard, wk, "webkit_settings_set_javascript_can_access_clipboard")

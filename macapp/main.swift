@@ -273,6 +273,8 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     }
 
     func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
+        // only the app's own page, in the window's main frame, may use the bridge
+        guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "app.reactiodraw.local" else { return }
         guard let s = message.body as? String, let d = s.data(using: .utf8),
               let m = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any],
               let id = m["id"] as? String, let cmd = m["cmd"] as? String else { return }
@@ -939,6 +941,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         pending += filenames.map { URL(fileURLWithPath: $0) }
         flushFiles()
         sender.reply(toOpenOrPrint: .success)
+    }
+    /* the window shows only the app's own page: any other address (a link, a redirect, a script of a document) is not
+       loaded in it, and a link the user clicked opens in the default browser, as the page's own links do; about:blank
+       is let through, and frames in the page may also show the page's own blob: and data: addresses */
+    func webView(_ w: WKWebView, decidePolicyFor action: WKNavigationAction, decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        let u = action.request.url
+        let scheme = u?.scheme?.lowercased() ?? ""
+        if (scheme == "https" && u?.host == "app.reactiodraw.local") || scheme == "about" { decisionHandler(.allow); return }
+        if let f = action.targetFrame, !f.isMainFrame, ["blob", "data"].contains(scheme) { decisionHandler(.allow); return }
+        if action.navigationType == .linkActivated, let u = u, ["http", "https"].contains(scheme) { NSWorkspace.shared.open(u) }
+        decisionHandler(.cancel)
     }
     func webView(_ w: WKWebView, didFinish navigation: WKNavigation!) { loaded = true; flushFiles(); LocalAPI.shared.failWaiting("the page was loaded again before it answered: the command may have been done in part; look at the sheet before sending it again") }
     func flushFiles() {

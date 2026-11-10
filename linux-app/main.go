@@ -32,6 +32,21 @@ var app struct {
 
 var logFile *os.File
 
+// ownPage: uri is the app's page, the file idx (frames: also about:blank and the page's own blob: addresses)
+func ownPage(uri, idx string, frames bool) bool {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+	switch u.Scheme {
+	case "file":
+		return u.Host == "" && u.Path == idx
+	case "about", "blob":
+		return frames
+	}
+	return false
+}
+
 func logf(f string, a ...interface{}) {
 	if logFile == nil {
 		return
@@ -115,6 +130,11 @@ func main() {
 	ucm := webkit_user_content_manager_new()
 	webkit_user_content_manager_register_script(ucm, "rd", 0)
 	g_signal_connect_data(ucm, "script-message-received::rd", purego.NewCallback(func(m, res, data uintptr) uintptr {
+		/* only the app's own page may use the bridge */
+		if !ownPage(goString(webkit_web_view_get_uri(app.view), false), idx, false) {
+			logf("bridge message from another page refused")
+			return 0
+		}
 		v := res
 		if webkit_javascript_result_get_js_value != nil {
 			v = webkit_javascript_result_get_js_value(res)
@@ -142,6 +162,25 @@ func main() {
 	webkit_settings_set_dev_extras(st, true)
 	webkit_settings_set_js_clipboard(st, true)
 	gtk_container_add(app.win, app.view)
+
+	/* the window shows only the app's own page: any other address (a link, a redirect, a script of a document) is not
+	   loaded in it, and a link the user clicked opens in the default browser, as the page's own links do */
+	g_signal_connect_data(app.view, "decide-policy", purego.NewCallback(func(v, d, kind, data uintptr) uintptr {
+		if int32(kind) == 2 { // a response: the navigation itself was already let through
+			return 0
+		}
+		a := webkit_nav_decision_get_action(d)
+		uri := goString(webkit_uri_request_get_uri(webkit_navigation_action_get_request(a)), false)
+		if ownPage(uri, idx, true) {
+			return 0
+		}
+		logf("navigation refused: %s", uri)
+		if webkit_navigation_action_get_type(a) == 0 { // a link clicked
+			openLink(uri)
+		}
+		webkit_policy_decision_ignore(d)
+		return 1
+	}), 0, 0, 0)
 
 	/* closing the window asks the page first (unsaved documents); the page answers with quit */
 	g_signal_connect_data(app.win, "delete-event", purego.NewCallback(func(w, ev, data uintptr) uintptr {

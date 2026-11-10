@@ -9,6 +9,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -69,6 +70,24 @@ func embedScript(kd string) string {
   delete st.zoom;localStorage.setItem('rd-en-4',JSON.stringify(st));
   localStorage.setItem('rd-tabs',JSON.stringify({cur:'main',list:[{id:'main',name:'Word object'}]}));
   if(d&&d.clip)window.__rdEmbedClip=d.clip;}catch(e){}})();`
+}
+
+// ownPage: uri is the app's page (served from appHost or embedHost, or the file idx itself)
+func ownPage(uri, idx string) bool {
+	u, err := url.Parse(uri)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "https":
+		h := strings.ToLower(u.Host)
+		return h == appHost || h == embedHost
+	case "file":
+		return strings.EqualFold(strings.TrimPrefix(u.Path, "/"), filepath.ToSlash(idx))
+	case "about":
+		return uri == "about:blank"
+	}
+	return false
 }
 
 func main() {
@@ -203,6 +222,20 @@ func main() {
 	if !mapped && !app.embedding {
 		triedFile = true
 	}
+	// the window shows only the app's own page: any other address (a link, a redirect, a script of a document) is not
+	// loaded in it, and one the user clicked opens in the default browser, as the page's own links do; the bridge
+	// answers only the app's own page
+	ch.NavigationStartingCallback = func(uri string, user bool) bool {
+		if ownPage(uri, idx) {
+			return true
+		}
+		logf("navigation refused: %s", uri)
+		if user {
+			openLink(uri)
+		}
+		return false
+	}
+	ch.MessageSourceCallback = func(src string) bool { return ownPage(src, idx) }
 	w.Bind("__rdPost", func(s string) { w.Dispatch(func() { handle(s) }) })
 	// files given on the command line (double-click in Explorer, Open with): handed to the page before it starts
 	if cliOn {
