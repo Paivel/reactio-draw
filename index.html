@@ -39385,8 +39385,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       const fill = tag === 'line' ? null : epsRgb(cs.fill, op * op1(cs.fillOpacity)),
         stroke = epsRgb(cs.stroke, op * op1(cs.strokeOpacity));
       const sw = (parseFloat(cs.strokeWidth) || 0) * Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) * k,
-        grad = tag !== 'line' && /^url\(/.test(cs.fill || '');
-      if (!fill && !grad && !(stroke && sw > 0)) return;
+        grad = tag !== 'line' && /^url\(/.test(cs.fill || ''),
+        sgrad = sw > 0 && /^url\(/.test(cs.stroke || '') ? epsGradAt(cs.stroke, op * op1(cs.strokeOpacity)) : null;
+      if (!fill && !grad && !(stroke && sw > 0) && !sgrad) return;
       let p = 'newpath';
       for (const sg of segs) {
         if (sg[0] === 'M') {
@@ -39407,15 +39408,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (fill) {
         setCol(fill);
         out.push(
-          stroke && sw > 0
+          (stroke && sw > 0) || sgrad
             ? 'gsave ' + (cs.fillRule === 'evenodd' ? 'eofill' : 'fill') + ' grestore'
             : cs.fillRule === 'evenodd'
               ? 'eofill'
               : 'fill'
         );
       }
-      if (stroke && sw > 0) {
-        setCol(stroke);
+      if ((stroke && sw > 0) || sgrad) {
         const cap = { butt: 0, round: 1, square: 2 }[cs.strokeLinecap] || 0,
           join = { miter: 0, round: 1, bevel: 2 }[cs.strokeLinejoin] || 0;
         const sc = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) * k;
@@ -39434,7 +39434,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               epsNum((parseFloat(cs.strokeDashoffset) || 0) * sc);
           }
         }
-        out.push(`${epsNum(sw)} w ${cap} J ${join} j ${dash} d stroke`);
+        if (!sgrad) {
+          setCol(stroke);
+          out.push(`${epsNum(sw)} w ${cap} J ${join} j ${dash} d stroke`);
+        } else {
+          /* a gradient stroke (the shaded tubes of the 3D tube style, shaded across): bands from the outside in, each
+             the colour of the gradient at its distance from the middle */
+          const N = 6;
+          for (let i = N; i >= 1; i--) {
+            const u = (i - 0.5) / (2 * N),
+              c0 = sgrad(0.5 - u),
+              c1 = sgrad(0.5 + u);
+            setCol(c0.map((x, j) => epsNum((x + c1[j]) / 2)).join(' '));
+            out.push(`${i < N ? p + ' ' : ''}${epsNum((sw * i) / N)} w ${cap} J ${join} j ${dash} d stroke`);
+          }
+        }
       }
     };
     /* gradient fills (shaded shapes, orbitals): a radial gradient becomes 40 filled ellipses inside the shape; any other gradient its average colour */
@@ -39456,11 +39470,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       return p;
     };
-    function epsGrad(el, cs, m, path, op) {
-      const id = /url\(["']?#([^"')]+)/.exec(cs.fill);
-      const g = id && root.querySelector('#' + CSS.escape(id[1]));
-      if (!g) return false;
-      const fr = v => (v == null ? null : /%$/.test(v) ? parseFloat(v) / 100 : parseFloat(v));
+    /* the colour (0…1 each, on white) of a gradient paint url(#id) at t (0…1) along it, alpha a; null if not found */
+    function epsGradAt(paint, a) {
+      const id = /url\(["']?#([^"')]+)/.exec(paint),
+        g = id && root.querySelector('#' + CSS.escape(id[1]));
+      if (!g) return null;
+      const fr = v => (v == null ? 0 : /%$/.test(v) ? parseFloat(v) / 100 : parseFloat(v) || 0);
       const stops = [...g.querySelectorAll('stop')].map(s => {
         const sc = getComputedStyle(s),
           c = /rgba?\(([^)]+)\)/.exec(sc.stopColor);
@@ -39471,21 +39486,30 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               .map(parseFloat)
           : [0, 0, 0];
         return {
-          o: Math.max(0, Math.min(1, fr(s.getAttribute('offset')) || 0)),
+          o: Math.max(0, Math.min(1, fr(s.getAttribute('offset')))),
           c: v.slice(0, 3),
           a: (v.length > 3 ? v[3] : 1) * op1(sc.stopOpacity)
         };
       });
-      if (!stops.length) return false;
-      const at = t => {
+      if (!stops.length) return null;
+      return t => {
         let i = 0;
         while (i < stops.length - 1 && stops[i + 1].o < t) i++;
         const A = stops[i],
-          B = stops[Math.min(i + 1, stops.length - 1)];
-        const u = B.o > A.o ? Math.max(0, Math.min(1, (t - A.o) / (B.o - A.o))) : t < A.o ? 0 : 1;
-        const a = (A.a + (B.a - A.a) * u) * op * op1(cs.fillOpacity);
-        return A.c.map((x, j) => epsNum(((x + (B.c[j] - x) * u) * a + 255 * (1 - a)) / 255)).join(' ');
+          B = stops[Math.min(i + 1, stops.length - 1)],
+          u = B.o > A.o ? Math.max(0, Math.min(1, (t - A.o) / (B.o - A.o))) : t < A.o ? 0 : 1,
+          al = (A.a + (B.a - A.a) * u) * a;
+        return A.c.map((x, j) => ((x + (B.c[j] - x) * u) * al + 255 * (1 - al)) / 255);
       };
+    }
+    function epsGrad(el, cs, m, path, op) {
+      const id = /url\(["']?#([^"')]+)/.exec(cs.fill);
+      const g = id && root.querySelector('#' + CSS.escape(id[1]));
+      if (!g) return false;
+      const fr = v => (v == null ? null : /%$/.test(v) ? parseFloat(v) / 100 : parseFloat(v));
+      const at0 = epsGradAt(cs.fill, op * op1(cs.fillOpacity));
+      if (!at0) return false;
+      const at = t => at0(t).map(epsNum).join(' ');
       if (g.tagName.toLowerCase() !== 'radialgradient') {
         out.push(path + ' ' + at(0.5) + ' setrgbcolor fill');
         curCol = null;
