@@ -46533,7 +46533,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!v) return null;
     try {
       const d = JSON.parse(decodeURIComponent(escape(atob(v[1]))));
-      return d && d.state && d.state.mol ? d : null;
+      return d && d.state && docStateOk(d.state) ? d : null;
     } catch (e) {
       return null;
     }
@@ -48778,6 +48778,34 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return null;
       });
   }
+  /* a document's state can be opened only when its drawing has the lists every part of the program reads: atoms with a
+     position, bonds between atoms that are there, arrows; texts and fills may be missing (an older file). A damaged
+     file (an atom list cut off, a key spoiled by bad bytes) is refused instead of leaving a tab that cannot be worked in */
+  function docStateOk(st) {
+    const m = st && st.mol,
+      obj = x => x && typeof x === 'object' && !Array.isArray(x),
+      list = (x, opt) => (x == null ? opt : Array.isArray(x) && x.every(obj));
+    if (!obj(st) || !obj(m) || !list(m.atoms) || !list(m.bonds) || !list(m.arrows) || !list(m.texts, true) || !list(m.fills, true))
+      return false;
+    const ids = new Set();
+    for (const a of m.atoms) {
+      if (!isFinite(a.x) || !isFinite(a.y) || a.id == null) return false;
+      ids.add(a.id);
+    }
+    return m.bonds.every(b => ids.has(b.a) && ids.has(b.b));
+  }
+  /* the Reactio Draw document kept in a CDXML comment (<!--rd:...-->), or null when there is none or it is damaged */
+  function cdxmlRdDoc(text) {
+    const m = CMTRX.exec(text || '');
+    if (!m) return null;
+    let d = null;
+    try {
+      d = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+    } catch (e) {
+      return null;
+    }
+    return d && d.state && docStateOk(d.state) ? d : null;
+  }
   function importText(name, text) {
     if (/\.cif$/i.test(name) || /^\s*(#.*\n\s*)*data_/i.test(text)) {
       importCif(text, name);
@@ -48816,23 +48844,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         toast('Not a Reactio Draw document', true);
         return;
       }
+      if (!docStateOk(d.state)) {
+        toast('That file could not be read: its drawing is damaged', true);
+        return;
+      }
       openInTab(d.state, name);
       toast('Opened ' + name + ' in a new tab');
       return;
     }
-    {
-      const m = CMTRX.exec(text);
-      if (m) {
-        let d = null;
-        try {
-          d = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
-        } catch (e) {}
-        if (d && d.state && d.state.mol) {
-          openInTab(d.state, name);
-          toast('Opened ' + name + ' in a new tab (Reactio Draw document inside the CDXML)');
-          return;
-        }
+    if (CMTRX.test(text)) {
+      const d = cdxmlRdDoc(text);
+      if (d) {
+        openInTab(d.state, name);
+        toast('Opened ' + name + ' in a new tab (Reactio Draw document inside the CDXML)');
+        return;
       }
+      /* the Reactio Draw data in the comment is damaged: the CDXML drawing itself is read below */
     }
     if (ext === 'cdxml' || /<CDXML/i.test(text)) {
       const n0 = mol.next;
@@ -50218,9 +50245,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       0
     );
   }
+  /* true when the file opened in a tab of its own that now stands for it (false when it could not be read) */
   function openExternal(name, u, path) {
-    openExternal0(name, u, path);
+    const ok = openExternal0(name, u, path);
     if (!/\.docx$/i.test(name)) fitOnOpen();
+    return ok === true;
   }
   function openExternal0(name, u, path) {
     if (/\.rdword$/i.test(name)) {
@@ -50239,7 +50268,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         cdxDoc = rdFromCdxml(cdxmlOfCdx(u));
       } catch (e) {}
     }
-    const whole = !!cdxDoc || (text != null && (/\.(json|reactio)$/i.test(name) || CMTRX.test(text)));
+    const whole = !!cdxDoc || (text != null && (/\.(json|reactio)$/i.test(name) || !!cdxmlRdDoc(text)));
     const ok = openInFileTab(name, whole, () => {
       if (/\.cdx$/i.test(name)) importCdxBytes(u, name);
       else if (/\.zip$/i.test(name)) openZip(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength), name);
@@ -50247,10 +50276,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     /* the tab now stands for this file: Save writes back to it (zips are only a container, so they stay unlinked) */
     if (ok && !/\.zip$/i.test(name)) linkTab(curTab(), name, path);
+    return ok;
   }
   /* a file opened from outside gets a tab of its own, named after it (an empty untitled tab is used as it is; whole
      Reactio Draw documents make their own tab). When the file cannot be read (an error was shown and the sheet stayed
      empty), that tab goes again and the tab the user was in comes back, so a failed open leaves nothing behind.
+     A whole document that cannot be read leaves the current one exactly as it was (its name, its file, its saved state
+     and its drawing): it is not renamed or linked to the file, so a later Save cannot write over the file with it.
      Returns false when the file could not be read. */
   function openInFileTab(name, whole, run) {
     const base = String(name).replace(/\.[^.]+$/, ''),
@@ -50271,14 +50303,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         renderTabs();
       }
     }
-    const e0 = toastErrs;
+    const e0 = toastErrs,
+      ids0 = new Set(TABS.list.map(t => t.id));
+    let threw = false;
     try {
       run();
     } catch (e) {
+      threw = true;
       console.error(e);
       toast('Could not open ' + name, true);
     }
-    const failed = !whole && toastErrs !== e0 && (made ? TABS.cur === made : TABS.cur === prev) && empty();
+    if (whole) {
+      /* a whole document opens in a tab it makes itself: no new tab (or an error while making it) means it failed */
+      const extra = TABS.list.filter(t => !ids0.has(t.id)).map(t => t.id);
+      if (!threw && extra.length && TABS.cur !== prev) return true;
+      if (extra.length) {
+        if (TABS.list.some(t => t.id === prev)) switchTab(prev);
+        extra.forEach(closeTab);
+      }
+      return false;
+    }
+    const failed = toastErrs !== e0 && (made ? TABS.cur === made : TABS.cur === prev) && empty();
     if (!failed) {
       dropStartTab(t0);
       return true;
@@ -50360,9 +50405,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       hp = it && it.getAsFileSystemHandle ? it.getAsFileSystemHandle() : null;
     const r = new FileReader();
     r.onload = () => {
-      openExternal(f.name, new Uint8Array(r.result), '');
+      const ok = openExternal(f.name, new Uint8Array(r.result), '');
       const t = curTab();
-      if (hp && t && t.file)
+      if (ok && hp && t && t.file)
         hp.then(h => {
           if (h && h.kind === 'file') fhPut(t.id, h);
         }).catch(() => {});
@@ -78815,9 +78860,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           openZip(u.buffer, f.name);
           return;
         }
-        openExternal(f.name, u, '');
+        const ok = openExternal(f.name, u, '');
         const t = curTab();
-        if (t && t.file) fhPut(t.id, h);
+        if (ok && t && t.file) fhPut(t.id, h);
       } catch (e) {
         if (!e || e.name !== 'AbortError') {
           fileIn.value = '';
