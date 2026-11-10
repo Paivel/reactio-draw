@@ -75459,7 +75459,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           ReactioAPI.run('set', { text: new TextDecoder().decode(u), format: fm });
         }
       } else {
-        if (/[\\/]/.test(inp) || /\.(reactio|mol|sdf|sd|rxn|smi|smiles|cdxml|cdx|json|txt|docx)$/i.test(inp))
+        /* a SMILES may hold / and \ (C/C=C/C): taken for a path only when it reads as no SMILES */
+        if (/\.(reactio|mol|sdf|sd|rxn|smi|smiles|cdxml|cdx|json|txt|docx)$/i.test(inp) || (/[\\/]/.test(inp) && !parseSmiles(inp)))
           throw new Error(inp + ': no such file');
         ReactioAPI.run('set', { text: inp, format: 'smiles' });
       }
