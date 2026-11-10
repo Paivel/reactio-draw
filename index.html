@@ -34560,9 +34560,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* SMILES with stereochemistry (R/S from wedges and hashes, E/Z from the drawing) for naming: the drawing goes to OpenChemLib as a molfile */
   function stereoSmilesList(only, cx) {
     const O = oclLoad();
+    /* the centre of an η ring (Cp–Fe drawn to the ring's middle) is no atom: left out, as in the sheet's SMILES */
     const m = expandedShared(),
-      byId = new Map(m.atoms.map(a => [a.id, a])),
-      adj = new Map(m.atoms.map(a => [a.id, []]));
+      at = m.atoms.filter(a => !a.multi),
+      byId = new Map(at.map(a => [a.id, a])),
+      adj = new Map(at.map(a => [a.id, []]));
     for (const b of m.bonds) {
       if (adj.has(b.a) && adj.has(b.b)) {
         adj.get(b.a).push(b.b);
@@ -34571,7 +34573,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     const seen = new Set(),
       frs = [];
-    for (const a of m.atoms) {
+    for (const a of at) {
       if (seen.has(a.id)) continue;
       const f = [],
         st = [a.id];
@@ -36540,6 +36542,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
               ? '⚠ ' + nm + ': read back as a different structure — do not trust it'
               : '⚠ ' + nm + ': ' + v
         );
+      }
+      /* η bonds to a ring's middle are in no part: the parts named one by one are not the complex */
+      if (mol.atoms.some(a => a.multi && (!sel.size || sel.has(a.id)))) {
+        allOk = false;
+        notes.push('⚠ the η bonds to the ring centres are not in this name: each part is named on its own');
       }
       OCTET_NAMES.set(nameKey(), {
         name: names.join('; '),
