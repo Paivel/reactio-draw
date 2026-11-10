@@ -56485,23 +56485,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (frontPool) frontPool.forEach(w => w.terminate());
     frontPool = null;
   }
-  /* one shape from worker k (or the cache); in the page when there are no workers or the worker failed; null when it
-     cannot be done at all (OpenChemLib does not start) */
+  /* one shape from worker k (or the cache); in the page when there are no workers or the worker failed (rejected when
+     that cannot run either: OpenChemLib does not start, and Clean Up then does without the shapes) */
   function frontAsk(k, sp) {
     const kept = oclShapeKept(sp);
     if (kept !== undefined) return Promise.resolve(kept);
-    const inPage = () => {
-      try {
-        return oclShape(oclLoad(), sp);
-      } catch (e) {
-        return null;
-      }
-    };
+    const inPage = () => new Promise(r => r(oclShape(oclLoad(), sp)));
     const pool = frontWorkers();
-    if (!pool) return Promise.resolve(inPage());
+    if (!pool) return inPage();
     const W = pool[k % pool.length];
-    if (W.__dead) return Promise.resolve(inPage());
-    return new Promise(done => {
+    if (W.__dead) return inPage();
+    return new Promise((done, no) => {
       const id = Math.random(),
         on = e => {
           if (e.data.id !== id) return;
@@ -56512,7 +56506,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         },
         fail = () => {
           W.removeEventListener('message', on);
-          done(inPage());
+          inPage().then(done, no);
         };
       W.addEventListener('message', on);
       W.__wait.add(fail);
