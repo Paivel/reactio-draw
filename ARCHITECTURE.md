@@ -64,6 +64,7 @@ A `.reactio` file is `{rd: 1, state: S}`. Each tab is its own `S`, kept in the b
 | Structure checks | `structChecks`, `runChecks` |
 | Reagent table | `schemeOrder`, `syncTable`, `calc`, `renderTable`, `renderCond` |
 | Analysis, HRMS | `updateInfo`, `refreshAna`, `hrmsCandidates` |
+| SMILES and InChI in the panel, made on Show (limits `SMI_MAX`, `SMI_STEREO_MAX`, `INCHI_MAX`) | `idPanelSync`, `idShowSmiles`, `idShowInchi`, `idScope` |
 | NMR prediction | `nmrEnsure`, `nmrPredict`, `nmrRun` (the shift encoder is its own `<script>` near the end) |
 | InChI | `inchiOf`, `inchiMolfile` |
 | Molfile, SDF, RXN | `molBlock`, `parseMolBlock`, `exportFormats` |

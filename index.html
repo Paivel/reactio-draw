@@ -4417,10 +4417,21 @@ function kdOf(st) {
     BW = 900,
     BH = 440,
     ANG = 1.54 / L;
-  /* the size from which a structure from a SMILES is drawn in steps, with Stop between them (BIG_PASTE), and from which the
-     SMILES in the panel is made only when asked for (BIG_INFO) */
+  /* the size from which a structure from a SMILES is drawn in steps, with Stop between them (BIG_PASTE), and from which no
+     name is looked for on every change (BIG_INFO) */
   const BIG_PASTE = 600,
     BIG_INFO = 800;
+  /* SMILES and InChI in the Properties panel are made only when Show (or Copy) is pressed, for the selection or the whole
+     sheet; the atoms are counted in that scope first, repeat units written out n times and labels as their groups.
+     Measured in Chromium: a SMILES without stereo takes 0.5–0.7 s for 10 000 atoms (a chain, a net of rings) and 2–5 s for
+     20 000–50 000 (a polymer written out), so above SMI_MAX the panel says to use File → Export. One made with its stereo
+     (wedges or double bonds) grows much faster: 1000 atoms 1–5 s, 2000 atoms 4–40 s, 5000 more than a minute: above
+     SMI_STEREO_MAX the same message. The InChI library gives nothing above 1023 atoms: above INCHI_MAX it is not asked
+     at all. From SMI_WAIT atoms "Working…" is shown while the SMILES is made. */
+  const SMI_MAX = 20000,
+    SMI_STEREO_MAX = 1000,
+    INCHI_MAX = 1023,
+    SMI_WAIT = 300;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
   const RD_VERSION = '1.14';
@@ -19237,33 +19248,194 @@ function kdOf(st) {
           })
           .join('');
     }
-    /* a very large structure (a polymer written out): its SMILES with stereo takes long to work out, so it is made when asked
-       for (Copy, export, or a click here), not on every change */
-    {
-      const big = mol.atoms.length > BIG_INFO,
-        box = $('smiles');
-      if (!big) box.textContent = currentSmiles(false, true);
-      else {
-        box.textContent = '';
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn ghost sm';
-        b.textContent = 'Show the SMILES (' + mol.atoms.length + ' atoms: takes a while)';
-        b.onclick = () => {
-          b.textContent = 'Working…';
-          setTimeout(() => (box.textContent = currentSmiles(false, true)), 30);
-        };
-        box.appendChild(b);
-      }
-    }
+    /* SMILES and InChI: made only when asked for (Show or Copy), not on every change; a value shown stays while the drawing
+       and the selection are the same */
+    try {
+      idPanelSync();
+    } catch (e) {}
     $('anaIns').hidden = !frs.length;
     try {
       syncNameBox();
     } catch (e) {}
-    try {
-      syncInchi();
-    } catch (e) {}
     updateInfoWin();
+  }
+  /* ===== SMILES and InChI in the Properties panel, on request =====
+     ID_SHOWN.smi / .inchi: what is shown and the state of the drawing it was made for (idSig); null: the Show button */
+  const ID_SHOWN = { smi: null, inchi: null };
+  let ID_RUNS = 0; /* how many times the panel made a SMILES or an InChI (for the tests) */
+  /* the drawing and the selection as one string: cheap next to a SMILES (no ring or stereo perception); a picture's data
+     counts by its length only */
+  function idSig() {
+    return (
+      JSON.stringify([mol.atoms, mol.bonds, mol.texts, mol.arrows.map(r => (r.src ? { ...r, src: String(r.src).length } : r))]) +
+      '|' +
+      [...sel].join(',')
+    );
+  }
+  /* the atoms in the scope asked for (only, else the selected structures, else the whole sheet), counted without writing
+     anything out: n with every repeat unit written out n times and every label as the atoms of its group; low the same
+     without the labels (never more than the Molfile for InChI has); stereo the atoms of the structures whose SMILES is
+     made with its stereo (a wedge, a double bond or a 3D shape: the slow way, see SMI_STEREO_MAX) */
+  function idScope(only) {
+    const want = only || (sel.size ? sel : null),
+      frs = fragments(),
+      pick = want ? frs.filter(f => f.some(a => want.has(a.id))) : frs,
+      fi = new Map();
+    pick.forEach((f, k) => f.forEach(a => fi.set(a.id, k)));
+    const st = pick.map(f => is3D(f));
+    for (const b of mol.bonds) {
+      const k = fi.get(b.a);
+      if (k !== undefined && !st[k] && (b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) st[k] = true;
+    }
+    const size = pick.map(f => {
+      let n = 0,
+        low = 0;
+      for (const a of f) {
+        if (a.multi) continue;
+        low++;
+        n += a.label && a.grp ? Math.max(1, (String(a.grp).match(SMI_ATOM) || []).length) : 1;
+      }
+      return { n, low };
+    });
+    for (const s of srus()) {
+      const k = fi.get(s.head.id);
+      if (k === undefined) continue;
+      size[k].n += (s.n - 1) * s.U.length;
+      size[k].low += (s.n - 1) * s.U.length;
+      /* drawn from a SMILES and unchanged since: its SMILES is that text with n units, made at once */
+      const q = s.r.sru;
+      if (st[k] && q.unit && q.sig === sruChemSig(pick[k], q) && srus().filter(x => fi.get(x.head.id) === k).length === 1) st[k] = false;
+    }
+    let n = 0,
+      low = 0,
+      stereo = 0;
+    size.forEach((z, k) => {
+      n += z.n;
+      low += z.low;
+      if (st[k]) stereo += z.n;
+    });
+    return { n, low, stereo };
+  }
+  const idScopeAtoms = only => idScope(only).n;
+  const idScopeWord = () => (sel.size ? 'the selection' : 'the whole sheet');
+  const idHasChem = () => mol.atoms.length > 0;
+  function idButton(box, kind, onClick) {
+    box.textContent = '';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'btn ghost sm';
+    b.dataset.show = kind;
+    b.textContent = 'Show for ' + idScopeWord();
+    b.title =
+      (kind === 'smi' ? 'Make the SMILES of ' : 'Make the InChI, InChIKey and CAS number of ') +
+      (sel.size ? 'the selected structures' : 'everything on the sheet') +
+      '. It is not made on every change, so large drawings stay fast';
+    b.onclick = onClick;
+    box.appendChild(b);
+    return b;
+  }
+  /* after a change: a value made for another drawing or selection goes, and the Show buttons come back. The InChI library
+     is still started once, in the background, as before: drawing a SMILES uses it (when it has started) to place wedges
+     that leave no centre ambiguous */
+  function idPanelSync() {
+    /* (at the very start the library's code is not read yet: tried again on the next update) */
+    if (!idPanelSync.warm)
+      try {
+        inchiLib().catch(() => {});
+        idPanelSync.warm = true;
+      } catch (e) {}
+    const sig = ID_SHOWN.smi || ID_SHOWN.inchi ? idSig() : null;
+    if (ID_SHOWN.smi && ID_SHOWN.smi.sig !== sig) ID_SHOWN.smi = null;
+    if (ID_SHOWN.inchi && ID_SHOWN.inchi.sig !== sig) ID_SHOWN.inchi = null;
+    if (!ID_SHOWN.smi) {
+      const box = $('smiles');
+      if (!idHasChem()) box.textContent = '';
+      else idButton(box, 'smi', () => idShowSmiles());
+    }
+    if (!ID_SHOWN.inchi) {
+      const I = $('inchi');
+      $('inchiKey').textContent = $('inchiNote').textContent = '';
+      if (!idHasChem()) I.textContent = '';
+      else idButton(I, 'inchi', () => idShowInchi());
+      casFill(null, null);
+    }
+  }
+  /* the SMILES of the scope, made at most once per state of the drawing: { text } or { error } */
+  function idSmilesNow() {
+    const { n, stereo } = idScope();
+    if (n > SMI_MAX) return { error: 'Too large to show here (' + n + ' atoms): use File → Export' };
+    if (stereo > SMI_STEREO_MAX)
+      return { error: 'Too large to show here with its stereo (' + stereo + ' atoms; at most ' + SMI_STEREO_MAX + '): use File → Export' };
+    ID_RUNS++;
+    try {
+      return { text: currentSmiles(false, true) };
+    } catch (e) {
+      return {
+        error:
+          e instanceof RangeError
+            ? 'Too large or too deep to make a SMILES here (' + n + ' atoms): use File → Export'
+            : 'Could not make the SMILES: ' + ((e && e.message) || e)
+      };
+    }
+  }
+  /* Show (or Copy before Show): the SMILES in the box; resolves with what idSmilesNow gave */
+  function idShowSmiles() {
+    const box = $('smiles');
+    if (ID_SHOWN.smi && ID_SHOWN.smi.sig === idSig()) return Promise.resolve(ID_SHOWN.smi.r);
+    ID_SHOWN.smi = null;
+    const put = () => {
+      const sig = idSig(),
+        r = idSmilesNow();
+      ID_SHOWN.smi = { sig, r };
+      box.textContent = '';
+      if (r.error) {
+        const s = document.createElement('span');
+        s.className = 'note';
+        s.textContent = r.error;
+        box.appendChild(s);
+      } else box.textContent = r.text;
+      return r;
+    };
+    if (idScopeAtoms() < SMI_WAIT) return Promise.resolve(put());
+    const b = box.querySelector('button');
+    if (b) {
+      b.textContent = 'Working…';
+      b.disabled = true;
+    }
+    return new Promise(res => setTimeout(() => res(put()), 30));
+  }
+  /* Show (or Copy, or Search PubChem, before Show): InChI, InChIKey and CAS number; resolves with inchiOf's answer or null */
+  function idShowInchi() {
+    if (ID_SHOWN.inchi && ID_SHOWN.inchi.sig === idSig()) return Promise.resolve(ID_SHOWN.inchi.r);
+    ID_SHOWN.inchi = null;
+    if (idShowInchi.busy) return idShowInchi.busy;
+    const I = $('inchi'),
+      K = $('inchiKey'),
+      N = $('inchiNote'),
+      sig = idSig();
+    const done = r => {
+      idShowInchi.busy = null;
+      /* the drawing changed while the InChI was being made: the Show button is back, nothing is put in */
+      if (idSig() !== sig) return r;
+      ID_SHOWN.inchi = { sig, r };
+      I.textContent = r && r.ok ? r.inchi : '';
+      K.textContent = r && r.ok ? r.key : '';
+      N.textContent = !r ? '' : r.ok ? (r.message ? 'Note: ' + r.message : '') : r.message || 'No InChI for this structure.';
+      casFill(r && r.ok ? r : null, sig);
+      return r;
+    };
+    /* too many atoms: inchiOf says so at once, before anything is written out */
+    const low = idScope().low;
+    if (low > INCHI_MAX) return Promise.resolve(done({ ok: false, message: 'Too many atoms for InChI (' + low + '; at most ' + INCHI_MAX + ')' }));
+    const b = I.querySelector('button');
+    if (b) {
+      b.textContent = 'Working…';
+      b.disabled = true;
+    }
+    ID_RUNS++;
+    return (idShowInchi.busy = new Promise(res => setTimeout(res, 30))
+      .then(() => inchiOf())
+      .then(done, e => done({ ok: false, message: 'Could not make the InChI: ' + ((e && e.message) || e) })));
   }
   let lastPtr = null;
   function updateInfoWin() {
@@ -34277,7 +34449,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     renderLib();
   });
   renderLib();
-  $('copySmi').onclick = () => copyText($('smiles').textContent, 'SMILES copied');
+  /* Copy before Show makes the SMILES (with the same limit) and shows it too */
+  $('copySmi').onclick = () =>
+    idShowSmiles().then(r => (r.error ? toast(r.error, true) : r.text ? copyText(r.text, 'SMILES copied') : toast('Nothing to copy', true)));
   /* InChI and InChIKey: the InChI library (InChI Trust / IUPAC, MIT, https://github.com/IUPAC-InChI/InChI), compiled to WebAssembly and kept
    in the page (tools/inchi in the source code); it starts the first time it is needed and runs here, nothing is sent anywhere */
   let INCHI = null;
@@ -34401,21 +34575,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const opts = gs.size === 1 && !at.some(a => a.esr === 'abs') ? (gs.has('&') ? '-SRac' : '-SRel') : '';
     return {
       mb: wedged ? mb.replace(CHIRAL_RX, CHIRAL_ON) : mb,
+      n: at.length,
       opts,
       mixed: gs.size > 1 || (gs.size && at.some(a => a.esr === 'abs'))
     };
   }
   async function inchiOf(only) {
+    /* too many atoms (a long polymer written out): said at once, before the chain is written out or the library asked */
+    {
+      const low = idScope(only).low;
+      if (low > INCHI_MAX) return { ok: false, message: 'Too many atoms for InChI (' + low + '; at most ' + INCHI_MAX + ')' };
+    }
     const r = inchiMolfile(only);
     if (!r) return null;
     if (r.unk) return { ok: false, message: 'A label that is not understood (red) has no InChI.' };
+    /* the InChI library reads at most INCHI_MAX atoms (a long polymer written out has more): not asked at all above */
+    if (r.n > INCHI_MAX) return { ok: false, message: 'Too many atoms for InChI (' + r.n + '; at most ' + INCHI_MAX + ')' };
     const f = await inchiLib(),
       o = f(r.mb, r.opts);
-    /* InChI is computed from a Molfile, which holds at most 999 atoms (a long polymer written out in full has more) */
-    {
-      const na = (r.mb.match(/^ *-?\d+\.\d{4} +-?\d+\.\d{4} +-?\d+\.\d{4} [A-Z*]/gm) || []).length;
-      if (o && !o.ok && !o.message && na >= 999) o.message = 'Too many atoms for InChI here (it reads at most 999).';
-    }
     if (o && o.ok && r.opts)
       o.message = (
         (o.message || '') +
@@ -34429,7 +34606,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ).trim();
     return o;
   }
-  let inchiFor = null;
   async function copyInchiCmd() {
     try {
       const r = await inchiOf();
@@ -34441,66 +34617,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } catch (e) {
       toast(e.message, true);
     }
-  }
-  function syncInchi() {
-    /* a very large structure: InChI when asked for (it takes long), as its SMILES */
-    if (mol.atoms.length > BIG_INFO && !syncInchi.now) {
-      inchiFor = null;
-      const I = $('inchi');
-      $('inchiKey').textContent = $('inchiNote').textContent = '';
-      I.textContent = '';
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn ghost sm';
-      b.textContent = 'Show the InChI (' + mol.atoms.length + ' atoms: takes a while)';
-      b.onclick = () => {
-        b.textContent = 'Working…';
-        setTimeout(() => {
-          syncInchi.now = true;
-          try {
-            syncInchi();
-          } finally {
-            syncInchi.now = false;
-          }
-        }, 30);
-      };
-      I.appendChild(b);
-      return;
-    }
-    /* (whether something is selected counts too: PubChem is asked only for a selected molecule) */
-    const k = currentSmiles() + '|' + nameKey() + '|' + (sel.size ? 's' : '');
-    if (k === inchiFor) return;
-    inchiFor = k;
-    const I = $('inchi'),
-      K = $('inchiKey'),
-      N = $('inchiNote');
-    if (!mol.atoms.length) {
-      I.textContent = K.textContent = N.textContent = '';
-      casFill(null, k);
-      return;
-    }
-    inchiOf()
-      .then(r => {
-        if (inchiFor !== k) return;
-        if (!r) {
-          I.textContent = K.textContent = N.textContent = '';
-          return;
-        }
-        I.textContent = r.ok ? r.inchi : '';
-        K.textContent = r.ok ? r.key : '';
-        casFill(r.ok ? r : null, k);
-        N.textContent = r.ok
-          ? r.message
-            ? 'Note: ' + r.message
-            : ''
-          : r.message || 'No InChI for this structure.';
-      })
-      .catch(e => {
-        if (inchiFor !== k) return;
-        inchiFor = null;
-        I.textContent = K.textContent = '';
-        N.textContent = e.message;
-      });
   }
   /* the CAS number: from the dictionary of names by the InChIKey (the dictionary is here in the apps; in the web version once
      it has been downloaded, else on asking); for one selected molecule PubChem can be asked, only on the button */
@@ -34541,12 +34657,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const C = $('casNo'),
       Nt = $('casNote'),
       Pb = $('pubchemCas');
-    casFor = r ? { key: r.key, k, one: !!sel.size && casOneCompound() } : null;
+    const one = !!sel.size && casOneCompound();
+    casFor = r ? { key: r.key, k, one } : null;
     C.textContent = Nt.textContent = '';
-    /* dimmed rather than switched off: a click then says what to select */
-    Pb.classList.toggle('dim', !(casFor && casFor.one));
-    Pb.style.opacity = casFor && casFor.one ? '' : '.5';
-    Pb.title = casFor && casFor.one ? 'Ask PubChem (pubchem.ncbi.nlm.nih.gov) for the CAS number of the selected molecule: only its InChIKey is sent' : 'Select one compound (a molecule or a salt) to ask PubChem for its CAS number';
+    /* dimmed rather than switched off: a click then says what to select (before Show, a click makes the InChI first) */
+    Pb.classList.toggle('dim', !one);
+    Pb.style.opacity = one ? '' : '.5';
+    Pb.title = one ? 'Ask PubChem (pubchem.ncbi.nlm.nih.gov) for the CAS number of the selected molecule: only its InChIKey is sent' : 'Select one compound (a molecule or a salt) to ask PubChem for its CAS number';
     if (!r) return;
     const show = () => {
       if (!casFor || casFor.k !== k) return;
@@ -34577,14 +34694,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (casFor && casFor.k === k) Nt.textContent = e.message;
       });
   }
-  $('copyCas').onclick = () => {
+  $('copyCas').onclick = async () => {
+    if (idHasChem()) await idShowInchi();
     const t = [...$('casNo').childNodes].filter(n => n.nodeType === 3).map(n => n.textContent).join('').trim();
     if (t) copyText(t, 'CAS number copied');
     else toast($('casNote').textContent || 'No CAS number', true);
   };
   $('pubchemCas').onclick = async () => {
+    /* the InChI not shown yet: it is made first (here, in the page), then only its InChIKey is sent */
+    if (!casFor && sel.size && casOneCompound()) await idShowInchi();
     const F = casFor,
       Nt = $('casNote');
+    if (!F && sel.size && ID_SHOWN.inchi && ID_SHOWN.inchi.r && !ID_SHOWN.inchi.r.ok)
+      return toast(ID_SHOWN.inchi.r.message || 'No InChI for this structure', true);
     if (!F || !F.one) return toast('Select one compound (a molecule or a salt) to ask PubChem for its CAS number', true);
     Nt.textContent = 'Asking PubChem…';
     try {
@@ -34609,16 +34731,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (casFor === F) Nt.textContent = 'Could not ask PubChem: ' + ((e && e.message) || e);
     }
   };
-  $('copyInchi').onclick = () => {
-    const t = $('inchi').textContent;
-    if (t) copyText(t, 'InChI copied');
-    else toast($('inchiNote').textContent || 'No InChI yet', true);
-  };
-  $('copyInchiKey').onclick = () => {
-    const t = $('inchiKey').textContent;
-    if (t) copyText(t, 'InChIKey copied');
-    else toast($('inchiNote').textContent || 'No InChIKey yet', true);
-  };
+  /* Copy before Show makes the InChI (with the same limit) and shows it too */
+  const copyInchiPart = (k, what) =>
+    idShowInchi().then(r =>
+      r && r.ok ? copyText(r[k], what + ' copied') : toast((r && r.message) || 'Nothing to give an InChI for', true)
+    );
+  $('copyInchi').onclick = () => copyInchiPart('inchi', 'InChI');
+  $('copyInchiKey').onclick = () => copyInchiPart('key', 'InChIKey');
   /* structure → name: openclatura (MIT, https://github.com/lamalab-org/openclatura) runs next to the desktop app in the computer's own
    Python, unchanged; every name is read back with OPSIN and compared with the drawing (OpenChemLib ID codes) before it is trusted */
   const NAMES = new Map();
@@ -34706,11 +34825,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   function syncNameBox() {
-    /* a very large structure: no name is looked for on every change (its SMILES takes long to make) */
-    if (mol.atoms.length > BIG_INFO) {
+    /* a very large structure: no name is looked for on every change (its SMILES takes long to make); a polymer counts with
+       its repeat units written out, as its SMILES has them */
+    const na = srus().length ? idScopeAtoms() : mol.atoms.length;
+    if (na > BIG_INFO) {
       nameFor = null;
       $('iupac').textContent = $('iupacOctet').textContent = $('iupacOctetNote').textContent = '';
-      $('iupacNote').textContent = 'Not named on every change for a structure of ' + mol.atoms.length + ' atoms';
+      $('iupacNote').textContent = 'Not named on every change for a structure of ' + na + ' atoms';
       $('nameIt').disabled = $('nameOctet').disabled = true;
       return;
     }
@@ -72580,6 +72701,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       }
       render();
+      /* the panel follows the selection (its SMILES and InChI go back to Show) */
+      try {
+        updateInfo();
+      } catch (e) {}
       return API_OPS.selection();
     },
     /* the atoms of one structure, numbered from 1: for highlight */
@@ -80237,6 +80362,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     fragBonds,
     inchiOf,
     currentSmiles,
+    get idRuns() {
+      return ID_RUNS;
+    },
+    idScopeAtoms,
     agentTexts,
     labelFrontFirst,
     useDepiction,
