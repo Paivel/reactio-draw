@@ -71225,6 +71225,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           sig0 = null;
         }
         const frs = foldPlainH(pickF);
+        /* a structure made larger or smaller (its bonds well off the document's length) keeps its size, as with the
+           Clean Up button: laid out, then brought back to its own bond length about its middle (keepBox sizes it to
+           its old box itself) */
+        const medBond = f => {
+            const ids = new Set(f.map(q => q.id)),
+              ls = mol.bonds
+                .filter(b => ids.has(b.a) && ids.has(b.b))
+                .map(b => {
+                  const p = atomById(b.a),
+                    q = atomById(b.b);
+                  return p && q ? Math.hypot(p.x - q.x, p.y - q.y) : 0;
+                })
+                .filter(x => x > 1)
+                .sort((x, y) => x - y);
+            return ls.length ? ls[ls.length >> 1] : null;
+          },
+          ownBond = frs.map(f => {
+            const m = medBond(f);
+            return m && Math.abs(m / L - 1) > 0.15 && !(a && a.keepBox) ? { id: f[0].id, m } : null;
+          });
         cleanFlat = !!(a && a.flat);
         /* which crossing bonds are in front: worked out at the end, both 3D shapes at once (frontNow) */
         let later = null;
@@ -71236,6 +71256,25 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           later = frontLater;
           frontLater = null;
           cleanFlat = false;
+        }
+        for (const o of ownBond) {
+          if (!o) continue;
+          const f = fragments().find(fr => fr.some(q => q.id === o.id)),
+            m1 = f && medBond(f);
+          if (!m1 || Math.abs(o.m / m1 - 1) < 0.01) continue;
+          const k = o.m / m1,
+            bx = fragBox(f),
+            cx = (bx.x0 + bx.x1) / 2,
+            cy = (bx.y0 + bx.y1) / 2;
+          for (const q of f) {
+            q.x = cx + (q.x - cx) * k;
+            q.y = cy + (q.y - cy) * k;
+            if (q.zx !== undefined) {
+              q.zx = cx + (q.zx - cx) * k;
+              q.zy = cy + (q.zy - cy) * k;
+            }
+            if (q.z !== undefined) q.z *= k;
+          }
         }
         const notes = [],
           swapped = [];
