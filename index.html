@@ -73829,7 +73829,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const u = st.pop();
         for (const v of neighbors(u)) if (v !== P && !side.has(v.id)) side.add(v.id), st.push(v);
       }
-      if (side.size >= fr.length) throw new Error('that side is the whole structure (a ring through both atoms): no part to mirror');
+      /* a ring through both atoms (the side comes back round to atom) with no ring system of atom's own beside it, as a
+         spiro atom has: nothing is left to mirror the part against */
+      const nb = neighbors(P);
+      if (side.size >= fr.length - 1 || (nb.some(v => v !== Q && side.has(v.id)) && nb.filter(v => !side.has(v.id)).length < 2))
+        throw new Error('that side is the whole structure (a ring through both atoms): no part to mirror');
       const S = [...side].map(atomById);
       let sig0 = null;
       try {
