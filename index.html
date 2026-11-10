@@ -56392,9 +56392,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   /* two workers, each with OpenChemLib and oclShape */
   let frontPool = null,
+    frontNoWorkers = false,
     frontJob = 0;
   function frontWorkers() {
     if (frontPool) return frontPool;
+    if (frontNoWorkers) return null;
     const lib = document.getElementById('oclLib'),
       res = document.getElementById('oclRes');
     if (!lib || !res || typeof Worker !== 'function') return null;
@@ -56408,6 +56410,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       frontPool = [0, 1].map(() => {
         const w = new Worker(url);
+        /* a worker that fails (its OpenChemLib does not start, its script cannot load) is listened to from the start:
+           its waiting jobs are done in the page instead, and the shapes are done in the page from then on */
+        w.__wait = new Set();
+        w.addEventListener('error', e => {
+          if (e && e.preventDefault) e.preventDefault();
+          w.__dead = true;
+          if (frontPool && frontPool.includes(w)) {
+            frontPool.forEach(x => x !== w && !x.__dead && x.terminate());
+            frontPool = null;
+            frontNoWorkers = true;
+          }
+          const W = [...w.__wait];
+          w.__wait.clear();
+          W.forEach(f => f());
+        });
         w.postMessage({ res: res.textContent });
         return w;
       });
@@ -56422,23 +56439,37 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (frontPool) frontPool.forEach(w => w.terminate());
     frontPool = null;
   }
-  /* one shape from worker k (or the cache); null when the worker fails */
+  /* one shape from worker k (or the cache); in the page when there are no workers or the worker failed; null when it
+     cannot be done at all (OpenChemLib does not start) */
   function frontAsk(k, sp) {
     const kept = oclShapeKept(sp);
     if (kept !== undefined) return Promise.resolve(kept);
+    const inPage = () => {
+      try {
+        return oclShape(oclLoad(), sp);
+      } catch (e) {
+        return null;
+      }
+    };
     const pool = frontWorkers();
-    if (!pool) return Promise.resolve(oclShape(oclLoad(), sp));
+    if (!pool) return Promise.resolve(inPage());
     const W = pool[k % pool.length];
+    if (W.__dead) return Promise.resolve(inPage());
     return new Promise(done => {
       const id = Math.random(),
         on = e => {
           if (e.data.id !== id) return;
           W.removeEventListener('message', on);
+          W.__wait.delete(fail);
           if (e.data.P) oclShapeKeep(sp, e.data.P);
           done(e.data.P);
+        },
+        fail = () => {
+          W.removeEventListener('message', on);
+          done(inPage());
         };
       W.addEventListener('message', on);
-      W.addEventListener('error', () => done(null), { once: true });
+      W.__wait.add(fail);
       W.postMessage({ id, sp });
     });
   }
