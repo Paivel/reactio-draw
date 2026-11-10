@@ -34829,6 +34829,103 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return null;
   }
+  /* an environment the tables lack at sphere s, looked up again with its alkyl groups generalised: each sp3 carbon
+     dmin bonds or more from the atom, on a branch of its own (joined by a bond that is in no ring), either at the edge
+     of the sphere (then CH3 or CH2, which are sp3 whatever lies beyond) or one bond inside it (then CH3 or a carbon with
+     up to three non-aromatic carbons on it). N-methylpyrrole's ring then finds the other N-alkylpyrroles at that sphere.
+     The matches are averaged, weighted by their spectra; gen is how many environments matched; null when there is
+     nothing to generalise or no match */
+  const NMR_ALK = ['CH3', 'CH2', 'CH1', 'C'];
+  function nmrGeneral(T, P, root, s, dmin) {
+    const n = P.sym.length,
+      dist = new Array(n).fill(-1);
+    dist[root] = 0;
+    for (let fr = [root], d = 1; d <= s && fr.length; d++) {
+      const nx = [];
+      for (const u of fr)
+        for (const [v] of P.adj[u])
+          if (dist[v] < 0) {
+            dist[v] = d;
+            nx.push(v);
+          }
+      fr = nx;
+    }
+    /* the bond g–p is no ring bond: g's side does not lead back to p */
+    const branch = (g, p) => {
+      const seen = new Set([g]),
+        st = [g];
+      while (st.length) {
+        const u = st.pop();
+        for (const [v] of P.adj[u]) {
+          if (u === g && v === p) continue;
+          if (v === p) return false;
+          if (seen.has(v)) continue;
+          seen.add(v);
+          st.push(v);
+        }
+      }
+      return true;
+    };
+    const cand = [];
+    for (let g = 0; g < n; g++) {
+      const d = dist[g],
+        k = s - d;
+      if (d < dmin || k > 1 || !/^C(H\d)?$/.test(P.sym[g]) || P.adj[g].some(([, b]) => P.bsym[b] !== '-'))
+        continue;
+      const up = P.adj[g].filter(([v]) => dist[v] === d - 1);
+      if (up.length !== 1 || P.adj[g].some(([v]) => dist[v] === d)) continue;
+      const kids = P.adj[g].filter(([v]) => v !== up[0][0]);
+      if (k === 1 && kids.some(([v]) => !NMR_ALK.includes(P.sym[v]))) continue;
+      cand.push({ g, k, p: up[0][0], kids });
+    }
+    /* a carbon whose parent is generalised one level inside is covered by its parent's variants */
+    const inner = new Set(cand.filter(c => c.k === 1).map(c => c.g)),
+      gen = cand.filter(c => !(c.k === 0 && inner.has(c.p)) && branch(c.g, c.p));
+    if (!gen.length) return null;
+    /* the variants of each */
+    for (const c of gen) {
+      c.vars = [];
+      if (c.k === 0) for (const sym of ['CH3', 'CH2']) c.vars.push({ sym, kids: [] });
+      else
+        (function multi(from, kids) {
+          c.vars.push({ sym: 'C' + (3 - kids.length ? 'H' + (3 - kids.length) : ''), kids });
+          if (kids.length < 3) for (let j = from; j < NMR_ALK.length; j++) multi(j, kids.concat(NMR_ALK[j]));
+        })(0, []);
+    }
+    if (gen.reduce((t, c) => t * c.vars.length, 1) > 3000) return null;
+    let sum = 0,
+      cnt = 0,
+      hits = 0;
+    const pick = new Array(gen.length).fill(0);
+    for (;;) {
+      const sym = P.sym.slice(),
+        bsym = P.bsym.slice(),
+        adj = P.adj.slice();
+      gen.forEach((c, j) => {
+        const v = c.vars[pick[j]];
+        sym[c.g] = v.sym;
+        adj[c.g] = adj[c.g].filter(([w]) => w === c.p);
+        for (const ks of v.kids) {
+          const a = sym.length,
+            b = bsym.length;
+          sym.push(ks);
+          bsym.push('-');
+          adj.push([[c.g, b]]);
+          adj[c.g].push([a, b]);
+        }
+      });
+      const f = nmrFind(T, s - 1, RDNMR.hash(RDNMR.codesFor({ adj, sym, bsym }, root, s)[s - 1]));
+      if (f) {
+        sum += f.val * f.n;
+        cnt += f.n;
+        hits++;
+      }
+      let j = 0;
+      while (j < gen.length && ++pick[j] === gen[j].vars.length) pick[j++] = 0;
+      if (j === gen.length) break;
+    }
+    return cnt ? { val: Math.round(sum / cnt), n: Math.min(255, cnt), gen: hits } : null;
+  }
   function molSig() {
     return (
       mol.atoms.map(a => a.id + a.el + (a.chg || 0) + (a.label || '')).join() +
@@ -34924,14 +35021,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           L,
           thin = null;
         for (L = RDNMR.MAXL - 1; L >= 0; L--) {
-          const f = nmrFind(T, L, RDNMR.hash(codes[L]));
+          /* missing as it is: the same sphere with its alkyl groups generalised, before a smaller sphere */
+          const f =
+            nmrFind(T, L, RDNMR.hash(codes[L])) || (L >= 1 ? nmrGeneral(T, P, i, L + 1, root ? 3 : 2) : null);
           if (!f) continue;
-          /* (for 1H, where OH, NH and solvent make single spectra spread; 13C keeps its deepest match) */
-          if (f.n >= 3 || L === 0 || nuc !== '1H') {
+          /* (for 1H, where OH, NH and solvent make single spectra spread; 13C keeps its deepest match; a generalised
+             match from a single environment counts as thin too) */
+          if ((f.n >= 3 && f.gen !== 1) || L === 0 || nuc !== '1H') {
             r = f;
             break;
           }
           if (!thin) thin = { f, L };
+          else {
+            /* a thin generalised match gives way to a thin exact one right below it that it does not agree with */
+            const off = Math.abs(thin.f.val - f.val) > 2 * (E[L + 1] || E[1]) * S;
+            if (thin.f.gen && !f.gen && thin.L === L + 1 && off) thin = { f, L };
+          }
         }
         /* agrees: within twice the usual error of the supported sphere (0.46 ppm for 1H at sphere 3, 1.4 at sphere 1) */
         const tol = r ? 2 * (E[L + 1] || E[1] || 0) * S : 0;
@@ -34952,7 +35057,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             nH: 0,
             shift: r ? r.val / S : null,
             level: r ? L + 1 : 0,
-            refs: r ? r.n : 0
+            refs: r ? r.n : 0,
+            gen: !!(r && r.gen)
           };
           groups.set(key, g);
         }
@@ -35811,7 +35917,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const rows = res
       .map(
         (g, gi) =>
-          `<tr data-ng="${gi}"><td style="text-align:right;font-family:var(--mono)">${nmrFmt(nuc, g.shift)}</td><td style="color:var(--muted)">${g.err != null ? '±' + g.err : 'no match'}</td><td>${nuc === '1H' ? (g.mult ? g.mult + (g.J && g.J.length ? ' <span style="color:var(--muted)">' + g.J.map(j => j.toFixed(1)).join(', ') + '</span>' : '') + ', ' : '') + g.nH + 'H' : g.atoms.length > 1 ? g.atoms.length + '×' : ''}</td><td style="color:var(--muted)">${g.level ? 'sphere ' + g.level + ', ' + g.refs + (g.refs >= 255 ? '+' : '') + ' ref.' : ''}</td></tr>`
+          `<tr data-ng="${gi}"><td style="text-align:right;font-family:var(--mono)">${nmrFmt(nuc, g.shift)}</td><td style="color:var(--muted)">${g.err != null ? '±' + g.err : 'no match'}</td><td>${nuc === '1H' ? (g.mult ? g.mult + (g.J && g.J.length ? ' <span style="color:var(--muted)">' + g.J.map(j => j.toFixed(1)).join(', ') + '</span>' : '') + ', ' : '') + g.nH + 'H' : g.atoms.length > 1 ? g.atoms.length + '×' : ''}</td><td style="color:var(--muted)">${g.level ? 'sphere ' + g.level + (g.gen ? ' (any alkyl)' : '') + ', ' + g.refs + (g.refs >= 255 ? '+' : '') + ' ref.' : ''}</td></tr>`
       )
       .join('');
     out.innerHTML =
@@ -71966,7 +72072,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             hydrogens: g.nH,
             ...(g.mult ? { multiplicity: g.mult, J: g.J || [] } : {}),
             sphere: g.level,
-            references: g.refs
+            references: g.refs,
+            ...(g.gen ? { generalised: true } : {})
           })),
           text: nmrText(nuc, res),
           note: 'Contains information from nmrshiftdb2, available under the nmrshiftdb2 Database License'
