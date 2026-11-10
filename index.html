@@ -68108,17 +68108,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   /* turn (or mirror) and move atoms onto where they were: the least-squares fit of their new layout to the old places, with
      the sides of the open-chain bonds flipped (every combination when there are few) so the chains go the way they went */
   function apiAlignTo(at, old) {
+    /* atoms with no old place (an H the clean-up drew for a wedge) go with the rest, the fit is made on the others */
     const n = at.length,
       idx = new Map(at.map((q, k) => [q.id, k])),
       Q = at.map(q => old.get(q.id)),
-      qc = [Q.reduce((s, p) => s + p[0], 0) / n, Q.reduce((s, p) => s + p[1], 0) / n];
+      K = Q.map((q, k) => k).filter(k => Q[k]),
+      nk = K.length || 1,
+      qc = [K.reduce((s, k) => s + Q[k][0], 0) / nk, K.reduce((s, k) => s + Q[k][1], 0) / nk];
     const fit = P => {
-      const pc = [P.reduce((s, p) => s + p[0], 0) / n, P.reduce((s, p) => s + p[1], 0) / n];
+      const pc = [K.reduce((s, k) => s + P[k][0], 0) / nk, K.reduce((s, k) => s + P[k][1], 0) / nk];
       let best = null;
       for (const fl of [1, -1]) {
         let sxx = 0,
           sxy = 0;
-        for (let k = 0; k < n; k++) {
+        for (const k of K) {
           const x = (P[k][0] - pc[0]) * fl,
             y = P[k][1] - pc[1],
             u = Q[k][0] - qc[0],
@@ -68135,7 +68138,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             y = y0 - pc[1];
           return [qc[0] + c * x - sn * y, qc[1] + sn * x + c * y];
         });
-        R.forEach((r, k) => (err += (r[0] - Q[k][0]) ** 2 + (r[1] - Q[k][1]) ** 2));
+        for (const k of K) err += (R[k][0] - Q[k][0]) ** 2 + (R[k][1] - Q[k][1]) ** 2;
         if (!best || err < best.err) best = { err, R };
       }
       return best;
@@ -68291,8 +68294,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         cleanFlat = false;
       }
     } else cleanFragments(frs);
-    const live = [...m.keys()].map(atomById).filter(Boolean);
-    if (live.length > 1) apiAlignTo(live, m);
+    /* with the H atoms the clean-up drew to carry wedges, so they are turned (and mirrored) with the rest */
+    const live = [...m.keys()].map(atomById).filter(Boolean),
+      lid = new Set(live.map(q => q.id)),
+      all = fragments().filter(f => f.some(q => lid.has(q.id))).flat();
+    if (all.length > 1) apiAlignTo(all, m);
     if (live.length > 3)
       try {
         const sc = moved => moved.reduce((t, q) => {
@@ -68300,11 +68306,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           return o2 ? t + (q.x - o2[0]) ** 2 + (q.y - o2[1]) ** 2 : t;
         }, 0);
         sc.margin = L * L * 0.5;
-        apiPermuteGroups(live, sc);
+        apiPermuteGroups(all, sc);
       } catch (e) {}
     if (sig0 && sig0.size)
       try {
-        const s1 = stereoSig(live.map(q => q.id)),
+        const s1 = stereoSig(all.map(q => q.id)),
           bad = new Set();
         for (const [kk, v] of sig0) if (kk[0] === 'a' && s1.get(kk) !== v) bad.add(+kk.slice(1));
         const sw = [];
