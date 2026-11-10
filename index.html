@@ -3525,6 +3525,12 @@ html {
         <div class="setg"><label class="tlabel" for="cuMe">Clean Up: a methyl drawn as a line end</label>
           <select id="cuMe" style="width:100%;padding:4px 6px;font-size:13px"><option value="line">Leave as drawn (a line)</option><option value="Me">Label: Me</option><option value="CH3">Label: CH3</option></select>
           <p class="note">What Clean Up and Clean Up 2D do with a methyl drawn as the bare end of a bond (toluene, the CH3 of an ethyl). Ethane and the methyl of a methoxy written as OMe or OCH3 are left alone.</p></div>
+        <div class="setg"><label class="tlabel" for="rsText">Resizing with the handles: text size</label>
+          <select id="rsText" style="width:100%;padding:4px 6px;font-size:13px"><option value="ask">Ask each time (default)</option><option value="scale">Change it with the size</option><option value="keep">Keep it</option></select>
+          <p class="note">What a corner or side handle of the selection does to its labels and texts. Line widths follow an even scale only. A text resized on its own always takes the new size.</p></div>
+        <div class="setg"><label class="tlabel" for="rsLines">Resizing an energy diagram: line width</label>
+          <select id="rsLines" style="width:100%;padding:4px 6px;font-size:13px"><option value="ask">Ask each time (default)</option><option value="scale">Change it with the size</option><option value="keep">Keep it</option></select>
+          <p class="note">An energy diagram selected whole and resized with the handles: whether its lines get thicker or thinner with it. Asked together with its text size.</p></div>
         <h3 class="shead">Warnings</h3>
         <div class="setg"><label class="row" style="font-size:12.5px;flex-wrap:nowrap;align-items:flex-start"><input type="checkbox" id="valMarks" style="width:auto;flex:none;margin-top:3px"> Mark valence errors on the structure</label>
           <p class="note">On by default: an atom over or short of its normal valence gets a red dashed ring. Turned off, the rings are gone from the sheet, but the Analysis tab and the API op check still report the errors. The rings never appear in copies or exports either way.</p></div>
@@ -23444,6 +23450,23 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (sy < 0) sy = 0.05;
     d.sx = sx;
     d.sy = sy;
+    scaleGeom(d);
+    scaleSizes(d, scaleTextK(d, resizeTextMode() === 'ask' ? null : resizeTextMode()));
+  }
+  /* the text's factor for a resize: 'scale' follows the size (a stretch: the mean of its width and height factors),
+     'keep' leaves it; null (not chosen yet): as an even scale, kept by a stretch */
+  function scaleTextK(d, mode) {
+    if (mode === 'keep') return 1;
+    if (mode === 'scale') return d.sx === d.sy ? d.sx : Math.sqrt(d.sx * d.sy);
+    return d.sx === d.sy ? d.sx : 1;
+  }
+  /* what a resize does with the text: ask after each one (the default), always scale it, or always keep it
+     (Settings → Drawing) */
+  const resizeTextMode = () => cuMode('rd-resize-text', ['ask', 'scale', 'keep'], 'ask');
+  function scaleGeom(d) {
+    const A = d.anchor,
+      sx = d.sx,
+      sy = d.sy;
     applyXform(d.orig, A, (x, y) => ({ x: x * sx, y: y * sy }));
     for (const [r, x1, y1, x2, y2] of d.orig.arrows)
       if (r.kind === 'img') {
@@ -23452,19 +23475,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         r.y1 = A.y + (y1 - A.y) * sy;
         r.y2 = A.y + (y2 - A.y) * sy;
       }
-    /* sizes follow only an even scale */
-    const k = sx === sy ? sx : 1,
-      Z = v => +(v * k).toFixed(3);
+  }
+  /* line widths follow only an even scale; the text (atom labels and texts) by kt */
+  function scaleSizes(d, kt, kl) {
+    const sx = d.sx,
+      sy = d.sy,
+      k = kl != null ? kl : sx === sy ? sx : 1,
+      Z = v => +(v * k).toFixed(3),
+      ZT = v => +(v * kt).toFixed(3);
+    d.kl = k;
+    d.kt = kt;
     for (const [a, fs, ss, px] of d.sz.atoms) {
-      if (k === 1) {
+      if (kt === 1) {
         if (fs === undefined) delete a.fs;
         else a.fs = fs;
         if (ss === undefined) delete a.ss;
         else a.ss = ss;
         continue;
       }
-      if (px) a.fs = Z(px);
-      a.ss = Z(ss || 1);
+      if (px) a.fs = ZT(px);
+      a.ss = ZT(ss || 1);
     }
     for (const [b, w, lw] of d.sz.bonds) {
       if (k === 1) {
@@ -23481,10 +23511,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     for (const [t, size, px] of d.sz.texts) {
       const cx = t.x + textW(t) / 2;
-      if (k === 1) {
+      if (kt === 1) {
         if (size === undefined) delete t.size;
         else t.size = size;
-      } else t.size = Z(px);
+      } else t.size = ZT(px);
       t.x = cx - textW(t) / 2;
     }
   }
@@ -25270,15 +25300,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (d.mode === 'scale') {
-      if (d.moved) {
-        try {
-          eneScaled(d);
-        } catch (e) {
-          console.warn('eneScaled', e);
-        }
-        commit();
-        toast(d.sx === d.sy ? 'Scaled to ' + Math.round(d.sx * 100) + '%' : 'Stretched');
-      } else render();
+      if (d.moved) scaleDone(d);
+      else render();
       return;
     }
     /* a click with a template or bridged ring on the selected structure: one more docked there */
@@ -61875,6 +61898,91 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      sizes) take the new size, so it is drawn again at that size, parts moved by hand keeping their shift scaled with it;
      each part handled on its own instead (eneFollow) took back the levels' moves up or down, as a level stays at its
      energy, and left the joins, numbers and axis apart from them */
+  /* the end of a resize with the handles: the text size as chosen (asked here when Settings say so and there is text in
+     it besides a lone text), then the energy diagrams in it, and one step to undo */
+  async function scaleDone(d) {
+    let mode = resizeTextMode(),
+      lmode = null;
+    const texty = d.sz.texts.length || d.sz.atoms.some(x => x[3] != null),
+      onlyText = !d.orig.atoms.length && !d.orig.arrows.length,
+      ene = eneWhole().length > 0,
+      what = d.sx === d.sy ? 'scaled to ' + Math.round(d.sx * 100) + '%' : 'stretched';
+    if (ene) {
+      /* an energy diagram: its text size and its line width, both as check boxes */
+      lmode = resizeLineMode();
+      if (mode === 'ask' || lmode === 'ask') {
+        const r = await ask(
+          'Resize the energy diagram',
+          'It was ' + what + '. What else takes the new size?',
+          [
+            ['cancel', 'Cancel'],
+            ['ok', 'OK', true]
+          ],
+          {
+            boxes: [
+              ['t', 'Text size', mode === 'ask' ? d.sx === d.sy : mode === 'scale'],
+              ['l', 'Line width', lmode === 'ask' ? d.sx === d.sy : lmode === 'scale']
+            ],
+            check: 'Always do this (Settings → Drawing)'
+          }
+        );
+        if (r.v === 'cancel') return scaleUndo(d);
+        mode = r.boxes.t ? 'scale' : 'keep';
+        lmode = r.boxes.l ? 'scale' : 'keep';
+        if (r.checked) rememberResize(mode, lmode);
+      }
+    } else if (mode === 'ask' && texty && !onlyText) {
+      const r = await ask(
+        'Change the text size too?',
+        'The selection was ' + what + '. Its labels and texts can take the new size or keep theirs.',
+        [
+          ['keep', 'Keep text size'],
+          ['scale', 'Change text size', true]
+        ],
+        { check: 'Always do this (Settings → Drawing)' }
+      );
+      if (r.v === 'cancel') return scaleUndo(d);
+      mode = r.v;
+      if (r.checked) rememberResize(mode, null);
+    }
+    const kl = lmode === 'scale' ? (d.sx === d.sy ? d.sx : Math.sqrt(d.sx * d.sy)) : lmode === 'keep' ? 1 : null;
+    scaleSizes(d, scaleTextK(d, mode === 'ask' ? null : mode), kl);
+    try {
+      eneScaled(d);
+    } catch (e) {
+      console.warn('eneScaled', e);
+    }
+    commit();
+    toast(d.sx === d.sy ? 'Scaled to ' + Math.round(d.sx * 100) + '%' : 'Stretched');
+  }
+  /* Esc on the question: the resize taken back */
+  function scaleUndo(d) {
+    d.sx = d.sy = 1;
+    scaleGeom(d);
+    scaleSizes(d, 1, 1);
+    render();
+  }
+  function rememberResize(mode, lmode) {
+    try {
+      localStorage.setItem('rd-resize-text', mode);
+      if (lmode) localStorage.setItem('rd-resize-lines', lmode);
+    } catch (e) {}
+    const e = $('rsText'),
+      f = $('rsLines');
+    if (e) e.value = mode;
+    if (f && lmode) f.value = lmode;
+  }
+  /* the line width of an energy diagram resized whole: ask (the default), scale or keep (Settings → Drawing) */
+  const resizeLineMode = () => cuMode('rd-resize-lines', ['ask', 'scale', 'keep'], 'ask');
+  /* the energy diagrams selected whole */
+  function eneWhole() {
+    const ids = new Set();
+    for (const o of [...mol.arrows, ...mol.texts]) if (o.eg != null) ids.add(o.eg);
+    return [...ids].filter(id => {
+      const parts = eneParts(id);
+      return parts.length && parts.every(o => (o.text != null ? selTxt.has(o.id) : selArr.has(o.id)));
+    });
+  }
   function eneScaled(d) {
     const A = d.anchor,
       sx = d.sx,
@@ -61889,16 +61997,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* only a diagram selected whole */
       if (!parts.every(o => (o.text != null ? selTxt.has(o.id) : selArr.has(o.id)))) continue;
       const X = x => A.x + (x - A.x) * sx,
-        Y = y => A.y + (y - A.y) * sy,
-        k = sx === sy ? sx : 1;
+        Y = y => A.y + (y - A.y) * sy;
       M.x = X(M.x);
       M.y = Y(M.y);
       M.sx *= sx;
       M.sy *= sy;
-      if (k !== 1) {
-        if (M.fs) M.fs *= k;
-        if (M.lw) M.lw *= k;
-      }
+      if (M.fs && d.kt && d.kt !== 1) M.fs *= d.kt;
+      if (M.lw && d.kl && d.kl !== 1) M.lw *= d.kl;
       if (M.mv) for (const key of Object.keys(M.mv)) M.mv[key] = [M.mv[key][0] * sx, M.mv[key][1] * sy, M.mv[key][2] * sx].map(v => +v.toFixed(4));
       /* each part where it was, scaled plainly (the resize also re-sizes and re-places texts by their size), and where the
          diagram put it, scaled the same: a hand-made shift stays, scaled */
@@ -63333,6 +63438,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       docDefault: docDefault(),
       prefixStyle: pfxMode(),
       cleanUp: { methoxy: cuOme(), methyl: cuMe() },
+      resizeText: resizeTextMode(),
+      resizeLines: resizeLineMode(),
       chars: MYCH,
       checks: { valenceMarks: valMarksOn(), noWedge: chkNoWedgeOn(), off: [...WARN_OFF] }
     };
@@ -63474,6 +63581,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       if (got) n.push('Clean Up labels');
     }
+    if (['ask', 'scale', 'keep'].includes(d.resizeText)) {
+      try {
+        localStorage.setItem('rd-resize-text', d.resizeText);
+      } catch (e) {}
+      const e = $('rsText');
+      if (e) e.value = d.resizeText;
+      n.push('text size on resizing');
+    }
+    if (['ask', 'scale', 'keep'].includes(d.resizeLines)) {
+      try {
+        localStorage.setItem('rd-resize-lines', d.resizeLines);
+      } catch (e) {}
+      const e = $('rsLines');
+      if (e) e.value = d.resizeLines;
+      n.push('energy diagram lines on resizing');
+    }
     toast(n.length ? 'Imported: ' + n.join(', ') : 'Nothing to import in that file', !n.length);
   }
   {
@@ -63497,7 +63620,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   for (const [id, key, get] of [
     ['cuOme', 'rd-cu-ome', cuOme],
-    ['cuMe', 'rd-cu-me', cuMe]
+    ['cuMe', 'rd-cu-me', cuMe],
+    ['rsText', 'rd-resize-text', resizeTextMode],
+    ['rsLines', 'rd-resize-lines', () => resizeLineMode()]
   ]) {
     const e = $(id);
     if (!e) continue;
@@ -79121,15 +79246,33 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     offerFile(base + '.ord.json', JSON.stringify(r.rx, null, 2));
   }
   /* a question with buttons, in the page */
-  function ask(title, text, buttons) {
-    return new Promise(res => {
+  /* opts.check: a check box under the text; the answer is then {v, checked} */
+  function ask(title, text, buttons, opts) {
+    return new Promise(res0 => {
       const box = document.createElement('div');
       box.className = 'askbox';
       box.setAttribute('role', 'dialog');
       box.setAttribute('aria-modal', 'true');
-      box.innerHTML = `<div class="card"><b></b><div class="tx"></div><div class="row"></div></div>`;
+      const bx = (opts && opts.boxes) || [];
+      box.innerHTML = `<div class="card"><b></b><div class="tx"></div>${bx.map(() => '<label class="bx" style="display:flex;gap:6px;align-items:center;margin:6px 0 0;font-size:13px"><input type="checkbox"><span></span></label>').join('')}${opts && opts.check ? '<label class="ck" style="display:flex;gap:6px;align-items:center;margin:10px 0 2px;font-size:12px"><input type="checkbox"><span></span></label>' : ''}<div class="row"></div></div>`;
       box.querySelector('b').textContent = title;
       box.querySelector('.tx').textContent = text;
+      box.querySelectorAll('.bx').forEach((l, i) => {
+        l.querySelector('span').textContent = bx[i][1];
+        l.querySelector('input').checked = !!bx[i][2];
+        l.querySelector('input').dataset.id = bx[i][0];
+      });
+      if (opts && opts.check) box.querySelector('.ck span').textContent = opts.check;
+      const res = v =>
+        res0(
+          opts && (opts.check || bx.length)
+            ? {
+                v,
+                checked: v !== 'cancel' && !!opts.check && box.querySelector('.ck input').checked,
+                boxes: Object.fromEntries([...box.querySelectorAll('.bx input')].map(e => [e.dataset.id, e.checked]))
+              }
+            : v
+        );
       const row = box.querySelector('.row');
       buttons.forEach(([v, l, pri]) => {
         const b = document.createElement('button');
