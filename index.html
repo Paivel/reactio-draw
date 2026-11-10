@@ -40778,6 +40778,21 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         case 'CDXPoint2D':
           pPt(tag, v);
           break;
+        /* a curve's points: their count, then each point y before x */
+        case 'CDXCurvePoints': {
+          const c = nums(v);
+          prop(
+            tag,
+            by(() => {
+              u16(c.length >> 1);
+              for (let k = 0; k + 1 < c.length; k += 2) {
+                i32(fx(c[k + 1]));
+                i32(fx(c[k]));
+              }
+            })
+          );
+          break;
+        }
         case 'CDXRectangle':
           pRect(tag, v);
           break;
@@ -41062,6 +41077,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           obj({ bracketedgroup: 0x8017, bracketattachment: 0x8018, crossingbond: 0x8019 }[el.tagName], el, () => {
             for (const at of el.attributes) if (at.name !== 'id') pAny(at.name, at.value);
             kids(el);
+          });
+          break;
+        /* a pen arrow or curve (a Bézier with or without a head) */
+        case 'curve':
+          obj(0x8008, el, () => {
+            for (const at of el.attributes)
+              if (at.name !== 'id' && at.name !== 'color') pAny(at.name, at.value);
+            color(el);
           });
           break;
         case 'arrow':
