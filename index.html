@@ -63504,6 +63504,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     }
     if (!P.length) throw new Error('Give at least one product');
+    /* every SMILES read before anything is drawn: one that cannot be read leaves no part of the reaction on the sheet */
+    for (const smi of [...R, ...P])
+      if (!parseSmiles(smi)) throw new Error('Cannot read SMILES: ' + smi + (parseSmiles.why ? ': ' + parseSmiles.why : ''));
     /* a sheet that already holds a drawing: the new reaction goes under it and its clean up is left out, as it would take the
        structures already there into the reaction */
     const others = mol.atoms.length > 0;
@@ -74921,11 +74924,38 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         histApi--;
         if (!histApi) histOp = '';
       };
+      /* a command that fails takes back what it drew before failing: the drawing as it was, no undo step of its own,
+         and the redo steps kept */
+      const top0 = undoSt[undoSt.length - 1],
+        redo0 = redoSt.slice(),
+        doc0 = TABS.cur,
+        back = () => {
+          if (TABS.cur !== doc0 || /^(undo|redo|newDocument|openDocument|closeDocument)$/.test(op)) return;
+          const k = top0 === undefined ? 0 : undoSt.lastIndexOf(top0) + 1;
+          if (top0 !== undefined && !k) return;
+          if (undoSt.length <= k) {
+            if (undoSt.length === k && !redoSt.length) redoSt.push(...redo0);
+            return;
+          }
+          try {
+            restoreEntry(undoSt[k]);
+            undoSt.length = k;
+            redoSt.length = 0;
+            redoSt.push(...redo0);
+            clearSel();
+            hover = null;
+            commit();
+            if (typeof syncTable === 'function') syncTable();
+          } catch (e) {
+            console.warn('API rollback', e);
+          }
+        };
       let r;
       try {
         r = f(args);
       } catch (e) {
         off();
+        back();
         throw e;
       }
       if (r && typeof r.then === 'function')
@@ -74933,6 +74963,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           v => (off(), done(), stray(v)),
           e => {
             off();
+            back();
             throw e;
           }
         );
