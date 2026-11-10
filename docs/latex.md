@@ -7,6 +7,10 @@ in the Mac app) turns the drawing into a LaTeX figure whose compound numbers mat
 Pasted into [Lattice](https://github.com/leo1oel/lattice), the figure brings its files: they are
 copied into `figures/`, the `\input` line goes in, and the preamble lines it needs are added.
 
+In VS Code, the extension [Reactio Draw figures for LaTeX](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) does the same: the figure is pasted with its
+files and preamble, opens in Reactio Draw for editing, and its compound numbers are shown. Install it from VS Code
+itself: Extensions (Ctrl+Shift+X), search for Reactio Draw.
+
 In any other LaTeX editor the paste gives only the `figure` block with `\input`. Copy the `.tex` and `.pdf` written beside
 the saved drawing into the project's `figures/` folder, and add `graphicx`, `tikz` and `chemnum` to the preamble, with
 the `\rcmpd` block from [LaTeX marks](latex-marks.md#using-marks-outside-lattice) if the figure has marks. An unsaved drawing writes no files, so save it first.
