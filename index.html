@@ -34926,6 +34926,89 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return cnt ? { val: Math.round(sum / cnt), n: Math.min(255, cnt), gen: hits } : null;
   }
+  /* an environment the tables lack at sphere s (s >= 3) because only one compound has it. The tables keep spheres 3 to 5
+     only where two compounds or more share them, so a parent compound's own environment is not there (phenol's para C
+     at sphere 4, aniline's too, pyridine's C4 at sphere 3, benzaldehyde's para C at sphere 5), and the next smaller
+     sphere, which no longer sees the OH, the NH2, the ring N or the C=O, gave benzene's 128.1 ppm. The sphere is looked
+     up again with one more substituent near its edge, in place of an H, where it changes the shift least; the first of
+     these that matches is taken:
+     - an H of an atom on the edge made a methyl or CH2 group, looked up one sphere further so that it is seen (phenol's
+       para C from anisole and the other alkyl aryl ethers, aniline's from the N-alkylanilines);
+     - an H there taken away (any substituent beyond the sphere);
+     - an H of an atom one bond inside made a methyl or CH2 group (benzaldehyde's para C from the alkyl phenyl ketones,
+       pyridine's C4 from the 2-alkylpyridines);
+     - an H there made another common end group (a branched alkyl, aryl, O, N, S, halogen).
+     Only when the edge holds what the smaller sphere cannot see (an atom other than carbon, or one on a double or triple
+     bond), never para to the atom in an aromatic ring (where a substituent shifts it most), and from matches on minN
+     spectra or more each. The matches are averaged, weighted by their spectra; null when none */
+  const NMR_NEAR = { '13C': 1, '1H': 1 };
+  const NMR_END = ['CH1', 'C', 'c', 'O', 'OH1', 'N', 'NH1', 'NH2', 'S', 'F', 'Cl', 'Br', 'I'];
+  function nmrNear(T, P, root, s, minN) {
+    const n = P.sym.length,
+      dist = new Array(n).fill(-1);
+    dist[root] = 0;
+    for (let fr = [root], d = 1; d <= s && fr.length; d++) {
+      const nx = [];
+      for (const u of fr)
+        for (const [v] of P.adj[u])
+          if (dist[v] < 0) {
+            dist[v] = d;
+            nx.push(v);
+          }
+      fr = nx;
+    }
+    const seen = u =>
+      dist[u] === s &&
+      (!/^[Cc](H\d)?$/.test(P.sym[u]) || P.adj[u].some(([v, b]) => dist[v] === s - 1 && (P.bsym[b] === '=' || P.bsym[b] === '#')));
+    if (!P.sym.some((x, u) => seen(u))) return null;
+    const arom = u => /^[a-z]/.test(P.sym[u]);
+    /* the atom's symbol with one H fewer, or null */
+    const lessH = sym => {
+      const m = /^(.*?)(?:H(\d+))?([+-]\d+)?$/.exec(sym),
+        h = +(m[2] || 0);
+      return h ? m[1] + (h > 1 ? 'H' + (h - 1) : '') + (m[3] || '') : null;
+    };
+    /* [distance of the atom that loses the H, what takes its place (null: nothing seen), sphere looked up] */
+    const steps = [
+      [s, ['CH3', 'CH2'], s + 1],
+      [s, [null], s],
+      [s - 1, ['CH3', 'CH2'], s],
+      [s - 1, NMR_END, s]
+    ];
+    for (const [d, ends, at] of steps) {
+      if (at > RDNMR.MAXL) continue;
+      let sum = 0,
+        cnt = 0,
+        hits = 0;
+      for (let u = 0; u < n; u++) {
+        if (dist[u] !== d || u === root || (d === 3 && arom(u) && arom(root))) continue;
+        const less = lessH(P.sym[u]);
+        if (!less) continue;
+        for (const e of ends) {
+          const sym = P.sym.slice();
+          let adj = P.adj,
+            bsym = P.bsym;
+          sym[u] = less;
+          if (e) {
+            const b = bsym.length;
+            bsym = bsym.concat('-');
+            adj = adj.slice();
+            adj[u] = adj[u].concat([[n, b]]);
+            adj.push([[u, b]]);
+            sym.push(e);
+          }
+          const f = nmrFind(T, at - 1, RDNMR.hash(RDNMR.codesFor({ adj, sym, bsym }, root, at)[at - 1]));
+          if (f && f.n >= minN) {
+            sum += f.val * f.n;
+            cnt += f.n;
+            hits++;
+          }
+        }
+      }
+      if (cnt) return { val: Math.round(sum / cnt), n: Math.min(255, cnt), gen: hits, near: true };
+    }
+    return null;
+  }
   function molSig() {
     return (
       mol.atoms.map(a => a.id + a.el + (a.chg || 0) + (a.label || '')).join() +
@@ -35024,7 +35107,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           /* missing as it is: the same sphere with its alkyl groups generalised, before a smaller sphere (1H and 13C, where
              it was checked on known spectra; 19F and 31P as before) */
           const f =
-            nmrFind(T, L, RDNMR.hash(codes[L])) || (L >= 1 && nuc !== '19F' && nuc !== '31P' ? nmrGeneral(T, P, i, L + 1, root ? 3 : 2) : null);
+            nmrFind(T, L, RDNMR.hash(codes[L])) ||
+            (L >= 1 && nuc !== '19F' && nuc !== '31P' ? nmrGeneral(T, P, i, L + 1, root ? 3 : 2) : null) ||
+            /* a parent compound's own environment, from its nearest analogues (1H only from those on three spectra or more) */
+            (L >= 2 && NMR_NEAR[nuc] ? nmrNear(T, P, i, L + 1, nuc === '1H' ? 3 : 1) : null);
           if (!f) continue;
           /* (for 1H, where OH, NH and solvent make single spectra spread; 13C keeps its deepest match; a generalised
              match from a single environment counts as thin too) */
@@ -35059,7 +35145,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             shift: r ? r.val / S : null,
             level: r ? L + 1 : 0,
             refs: r ? r.n : 0,
-            gen: !!(r && r.gen)
+            gen: !!(r && r.gen),
+            near: !!(r && r.near)
           };
           groups.set(key, g);
         }
@@ -35918,7 +36005,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const rows = res
       .map(
         (g, gi) =>
-          `<tr data-ng="${gi}"><td style="text-align:right;font-family:var(--mono)">${nmrFmt(nuc, g.shift)}</td><td style="color:var(--muted)">${g.err != null ? '±' + g.err : 'no match'}</td><td>${nuc === '1H' ? (g.mult ? g.mult + (g.J && g.J.length ? ' <span style="color:var(--muted)">' + g.J.map(j => j.toFixed(1)).join(', ') + '</span>' : '') + ', ' : '') + g.nH + 'H' : g.atoms.length > 1 ? g.atoms.length + '×' : ''}</td><td style="color:var(--muted)">${g.level ? 'sphere ' + g.level + (g.gen ? ' (any alkyl)' : '') + ', ' + g.refs + (g.refs >= 255 ? '+' : '') + ' ref.' : ''}</td></tr>`
+          `<tr data-ng="${gi}"><td style="text-align:right;font-family:var(--mono)">${nmrFmt(nuc, g.shift)}</td><td style="color:var(--muted)">${g.err != null ? '±' + g.err : 'no match'}</td><td>${nuc === '1H' ? (g.mult ? g.mult + (g.J && g.J.length ? ' <span style="color:var(--muted)">' + g.J.map(j => j.toFixed(1)).join(', ') + '</span>' : '') + ', ' : '') + g.nH + 'H' : g.atoms.length > 1 ? g.atoms.length + '×' : ''}</td><td style="color:var(--muted)">${g.level ? 'sphere ' + g.level + (g.near ? ' (nearest analogues)' : g.gen ? ' (any alkyl)' : '') + ', ' + g.refs + (g.refs >= 255 ? '+' : '') + ' ref.' : ''}</td></tr>`
       )
       .join('');
     out.innerHTML =
