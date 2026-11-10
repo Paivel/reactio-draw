@@ -36589,7 +36589,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           i + 1 + ' ' + el + ' ' + n(a.x * ANG) + ' ' + n(-a.y * ANG) + ' 0 0' +
             (a.chg ? ' CHG=' + a.chg : '') +
             (a.rad ? ' RAD=' + (a.rad === 2 ? 3 : 2) : '') +
-            (a.iso && !a.label ? ' MASS=' + a.iso : '')
+            (a.iso && !a.label ? ' MASS=' + a.iso : '') +
+            (molVal(a) ? ' VAL=' + molVal(a) : '')
         )
       );
     });
@@ -36636,8 +36637,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     L.push(pad(atoms.length, 3) + pad(bonds.length, 3) + '  0  0  0  0  0  0  0  0999 V2000');
     for (const a of atoms) {
       const el = a.label && !a.grp ? 'R' : a.el === 'D' ? 'D' : a.el;
+      const vv = molVal(a);
       L.push(
-        f(a.x * ANG) + f(-a.y * ANG) + f(d3 && a.z !== undefined ? a.z * ANG : 0) + ' ' + el.padEnd(3) + ' 0  0  0  0  0  0  0  0  0  0  0  0'
+        f(a.x * ANG) + f(-a.y * ANG) + f(d3 && a.z !== undefined ? a.z * ANG : 0) + ' ' + el.padEnd(3) + ' 0  0  0  0  0' + pad(vv < 0 ? 15 : vv, 3) + '  0  0  0  0  0  0'
       );
     }
     for (const b of bonds) {
@@ -36708,6 +36710,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return L.join('\n');
   }
   let MOL_SRU = false;
+  /* the valence written for an atom whose H are not the usual count (an N with no H on two bonds, a lone H), so a
+     reader gives it the H drawn: bonds, H and radical together, -1 for none at all; 0 where the usual count fits.
+     Only in files written out (as the repeat units) */
+  function molVal(a) {
+    if (!MOL_SRU || a.label || a.multi || valenceOf(a.el, a.chg) === undefined) return 0;
+    const h = implicitH(a);
+    if (h === implicitH({ ...a, hExp: undefined })) return 0;
+    const v = usedVal(a) + h + (a.rad || 0);
+    return v !== Math.floor(v) || v > 14 ? 0 : v || -1;
+  }
   function fragBonds(m, fr) {
     const ids = new Set(fr.map(a => a.id));
     return m.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
