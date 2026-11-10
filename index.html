@@ -30814,8 +30814,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         el.value = v;
         prev = v;
         setFont(v);
+        /* document.fonts.check() answers true for any font that is not one of the page's web fonts, so the font is
+           measured instead: a sample in it, with each generic font behind it, as wide as in the generic font alone
+           means the browser fell back */
         try {
-          if (!document.fonts.check('12px "' + v + '"'))
+          const g = document.createElement('canvas').getContext('2d'),
+            w = f => ((g.font = '72px ' + f), g.measureText('mmmmmmmmmlliWQ@#%&0123').width),
+            web = [...document.fonts].some(f => f.family.replace(/["']/g, '') === v),
+            here = web || ['monospace', 'serif', 'sans-serif'].some(b => w('"' + v + '", ' + b) !== w(b));
+          if (!here)
             toast('“' + v + '” may not be installed here: it shows in a fallback font until it is.', true);
         } catch (e) {}
       };
