@@ -13,6 +13,7 @@
 
 - **A paste comes selected.** A pasted structure, reaction or scheme is selected, ready to be moved, and the sheet no longer jumps or changes its scale to fit the whole drawing; what lands out of sight is brought into view. A reaction SMILES pasted as text (A>>B) is drawn as the reaction.
 - **A centred double bond meets the bonds beside it** (a ketone's C=O, C=CH2), with no gap under its lines.
+- **The developer tools are off in the apps** (F12 and Inspect in Windows, Inspect Element on the Mac and in Linux): they are for finding faults, and come back when the app is started with `--devtools` or with `REACTIO_DEVTOOLS=1`.
 
 ## Fixed
 

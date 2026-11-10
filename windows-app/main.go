@@ -49,6 +49,10 @@ func logf(f string, a ...interface{}) {
 	fmt.Fprintf(logFile, time.Now().Format("15:04:05 ")+f+"\n", a...)
 }
 
+/* the developer tools (F12, Inspect) are for finding faults, not for everyday use: they are on only when the app is
+   started with --devtools or with REACTIO_DEVTOOLS=1 in the environment */
+func devtoolsOn() bool { return hasArg("--devtools") || os.Getenv("REACTIO_DEVTOOLS") == "1" }
+
 func hasArg(names ...string) bool {
 	for _, a := range os.Args[1:] {
 		for _, n := range names {
@@ -162,7 +166,7 @@ func main() {
 	}
 
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
-		Debug:     true, // F12 and Inspect for now, while the Windows version is being tested
+		Debug:     devtoolsOn(), // F12 and Inspect only when asked for (--devtools or REACTIO_DEVTOOLS=1)
 		AutoFocus: true,
 		DataPath:  filepath.Join(app.base, "WebView2"),
 		WindowOptions: webview2.WindowOptions{

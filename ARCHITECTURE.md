@@ -105,5 +105,7 @@ README.md says how to build each.
 ## Trying a change
 
 Open `index.html` in Chrome or Firefox: that is the whole build. The browser console (F12) shows errors.
+The apps have the developer tools (Inspect) off; start one with `--devtools` or with `REACTIO_DEVTOOLS=1` in the
+environment to have them (on the Mac also `defaults write org.reactiodraw.editor rd.devtools -bool true`).
 `window.ReactioAPI.run('help')` lists the API commands, handy for checking a change from the console.
 There is no automated test suite in the repository yet.

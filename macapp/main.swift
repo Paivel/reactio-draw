@@ -890,7 +890,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let cfg = WKWebViewConfiguration()
         cfg.userContentController.add(bridge, name: "rd")
         cfg.userContentController.addUserScript(WKUserScript(source: "window.__rdUpdate={asset:'ReactioDraw-Mac.zip'};", injectionTime: .atDocumentStart, forMainFrameOnly: true))
-        cfg.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        /* the developer tools (Inspect Element) are for finding faults, not for everyday use: on only when asked for, with
+           `defaults write org.reactiodraw.editor rd.devtools -bool true`, --devtools, or REACTIO_DEVTOOLS=1 */
+        let devtools = UserDefaults.standard.bool(forKey: "rd.devtools") || CommandLine.arguments.contains("--devtools") || ProcessInfo.processInfo.environment["REACTIO_DEVTOOLS"] == "1"
+        if devtools { cfg.preferences.setValue(true, forKey: "developerExtrasEnabled") }
         let rect = NSRect(x: 0, y: 0, width: 1440, height: 920)
         web = WKWebView(frame: rect, configuration: cfg); web.autoresizingMask = [.width, .height]
         web.navigationDelegate = self

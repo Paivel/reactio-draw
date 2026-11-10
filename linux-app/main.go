@@ -56,6 +56,17 @@ func logf(f string, a ...interface{}) {
 
 func init() { runtime.LockOSThread() } // GTK runs on the main thread
 
+/* the developer tools (Inspect) are for finding faults, not for everyday use: they are on only when the app is started
+   with --devtools or with REACTIO_DEVTOOLS=1 in the environment */
+func devtoolsOn() bool {
+	for _, a := range os.Args[1:] {
+		if a == "--devtools" {
+			return true
+		}
+	}
+	return os.Getenv("REACTIO_DEVTOOLS") == "1"
+}
+
 /* files given on the command line (Open with, a double-click in the file manager) */
 func fileArgs() [][3]string {
 	var files [][3]string
@@ -159,7 +170,7 @@ func main() {
 
 	app.view = webkit_web_view_new_with_ucm(ucm)
 	st := webkit_web_view_get_settings(app.view)
-	webkit_settings_set_dev_extras(st, true)
+	webkit_settings_set_dev_extras(st, devtoolsOn())
 	webkit_settings_set_js_clipboard(st, true)
 	gtk_container_add(app.win, app.view)
 
