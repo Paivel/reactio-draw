@@ -45868,6 +45868,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
         na.chg = a.chg || 0;
         if (a.rad) na.rad = a.rad;
+        if (a.iso) na.iso = a.iso;
         if (a.label) setLabel(na, a.label);
         if (esrOk(a.esr)) na.esr = a.esr;
         return na;
