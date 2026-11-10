@@ -39983,11 +39983,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     '−': '-',
     ' ': '~'
   };
+  /* charge signs written as Unicode sub- and superscripts (Fe³⁺): pdflatex has no glyph for them */
+  const TEX_SIGN = { '⁺': '+', '⁻': '-', '₊': '+', '₋': '-' };
   const texEsc = s =>
     String(s)
       .replace(/[\\{}#$%&_~^− ]/g, c => TEX_ESC[c])
-      .replace(/[₀-₉]+/g, d => '\\textsubscript{' + [...d].map(c => c.charCodeAt(0) - 0x2080).join('') + '}')
-      .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, d => '\\textsuperscript{' + [...d].map(c => SUPDIG[c]).join('') + '}');
+      .replace(
+        /[₀-₉₊₋]+/g,
+        d => '\\textsubscript{' + [...d].map(c => TEX_SIGN[c] || c.charCodeAt(0) - 0x2080).join('') + '}'
+      )
+      .replace(
+        /[⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻]+/g,
+        d => '\\textsuperscript{' + [...d].map(c => TEX_SIGN[c] || SUPDIG[c]).join('') + '}'
+      );
   /* what a figure's marks need in the preamble: \rcmpd takes what is inside [[ ]] (chemnum for numbers, a counter per series) */
   const RCMPD_PREAMBLE = [
     String.raw`% Compound marks from drawings: \rcmpd{what is inside [[ ]]}, added for editable figures`,
