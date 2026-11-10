@@ -46831,6 +46831,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       at.set(lab, {
         lab,
         el,
+        /* a type with an oxidation state (Na1+, Cl1-): an ion, no hydrogens of its own */
+        ion: /\d*[+-]$/.test(s['_atom_site_type_symbol'] || ''),
         occ: occ > 0 ? occ : 1,
         f: ['x', 'y', 'z'].map(k => cifNum(s['_atom_site_fract_' + k]))
       });
@@ -46894,7 +46896,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       haveLab.add(lab);
       const i = nodes.length;
-      nodes.push({ lab, op, p, el: at.get(lab).el });
+      nodes.push({ lab, op, p, el: at.get(lab).el, ...(at.get(lab).ion ? { ion: 1 } : {}) });
       byKey.set(k, i);
       return [i, true];
     };
@@ -46920,6 +46922,29 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     };
     grow();
+    /* no bond list: the images within bonding distance of the asymmetric unit's own atoms (the second O of CO2, whose C
+       sits on an inversion centre) are bonded to them, one shell, so the step below completes the molecule */
+    if (!blist.length) {
+      const dd = (p, q) => Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]),
+        sh = [-1, 0, 1].flatMap(x => [-1, 0, 1].flatMap(y => [-1, 0, 1].map(z => [x, y, z]))),
+        n0 = nodes.length;
+      for (let i = 0; i < n0 && nodes.length < 3000; i++) {
+        const ri = CIF_COV[nodes[i].el];
+        if (!ri) continue;
+        for (const lab of at.keys()) {
+          const rj = CIF_COV[at.get(lab).el];
+          if (!rj) continue;
+          for (const op of ops)
+            for (const t of sh) {
+              const o2 = { R: op.R, T: op.T.map((v, k) => v + t[k]) },
+                e = dd(cart(cifApply(o2, at.get(lab).f)), nodes[i].p);
+              if (e < 0.3 || e > ri + rj + 0.45) continue;
+              const [j] = node(lab, o2);
+              if (j !== i) edges.add(i < j ? i + ',' + j : j + ',' + i);
+            }
+        }
+      }
+    }
     /* a molecule completed by a symmetry element (a dimer on an inversion centre) holds that element's image of a label
        it also holds itself; the formula unit then takes the same image of everything else in the asymmetric unit (the
        second anion and solvent of a salt), as the formula in the file counts them */
@@ -47238,6 +47263,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a.xray = 1;
         a.gid = gid;
         if (r.chg[i]) a.chg = r.chg[i];
+        /* an ion on its own (Cl- of rock salt) gets no H */
+        if (r.nodes[i].ion && !r.E.some(([p, q]) => p === i || q === i)) {
+          a.hExp = 0;
+          a.hUsed = 0;
+        }
         map.set(i, a);
         made3D.add(a.id);
       });
