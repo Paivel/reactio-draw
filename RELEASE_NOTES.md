@@ -1,3 +1,13 @@
+# Reactio Draw 1.14.1
+
+## Changed
+
+- **Copy for LaTeX: the numbers in the drawing's font.** The texts with `[[key]]` marks that a figure sets over its PDF were in the document's font (Computer Modern by default) while the atoms and other texts are in the drawing's (Arial in the ACS style); they now take the drawing's font as a LaTeX family: Helvetica for Arial and other sans-serif fonts, Times or Courier, with pdfLaTeX, XeLaTeX and LuaLaTeX and nothing to add to the preamble. A document that wants another font for all figure labels defines `\reactiofigurefont` in its preamble (docs/latex.md).
+
+## Fixed
+
+- **`\rcmpd` wrote a warning for every mark** ("Invalid end-point for range") with current LaTeX (TeX Live 2023 and later); the numbers were right. The block for the preamble is corrected; a document that already has the old one can change one line by hand: `[A-Za-z0-9_-]` becomes `[A-Za-z0-9_\-]` (docs/latex-marks.md).
+
 # Reactio Draw 1.14
 
 ## New
