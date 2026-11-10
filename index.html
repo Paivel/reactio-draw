@@ -36555,7 +36555,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     Ls.splice(e, 0, ...alias, ...extra);
     return Ls.join('\n');
   }
-  function molBlockE(atoms, bonds, title) {
+  function molBlockE(atoms, bonds, title, hap) {
+    /* an η-ring's attachment point (sandwich complexes): V3000, where it is a * bonded to the metal by a coordination
+       bond to all the ring atoms (ENDPTS, ATTACH=ALL), not a carbon */
+    if (hap && atoms.some(a => a.multi)) return molBlockV3(atoms, bonds.filter(b => !isDative(b)), title, true);
     if (!atoms.some(a => esrOk(a.esr))) return molRgroups(molBlock(atoms, bonds, title), atoms);
     [atoms, bonds] = hLast(atoms, bonds);
     const base = molBlock(atoms, bonds, title);
@@ -36577,16 +36580,20 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   /* the same in V3000 (no limit on atoms); its chiral flag is the last number of COUNTS (CHIRAL_RX sets it as for V2000) */
-  function molBlockV3(atoms, bonds, title) {
+  function molBlockV3(atoms, bonds, title, hap) {
     const idx = new Map(atoms.map((a, i) => [a.id, i + 1])),
       n = v => +v.toFixed(4),
       V = s => 'M  V30 ' + s,
-      L = [title || '', '  Reactio   2D', '', '  0  0  0     0  0            999 V3000', V('BEGIN CTAB'), V('COUNTS ' + atoms.length + ' ' + bonds.length + ' 0 0 0'), V('BEGIN ATOM')];
+      d3 = hap && is3D(atoms),
+      L = [title || '', d3 ? '  Reactio   3D' : '  Reactio   2D', '', '  0  0  0     0  0            999 V3000', V('BEGIN CTAB'), V('COUNTS ' + atoms.length + ' ' + bonds.length + ' 0 0 0'), V('BEGIN ATOM')];
+    /* hap: an η-ring's attachment point whose ring is written too goes out as * */
+    const ring = a => hap && a.multi && a.multi.every(id => idx.has(id)),
+      byId = new Map(atoms.map(a => [a.id, a]));
     atoms.forEach((a, i) => {
-      const el = a.label && !a.grp ? 'R' : a.el;
+      const el = ring(a) ? '*' : a.label && !a.grp ? 'R' : a.el;
       L.push(
         V(
-          i + 1 + ' ' + el + ' ' + n(a.x * ANG) + ' ' + n(-a.y * ANG) + ' 0 0' +
+          i + 1 + ' ' + el + ' ' + n(a.x * ANG) + ' ' + n(-a.y * ANG) + ' ' + (d3 && a.z !== undefined ? n(a.z * ANG) : 0) + ' 0' +
             (a.chg ? ' CHG=' + a.chg : '') +
             (a.rad ? ' RAD=' + (a.rad === 2 ? 3 : 2) : '') +
             (a.iso && !a.label ? ' MASS=' + a.iso : '') +
@@ -36598,7 +36605,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     bonds.forEach((b, i) => {
       const ord = b.stereo === 'deloc' ? 4 : b.order === 4 ? 1 : b.order,
         cfg = b.order === 2 && b.dx ? 2 : b.order > 1 && b.stereo !== 'deloc' ? 0 : b.stereo === 'wedge' ? 1 : b.stereo === 'hash' ? 3 : b.stereo === 'wavy' ? 2 : 0;
-      L.push(V(i + 1 + ' ' + ord + ' ' + idx.get(b.a) + ' ' + idx.get(b.b) + (cfg ? ' CFG=' + cfg : '')));
+      const c = [b.a, b.b].map(id => byId.get(id)).find(q => q && ring(q));
+      if (c) {
+        const o = c.id === b.a ? b.b : b.a;
+        L.push(V(i + 1 + ' 9 ' + idx.get(c.id) + ' ' + idx.get(o) + ' ENDPTS=(' + c.multi.length + ' ' + c.multi.map(id => idx.get(id)).join(' ') + ') ATTACH=ALL'));
+      } else L.push(V(i + 1 + ' ' + ord + ' ' + idx.get(b.a) + ' ' + idx.get(b.b) + (cfg ? ' CFG=' + cfg : '')));
     });
     L.push(V('END BOND'), V('END CTAB'), 'M  END');
     return L.join('\n');
@@ -36938,10 +36949,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     try {
       const sch = schemeOrder();
       const groups = sch.list.filter(x => x.fr);
-      const all = molBlockE(numOrder(m.atoms), m.bonds, 'Reactio Draw drawing');
+      const all = molBlockE(numOrder(m.atoms), m.bonds, 'Reactio Draw drawing', true);
       const sdf =
         groups
-          .map((x, i) => molBlockE(numOrder(x.fr), fragBonds(m, x.fr), 'compound ' + (i + 1)) + '\n$$$$')
+          .map((x, i) => molBlockE(numOrder(x.fr), fragBonds(m, x.fr), 'compound ' + (i + 1), true) + '\n$$$$')
           .join('\n') + '\n';
       let rxn = null;
       if (sch.ar) {
@@ -45919,13 +45930,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     return { atoms, bonds, end: j, sgroups: [...sg.values()].filter(g => g.type === 'SRU') };
   }
   /* one V3000 record: read by OpenChemLib and written again as V2000 for parseMolBlock, with the stereo groups;
-     a record too large for V2000 (more than 999 atoms or bonds) is read directly */
+     a record too large for V2000 (more than 999 atoms or bonds), or with η-rings, is read directly */
   function molV3000(rec) {
     try {
       const O = oclLoad(),
         M = O.Molecule,
         om = M.fromMolfile(rec);
-      if (om.getAllAtoms() > 999 || om.getAllBonds() > 999) return parseV3000(rec);
+      if (om.getAllAtoms() > 999 || om.getAllBonds() > 999 || /\bENDPTS=/.test(rec)) return parseV3000(rec);
       om.ensureHelperArrays(M.cHelperParities);
       const m = parseMolBlock(om.toMolfile().replace(/\r/g, '').split('\n'), 0);
       if (!m) return null;
@@ -45980,6 +45991,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!(el in AW) && el !== 'D') el = 'C';
         const a = { el, x: +w[2] / ANG, y: -w[3] / ANG, z: (+w[4] || 0) / ANG, chg: parseInt(opt(w, 'CHG')) || 0 };
         if (lab) a.label = lab;
+        if (w[1] === '*') a.star = 1;
         const rad = parseInt(opt(w, 'RAD')) || 0,
           val = parseInt(opt(w, 'VAL')) || 0;
         if (rad) a.rad = rad === 3 ? 2 : rad === 2 ? 1 : 2;
@@ -45994,6 +46006,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const o = parseInt(w[1]),
           cfg = parseInt(opt(w, 'CFG')) || 0;
         if (!ix.has(w[2]) || !ix.has(w[3])) continue;
+        /* a * bonded to all the atoms of a ring (ENDPTS, ATTACH=ALL): the ring's attachment point (η5 Cp, η6 arene) */
+        const ep = /^\(\d+((?:\s+\d+)*)\)$/.exec(opt(w, 'ENDPTS') || ''),
+          st = [w[2], w[3]].find(k => atoms[ix.get(k)].star);
+        if (ep && st && opt(w, 'ATTACH') === 'ALL') {
+          const R = ep[1].trim().split(/\s+/).map(k => ix.get(k));
+          if (R.length >= 2 && R.every(k => k != null)) atoms[ix.get(st)].multi = R;
+        }
         bonds.push({
           a: ix.get(w[2]),
           b: ix.get(w[3]),
@@ -46063,6 +46082,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             order: b.order,
             stereo: b.stereo || null
           });
+      });
+      /* η-rings: the attachment point lists its ring atoms */
+      f.atoms.forEach((a, i) => {
+        if (!a.multi || !map[i]) return;
+        const R = a.multi.map(k => map[k]).filter(Boolean);
+        map[i].multi = R.map(q => q.id);
+        R.forEach(q => (q.hap = 1));
       });
       /* hydrogens as the file's valence counts them (kept until the atom's bonds change) */
       f.atoms.forEach((a, i) => {
