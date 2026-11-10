@@ -542,7 +542,7 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     }
 
     /* Help > Clipboard Report: what the clipboard holds now (types, sizes, where a drawing tag was found), saved to Downloads */
-    static func clipReport() -> URL? {
+    static func clipReport() throws -> URL {
         let pb = NSPasteboard.general
         var lines = ["Reactio Draw clipboard report", "changeCount \(pb.changeCount)", ""]
         for (n, it) in (pb.pasteboardItems ?? []).enumerated() {
@@ -556,7 +556,7 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             }
         }
         let url = FileManager.default.urls(for: .downloadsDirectory, in: .userDomainMask)[0].appendingPathComponent("Reactio Draw clipboard report.txt")
-        do { try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8) } catch { return nil }
+        try lines.joined(separator: "\n").write(to: url, atomically: true, encoding: .utf8)
         return url
     }
 
@@ -971,9 +971,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "Reactio Draw"; window.minSize = NSSize(width: 800, height: 560); window.contentView = web; window.delegate = bridge
         window.isReleasedWhenClosed = false
-        if let url = Bundle.main.url(forResource: "index", withExtension: "html"), let html = try? String(contentsOf: url, encoding: .utf8) {
-            web.loadHTMLString(html, baseURL: URL(string: "https://app.reactiodraw.local/"))
+        var page: String? = nil, why = "index.html is missing from the app."
+        if let url = Bundle.main.url(forResource: "index", withExtension: "html") {
+            do { page = try String(contentsOf: url, encoding: .utf8) } catch { why = "index.html in the app cannot be read: " + error.localizedDescription }
         }
+        guard let html = page else {
+            // without its page the window would stay blank: say so and quit
+            let a = NSAlert(); a.messageText = "Reactio Draw cannot start"; a.informativeText = why + " Download Reactio Draw again and replace this copy."; _ = a.runModal()
+            NSApp.terminate(nil); return
+        }
+        web.loadHTMLString(html, baseURL: URL(string: "https://app.reactiodraw.local/"))
         window.center(); window.setFrameAutosaveName("ReactioDrawMain"); window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
         timer = Timer.scheduledTimer(timeInterval: 0.5, target: bridge, selector: #selector(Bridge.watchClipboard), userInfo: nil, repeats: true)
@@ -1077,7 +1084,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
 
     @objc func clipReport(_ sender: Any?) {
-        if let u = Bridge.clipReport() { NSWorkspace.shared.open(u) }
+        do { let u = try Bridge.clipReport(); NSWorkspace.shared.open(u) } catch {
+            let a = NSAlert(); a.messageText = "Could not save the clipboard report"; a.informativeText = error.localizedDescription; _ = a.runModal()
+        }
     }
 }
 
