@@ -4796,6 +4796,16 @@ function kdOf(st) {
      longer fits there must not come back empty when its tab is shown again */
   const DOCS_MEM = new Map();
   let storageWarned = 0;
+  /* pointer capture for a drag: where the browser refuses it (a pointer it no longer knows, InvalidPointerId), the drag
+     goes on without it instead of throwing out of the pointerdown handler */
+  function capturePtr(el, id) {
+    try {
+      el.setPointerCapture(id);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
   /* one item written to the browser storage: false when the storage is full or blocked. With `what` the user is told
      that it was not kept (it works in this window, but is gone after a restart) */
   function storeItem(k, v, what) {
@@ -18635,9 +18645,7 @@ function kdOf(st) {
         e.preventDefault();
         e.stopPropagation();
         cd = { c, p0: pt(e), x0: c.x - c.ox, y0: c.y - c.oy, moved: false };
-        try {
-          svgEl.setPointerCapture(e.pointerId);
-        } catch (x) {}
+        capturePtr(svgEl, e.pointerId);
       },
       true
     );
@@ -18787,9 +18795,7 @@ function kdOf(st) {
         e.preventDefault();
         e.stopPropagation();
         nd = { c, p0: pt(e), x0: c.x - c.a.x, y0: c.y - c.a.y, moved: false };
-        try {
-          svgEl.setPointerCapture(e.pointerId);
-        } catch (x) {}
+        capturePtr(svgEl, e.pointerId);
       },
       true
     );
@@ -24004,9 +24010,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function touchDown(e) {
     e.preventDefault();
     TOUCHP.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    try {
-      svg.setPointerCapture(e.pointerId);
-    } catch (err) {}
+    capturePtr(svg, e.pointerId);
     touchStart();
     if (!touchDown.told) {
       touchDown.told = true;
@@ -24068,7 +24072,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       e.preventDefault();
       drag = { mode: 'pan', c0: { x: e.clientX, y: e.clientY }, v0: { ...view } };
       svg.classList.add('pan');
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     /* eraser + right button held: rub out everything the pointer passes over */
@@ -24077,7 +24081,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       snap();
       drag = { mode: 'scrub', n: 0 };
       scrubAt(pt(e));
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (e.button !== 0) return;
@@ -24086,7 +24090,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       e.preventDefault();
       drag = { mode: 'pan', c0: { x: e.clientX, y: e.clientY }, v0: { ...view } };
       svg.classList.add('pan');
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     const p = pt(e),
@@ -24099,7 +24103,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (hd) {
         e.preventDefault();
         drag = hd;
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
     }
@@ -24158,7 +24162,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           moved: false,
           orig: JSON.stringify(dc.a.dpos || null)
         };
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
       if (ca) {
@@ -24181,7 +24185,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           return;
         }
         drag = { mode: 'chgdrag', shift: e.shiftKey, a: ca, p0: p, moved: false };
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
     }
@@ -24200,7 +24204,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         alt: e.altKey,
         dock
       };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'rot3d') {
@@ -24218,13 +24222,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!atoms || !atoms.length) return;
       e.preventDefault();
       drag = start3D(atoms, p);
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'orbital') {
       e.preventDefault();
       drag = { mode: 'orb', p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'table') {
@@ -24235,7 +24239,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (tool === 'shape' || tool === 'chart') {
       e.preventDefault();
       drag = { mode: 'shp', p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'bracket') {
@@ -24245,18 +24249,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return;
       }
       drag = { mode: 'brk', p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'cutRad' || tool === 'cutRetro' || tool === 'cutFwd') {
       e.preventDefault();
       drag = { mode: 'cut', p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'erase' && !h) {
       drag = { mode: 'emarq', p0: p };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'erase') {
@@ -24317,12 +24321,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             selArr.clear();
             selArr.add(c.id);
             drag = { mode: 'ahandle', r: c, k: hh.k, p0: p, moved: true };
-            svg.setPointerCapture(e.pointerId);
+            capturePtr(svg, e.pointerId);
             render();
             return;
           }
           drag = { mode: 'ahandle', r: hh.r, k: hh.k, p0: p, moved: false, len0: Math.hypot(hh.r.x2 - hh.r.x1, hh.r.y2 - hh.r.y1) };
-          svg.setPointerCapture(e.pointerId);
+          capturePtr(svg, e.pointerId);
           return;
         }
       }
@@ -24334,11 +24338,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           const tw = 'ewns'.includes(sh.k) && !sel.size && !selArr.size && selTxt.size === 1 && mol.texts.find(t => selTxt.has(t.id));
           if (tw && /\s/.test(tw.text.trim())) {
             drag = twrapStart(tw, sh.k, p);
-            svg.setPointerCapture(e.pointerId);
+            capturePtr(svg, e.pointerId);
             return;
           }
           drag = startScale(sh, sb, p);
-          svg.setPointerCapture(e.pointerId);
+          capturePtr(svg, e.pointerId);
           return;
         }
       }
@@ -24353,7 +24357,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           moved: false,
           deg: 0
         };
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
       /* inside the selection box, on empty sheet or on something selected: the whole selection moves (as if picked by an atom) */
@@ -24374,7 +24378,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           copy: e.ctrlKey || e.metaKey,
           alt: e.altKey
         };
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
       if (h) {
@@ -24388,7 +24392,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         /* an atom or bond that is not selected: a drag moves only it (the structure stretches), a click selects the structure */
         if (!already && (h.atom || h.bond) && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
           drag = { mode: 'piece', h, p0: p, moved: false };
-          svg.setPointerCapture(e.pointerId);
+          capturePtr(svg, e.pointerId);
           return;
         }
         /* Shift+click on something already selected takes it out of the selection */
@@ -24403,7 +24407,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             alt: e.altKey,
             unpick: h
           };
-          svg.setPointerCapture(e.pointerId);
+          capturePtr(svg, e.pointerId);
           return;
         }
         if (!already) {
@@ -24440,7 +24444,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       render();
       updateInfo();
       syncStyle();
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'chg' && h && h.text && /^(p?-?1)$/.test(chgMode)) {
@@ -24566,13 +24570,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (tool === 'arrow') {
       drag = { mode: 'arrow', p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'pen') {
       e.preventDefault();
       penDown(p, e);
-      if (drag) svg.setPointerCapture(e.pointerId);
+      if (drag) capturePtr(svg, e.pointerId);
       return;
     }
     /* from the tip of an orbital the bond tool draws a plain line (the overlap of two p orbitals), ending on another tip */
@@ -24581,7 +24585,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (tp) {
         e.preventDefault();
         drag = { mode: 'bond', orbTip: tp, start: null, p0: tp, moved: false };
-        svg.setPointerCapture(e.pointerId);
+        capturePtr(svg, e.pointerId);
         return;
       }
     }
@@ -24595,7 +24599,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           ? { mode: 'chain', p0: { x: a.x, y: a.y }, start: a, moved: false }
           : { mode: 'bond', start: a, p0: { x: a.x, y: a.y }, moved: false };
       render();
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (tool === 'chain') {
@@ -24605,13 +24609,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         start: h && h.atom,
         moved: false
       };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (h && (h.bond || h.arrow || h.text)) {
       e.preventDefault();
       drag = { mode: 'press', h, p0: p, moved: false };
-      svg.setPointerCapture(e.pointerId);
+      capturePtr(svg, e.pointerId);
       return;
     }
     if (false) {
@@ -24643,7 +24647,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       p0: h && h.atom ? { x: h.atom.x, y: h.atom.y } : p,
       moved: false
     };
-    svg.setPointerCapture(e.pointerId);
+    capturePtr(svg, e.pointerId);
   });
   /* the pen: click to place points, drag while placing a point to bend the curve there (its direction line);
    drag a direction point to reshape, Alt/Option-drag a point to move it; click a pen curve to edit it; Enter or Esc finishes */
@@ -33332,7 +33336,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       tbl = h.closest('table');
     rz = { id, col, tbl, x: e.clientX, w: parseFloat(col.style.width), tw: parseFloat(tbl.style.width), h };
     h.classList.add('on');
-    h.setPointerCapture(e.pointerId);
+    capturePtr(h, e.pointerId);
   });
   $('grids').addEventListener('pointermove', e => {
     if (!rz) return;
@@ -36098,7 +36102,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } catch (e) {}
     g.addEventListener('pointerdown', e => {
       e.preventDefault();
-      g.setPointerCapture(e.pointerId);
+      capturePtr(g, e.pointerId);
       g.classList.add('on');
       const r = ed.getBoundingClientRect();
       const mv = ev => {
@@ -48113,7 +48117,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     let drag = null;
     cv.addEventListener('pointerdown', e => {
       drag = { x: e.clientX, y: e.clientY };
-      cv.setPointerCapture(e.pointerId);
+      capturePtr(cv, e.pointerId);
       cv.style.cursor = 'grabbing';
     });
     cv.addEventListener('pointermove', e => {
@@ -61511,9 +61515,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const G = jabGeo(r),
           o = h.kind === 'lvl' || h.kind === 'lvlname' ? r.lv[h.i] : r.tr[h.i];
         jd = { h, p0: p, o, s0: { ...o }, fs: G.fs, per: (G.y1 - G.y0 - G.fs * 1.8) / 100 };
-        try {
-          svgEl.setPointerCapture(e.pointerId);
-        } catch (x) {}
+        capturePtr(svgEl, e.pointerId);
       },
       true
     );
@@ -62675,7 +62677,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     eneEd.addEventListener('pointerdown', e => {
       if (!e.target.classList.contains('ttl')) return;
       mv = { x: e.clientX, y: e.clientY, l: eneEd.offsetLeft, t: eneEd.offsetTop };
-      eneEd.setPointerCapture(e.pointerId);
+      capturePtr(eneEd, e.pointerId);
     });
     eneEd.addEventListener('pointermove', e => {
       if (!mv) return;
