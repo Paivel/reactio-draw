@@ -8,7 +8,7 @@ and PowerPoint or to and from other chemistry editors as CDXML and CDX files. It
 | :---: | :---: | :---: |
 | nothing to install | work fully offline | every function and button explained |
 | [📝 Word test file](examples/Reactio%20Draw%20-%20marks%20test.docx) | [📄 LaTeX: Lattice](https://github.com/leo1oel/lattice) | [🧩 LaTeX: VS Code extension](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) |
-| compound numbers in Word, every kind of mark | a LaTeX editor: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-and-vs-code)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it |
+| compound numbers in Word, every kind of mark | a LaTeX editor with a review mode: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-and-vs-code)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it |
 
 ![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview-1.5.1.png)
 
@@ -43,7 +43,7 @@ Schemes go into a LaTeX paper the same way they go into Word: with their compoun
 - **Copy for LaTeX, paste into the paper.** File → Copy to clipboard → Figure for LaTeX (Edit → Copy for LaTeX on the
   Mac). The figure is the drawing as a PDF with its numbers set by LaTeX in the drawing's font; with something
   selected, only that part.
-  - In [Lattice](https://github.com/leo1oel/lattice), a LaTeX editor, the paste brings the figure's files into `figures/`, adds the
+  - In [Lattice](https://github.com/leo1oel/lattice), a LaTeX editor with a review mode, the paste brings the figure's files into `figures/`, adds the
     `\input` and the lines the preamble needs; the compound numbers on the scheme match the text. Double-click the
     figure to edit it in Reactio Draw.
   - In VS Code, for LaTeX there, the extension
