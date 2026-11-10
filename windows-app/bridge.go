@@ -37,7 +37,12 @@ func reply(id string, v interface{}) {
 	if id == "" || id == "x" {
 		return
 	}
-	b, _ := json.Marshal(v)
+	// an answer that cannot be written as JSON is still answered, with an error, so the page does not wait for ever
+	b, err := json.Marshal(v)
+	if err != nil {
+		logf("could not write the reply: %v", err)
+		b, _ = json.Marshal(map[string]interface{}{"ok": false, "err": "the app could not write its reply"})
+	}
 	js, _ := json.Marshal(string(b))
 	idj, _ := json.Marshal(id)
 	app.w.Eval("window.__rdReply&&window.__rdReply(" + string(idj) + "," + string(js) + ")")
@@ -47,6 +52,8 @@ func handle(s string) {
 	var r request
 	if err := json.Unmarshal([]byte(s), &r); err != nil {
 		logf("bad message: %v", err)
+		// a message with a field of the wrong kind still carries its id: answer it, so the page does not wait for ever
+		reply(r.ID, map[string]interface{}{"ok": false, "err": "bad message"})
 		return
 	}
 	b64 := func(t string) []byte { b, _ := base64.StdEncoding.DecodeString(t); return b }
@@ -273,11 +280,13 @@ func handle(s string) {
 		saveFolders(list)
 		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
 	case "cliDone":
+		reply(r.ID, map[string]interface{}{"ok": true})
 		cliDone(r.Msg)
 	case "link":
 		reply(r.ID, map[string]interface{}{"ok": openLink(r.URL)})
 	case "log":
 		logf("page: %s", r.Msg)
+		reply(r.ID, map[string]interface{}{"ok": true})
 	case "embedReady":
 		reply(r.ID, map[string]interface{}{"ok": true})
 		if !app.embedding {

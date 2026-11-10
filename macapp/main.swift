@@ -266,8 +266,13 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     var lastCC = NSPasteboard.general.changeCount
 
     func reply(_ id: String, _ obj: [String: Any]) {
-        guard let d = try? JSONSerialization.data(withJSONObject: obj), let s = String(data: d, encoding: .utf8),
-              let idj = try? JSONSerialization.data(withJSONObject: [id, s]), let args = String(data: idj, encoding: .utf8) else { return }
+        // an answer that cannot be written as JSON is still answered, with an error, so the page does not wait for ever
+        // (checked first: data(withJSONObject:) raises an exception for it, which try? does not catch)
+        let failed = "{\"ok\":false,\"err\":\"the app could not write its reply\"}"
+        var s = failed
+        if JSONSerialization.isValidJSONObject(obj), let d = try? JSONSerialization.data(withJSONObject: obj),
+           let t = String(data: d, encoding: .utf8) { s = t }
+        guard let idj = try? JSONSerialization.data(withJSONObject: [id, s]), let args = String(data: idj, encoding: .utf8) else { return }
         // args is ["id","{...}"]
         web?.evaluateJavaScript("window.__rdReply.apply(null,\(args))", completionHandler: nil)
     }

@@ -3703,17 +3703,37 @@ function kdOf(st) {
   if (!H) return;
   let n = 0;
   const wait = {};
+  /* a reply that cannot be read rejects its call (the caller would otherwise wait for ever) */
   window.__rdReply = (id, json) => {
     const f = wait[id];
     delete wait[id];
-    if (f) f(JSON.parse(json));
+    if (!f) return;
+    let v;
+    try {
+      v = JSON.parse(json);
+    } catch (e) {
+      f.rej(new Error('the app sent a reply that could not be read'));
+      return;
+    }
+    f.res(v);
   };
+  /* no time limit: a call may wait for the user (the Open and Save dialogs) */
   const call = (cmd, o) =>
-    new Promise(res => {
+    new Promise((res, rej) => {
       const id = 'k' + ++n;
-      wait[id] = res;
-      H.postMessage(JSON.stringify({ id, cmd, ...o }));
+      wait[id] = { res, rej };
+      try {
+        H.postMessage(JSON.stringify({ id, cmd, ...o }));
+      } catch (e) {
+        delete wait[id];
+        rej(e);
+      }
     });
+  /* a message in the editor's message line (set by the editor once it has started) */
+  const say = m => {
+    if (window.__rdToast) window.__rdToast(m, true);
+    else console.error(m);
+  };
   const b64 = u => {
     let s = '';
     for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192));
@@ -3744,7 +3764,7 @@ function kdOf(st) {
       if (!l || !/^https?:\/\//i.test(l.href) || /^#/.test(l.getAttribute('href') || '') || l.origin === location.origin)
         return;
       e.preventDefault();
-      call('link', { url: l.href });
+      call('link', { url: l.href }).catch(err => say('Could not open the link: ' + ((err && err.message) || err)));
     },
     true
   );
@@ -3772,7 +3792,7 @@ function kdOf(st) {
       dt.items.add(new File([unb64(r.b64)], r.name, { type: mime }));
       inp.files = dt.files;
       inp.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    }).catch(err => say('Could not open the file: ' + ((err && err.message) || err)));
   };
 })();
 (function () {
@@ -50402,6 +50422,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return false;
   }
+  /* the native bridge (the first script) shows its errors here */
+  window.__rdToast = (m, err) => toast(m, err);
   window.__rdOpenFile = (name, b64, path) => {
     try {
       openExternal(
