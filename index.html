@@ -48586,7 +48586,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!w) return Promise.resolve().then(inPage);
     return new Promise((ok, no) => {
       const id = ++xyzSeq;
-      xyzWait.set(id, { ok, prog, no: e => (e ? no(e) : ok(inPage())) });
+      /* the worker died (no e): the job runs in the page instead, after the worker's error handler has returned, and
+         rejects with its own message when that cannot run either (OpenChemLib did not start) */
+      xyzWait.set(id, { ok, prog, no: e => (e ? no(e) : Promise.resolve().then(inPage).then(ok, no)) });
       w.postMessage({ id, mb, o });
     });
   }
