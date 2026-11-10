@@ -11114,7 +11114,19 @@ function kdOf(st) {
           break;
         }
       }
-      if (!ok) bs.forEach(b => (b.stereo = null));
+      if (!ok) {
+        bs.forEach(b => (b.stereo = null));
+        continue;
+      }
+      /* the bridge's wedges show the bridgeheads: a second wedge or hash at a bridgehead goes when the molecule stays
+         without it (a wedge and a hash side by side on one side of the centre read as undefined in InChI and Molfiles) */
+      for (const e of ends)
+        for (const b of mol.bonds) {
+          if (bs.includes(b) || b.a !== e.id || (b.stereo !== 'wedge' && b.stereo !== 'hash')) continue;
+          const was = b.stereo;
+          b.stereo = null;
+          if (fragSmilesS(fr) !== smi0) b.stereo = was;
+        }
     }
   }
   /* a group on a ring atom (the H or the substituent at a ring junction) that the layout put inside a ring is turned out of
