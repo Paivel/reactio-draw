@@ -72096,14 +72096,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       let boxes;
       if (Array.isArray(a.boxes)) boxes = a.boxes.map(b => (a.units === 'figure' ? [R.x0 + b[0] * k, R.y0 + b[1] * k, R.x0 + b[2] * k, R.y0 + b[3] * k] : b.map(Number)));
       else boxes = ((await API_OPS.findStructures({ ref: a.ref })).structures || []).filter(x => !x.small).map(x => x.sheet);
-      /* the template's own place, and boxes too small to hold it, left out */
-      const tw = tb.x1 - tb.x0,
-        th = tb.y1 - tb.y0,
+      /* the template's own place, and boxes too small to hold it, left out; found boxes are tight round the figure's ink,
+         so they are measured against the template's atoms, not its box with the letters' margins */
+      const xs = tf.map(q => q.x),
+        ys = tf.map(q => q.y),
+        tw = Math.max(...xs) - Math.min(...xs),
+        th = Math.max(...ys) - Math.min(...ys),
         minSide = Math.min(tw, th) * 0.8,
         given = Array.isArray(a.boxes),
+        usable = b => b.length === 4 && b.every(v => isFinite(v)) && !(tc[0] >= b[0] && tc[0] <= b[2] && tc[1] >= b[1] && tc[1] <= b[3]),
+        holds = b => Math.max(b[2] - b[0], b[3] - b[1]) >= Math.max(tw, th) * 0.8 && Math.min(b[2] - b[0], b[3] - b[1]) >= minSide,
         /* boxes given are tried as they are (tight round a core, smaller than the template's box with its letters);
            found ones only when they can hold the template */
-        cand = boxes.filter(b => b.length === 4 && b.every(v => isFinite(v)) && !(tc[0] >= b[0] && tc[0] <= b[2] && tc[1] >= b[1] && tc[1] <= b[3]) && (given || (Math.max(b[2] - b[0], b[3] - b[1]) >= Math.max(tw, th) * 0.8 && Math.min(b[2] - b[0], b[3] - b[1]) >= minSide)));
+        cand = boxes.filter(b => usable(b) && (given || holds(b)));
       if (given && !cand.length) throw new Error('placeLike: none of the boxes can be used (each [x0, y0, x1, y1]' + (a.units === 'figure' ? ' in the figure\'s pixels' : ' on the sheet; units: "figure" for the figure\'s pixels') + ', not on the template itself)');
       const bad0 = apiDrawBadness(tf, q => [q.x, q.y], true),
         field = await apiInkField(ref),
@@ -72126,8 +72131,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         ink0 = onInk(tf);
       const placed = [],
         left = [];
-      for (const b of cand) {
-        await apiBreath('placeLike ' + (placed.length + left.length + 1) + '/' + cand.length);
+      /* found places too small for the template: said, not passed over silently */
+      if (!given) for (const b of boxes) if (usable(b) && !holds(b)) left.push({ box: b.map(v => +v.toFixed(1)), score: 0, why: 'too small to hold the template' });
+      for (const [ci, b] of cand.entries()) {
+        await apiBreath('placeLike ' + (ci + 1) + '/' + cand.length);
         if (apiStopAsked()) break;
         const d = API_OPS.duplicate({ index: fragments().findIndex(f => f.includes(tf[0])), x: (b[0] + b[2]) / 2, y: (b[1] + b[3]) / 2 });
         let r = null;
