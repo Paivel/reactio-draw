@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/base64"
+	"errors"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -65,9 +66,15 @@ func handle(s string) {
 		reply(r.ID, map[string]interface{}{"ok": true, "path": p})
 	case "open":
 		p := fileDialog(false, "Open", "")
-		b, err := os.ReadFile(p)
-		if p == "" || err != nil {
+		if p == "" {
 			reply(r.ID, map[string]interface{}{"cancel": true})
+			return
+		}
+		b, err := os.ReadFile(p)
+		if err != nil {
+			// chosen but not readable (no permission, a folder, gone since): the page says so; not a cancel
+			logf("could not open %s: %v", p, err)
+			reply(r.ID, map[string]interface{}{"name": filepath.Base(p), "err": errReason(err)})
 			return
 		}
 		allowPath(p)
@@ -225,6 +232,15 @@ func aiKitInstalled() bool {
 	}
 	st, err := os.Stat(filepath.Join(filepath.Dir(exe), "reactio-mcp"))
 	return err == nil && !st.IsDir()
+}
+
+// errReason: an error without the path in front of it ("permission denied", "is a directory")
+func errReason(err error) string {
+	var pe *os.PathError
+	if errors.As(err, &pe) {
+		return pe.Err.Error()
+	}
+	return err.Error()
 }
 
 // chosenTarget: a link chosen in the Save dialog is the user's choice: the file it points to is replaced (the link

@@ -303,8 +303,8 @@ func TestErrBridgeOpenUnreadableReported(t *testing.T) {
 		if r["b64"] != nil {
 			t.Fatalf("a file without read permission was read: %v", r)
 		}
-		if r["cancel"] == true && r["error"] == nil && r["err"] == nil {
-			t.Skip("bug 77: an Open of a file without read permission is answered {cancel:true}")
+		if r["cancel"] == true || r["err"] == nil || r["name"] != "locked.mol" {
+			t.Errorf("bug 77: an Open of a file without read permission must be reported with its name: %v", r)
 		}
 	})
 	ePick = filepath.Join(d, "folder.mol") // a folder: unreadable as a file even for root
@@ -313,8 +313,11 @@ func TestErrBridgeOpenUnreadableReported(t *testing.T) {
 	if r["b64"] != nil {
 		t.Fatalf("a folder was read as a file: %v", r)
 	}
-	if r["cancel"] == true && r["error"] == nil && r["err"] == nil {
-		t.Skip("bug 77: an Open of a file that cannot be read is answered {cancel:true}: the page acts as if the dialog was cancelled")
+	if r["cancel"] == true || r["err"] == nil || r["name"] != "folder.mol" {
+		t.Errorf("bug 77: an Open of a file that cannot be read must be reported, not answered as cancelled: %v", r)
+	}
+	if pathAllowed(ePick) {
+		t.Errorf("a file that could not be opened became writable for the page")
 	}
 }
 

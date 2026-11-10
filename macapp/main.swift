@@ -305,9 +305,13 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             } else { reply(id, ["ok": false]) }
         case "open":
             let o = NSOpenPanel(); o.allowsMultipleSelection = false; o.canChooseDirectories = false
-            if o.runModal() == .OK, let url = o.url, let data = try? Data(contentsOf: url) {
-                allowPath(url.path)
-                reply(id, ["name": url.lastPathComponent, "path": url.path, "b64": data.base64EncodedString()])
+            if o.runModal() == .OK, let url = o.url {
+                // chosen but not readable: the page says why (it is not a cancel)
+                do {
+                    let data = try Data(contentsOf: url)
+                    allowPath(url.path)
+                    reply(id, ["name": url.lastPathComponent, "path": url.path, "b64": data.base64EncodedString()])
+                } catch { reply(id, ["name": url.lastPathComponent, "err": error.localizedDescription]) }
             } else { reply(id, ["cancel": true]) }
         case "saveAs":
             // Save as: the panel only; the page then writes the file in the format the name asks for

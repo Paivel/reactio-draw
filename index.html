@@ -3774,6 +3774,11 @@ function kdOf(st) {
     if (this.type !== 'file') return click0.call(this);
     const inp = this;
     call('open', { accept: inp.accept || '' }).then(r => {
+      /* chosen, but the app could not read it */
+      if (r && (r.err || r.error)) {
+        say('Could not read ' + (r.name || 'the file') + ': ' + (r.err || r.error));
+        return;
+      }
       if (!r || !r.b64) return;
       window.__rdLastOpen = { name: r.name, path: r.path || '' };
       const dt = new DataTransfer();
