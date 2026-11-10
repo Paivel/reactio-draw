@@ -40871,6 +40871,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             if (has('Charge')) pI8(0x0421, +a('Charge'));
             if (has('Radical')) pI8(0x0422, RAD[a('Radical')] || 0);
             if (has('NumHydrogens')) pI16(0x042b, +a('NumHydrogens'));
+            for (const nm of ['EnhancedStereoType', 'EnhancedStereoGroupNum']) if (has(nm)) pAny(nm, a(nm));
             if (has('Attachments')) {
               const ids = nums(a('Attachments'));
               prop(
@@ -40892,7 +40893,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             if (has('Order') && a('Order') !== '1') pI16(0x0600, ORDER[a('Order')] || 1);
             if (has('Display') && a('Display') in DISP) pI16(0x0601, DISP[a('Display')]);
             if (has('Display2') && a('Display2') in DISP) pI16(0x0602, DISP[a('Display2')]);
+            if (has('BS')) pAny('BS', a('BS'));
             color(el);
+          });
+          break;
+        /* a filled ring: its colour and the bonds round it */
+        case 'ColoredMolecularArea':
+          obj(0x8032, el, () => {
+            for (const nm of ['bgcolor', 'BasisObjects']) if (has(nm)) pAny(nm, a(nm));
           });
           break;
         case 't':
@@ -48963,6 +48971,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       /* a dative bond drawn as a wedge or hash keeps its drawing; it stays dative for the valence and for writing it back */
       if (o === 'dative' && nb.stereo !== 'dative') nb.dat = 1;
+      /* a double bond of unknown geometry (BS="U") is drawn crossed and has no E/Z */
+      if (nb.order === 2 && b.getAttribute('BS') === 'U') nb.dx = 1;
       mol.bonds.push(nb);
       bondMap.set(b.getAttribute('id'), [A, B]);
     };
