@@ -71410,6 +71410,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (f === 'json' || f === 'reactio') return { json: JSON.stringify({ rd: 1, state: S }) };
       const F = exportFormats();
       const v = { mol: F.mol, sdf: F.sdf, rxn: F.rxn, cdxml: F.cdxml, smiles: F.smi }[f];
+      if (v == null && f === 'rxn') throw new Error('export rxn: no reaction on the sheet (draw a reaction arrow first)');
       if (v == null) throw new Error('Formats: smiles, mol, sdf, sdf3d, rxn, cdxml, xyz, svg, json');
       return { [f]: v };
     },
