@@ -11,7 +11,8 @@ the assistant.
 
 Files: the assistant can read and write files only inside the folders listed in Reactio Draw → Info → API →
 "Folders for AI assistants" (empty until you add a folder), and only
-drawings, pictures and their data (.png, .svg, .mol, .sdf, .cdxml, .json, .reactio, .txt…). Hidden files and folders
+drawings, pictures and their data (.png, .svg, .mol, .sdf, .cdxml, .json, .reactio, .txt…); plain data files (.json,
+.txt, .csv, .tsv) are written only as new files, never over one that was there before. Hidden files and folders
 (.ssh, .zshrc…), the Library of the Mac and the AppData of Windows are never used. Only you can change the list, with
 "Add a folder…" (the app's own folder dialog) and "Remove"; no command of the assistant can.
 

@@ -17,6 +17,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 )
 
 const foldersFileName = "allowed-folders.json"
@@ -63,6 +64,13 @@ var writeKinds = map[string]bool{
 	".cdx": true, ".smi": true, ".smiles": true, ".json": true, ".reactio": true, ".txt": true, ".csv": true, ".tsv": true,
 	".xyz": true, ".cif": true, ".inchi": true, ".docx": true, ".cml": true,
 }
+
+// Plain data files (an answer saved with "out", a table as .csv): any program's settings can be such a file (package.json,
+// tsconfig.json, notes.txt), so one is written only as a new file, or again when this server made it itself
+var dataKinds = map[string]bool{".json": true, ".txt": true, ".csv": true, ".tsv": true}
+
+var madeMu sync.Mutex
+var madeHere = map[string]bool{}
 
 func samePathCase(p string) string {
 	if runtime.GOOS == "windows" || runtime.GOOS == "darwin" {
@@ -141,6 +149,13 @@ func checkFile(p string, write bool) (string, error) {
 	if !kinds[kind] {
 		return "", fmt.Errorf("%s: files of this kind (%q) are not %s by Reactio Draw's AI assistants", p, kind, verb)
 	}
+	if write && dataKinds[kind] {
+		madeMu.Lock()
+		defer madeMu.Unlock()
+		if _, err := os.Lstat(r); err == nil && !madeHere[samePathCase(r)] {
+			return "", fmt.Errorf("%s already exists: Reactio Draw's AI assistants write %s files only as new files; choose a new name", p, kind)
+		}
+	}
 	h, _ := os.UserHomeDir()
 	never := []string{rdConfigDir()}
 	switch runtime.GOOS {
@@ -170,6 +185,9 @@ func checkFile(p string, write bool) (string, error) {
 			if strings.HasPrefix(part, ".") && part != "." {
 				return "", fmt.Errorf("%s: hidden files and folders are not used", p)
 			}
+		}
+		if write && dataKinds[kind] {
+			madeHere[samePathCase(r)] = true
 		}
 		return r, nil
 	}

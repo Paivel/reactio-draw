@@ -503,10 +503,18 @@ func toWebPicture(b []byte) []byte {
 	case "darwin":
 		err = exec.Command("sips", "-s", "format", "png", in, "--out", out).Run()
 	case "windows":
+		// the paths go in PowerShell's single quotes, where a quote (C:\Users\O'Brien) is written twice
+		q := func(p string) string { return "'" + strings.ReplaceAll(p, "'", "''") + "'" }
 		err = exec.Command("powershell", "-NoProfile", "-Command",
-			`Add-Type -AssemblyName System.Drawing; $i=[System.Drawing.Image]::FromFile('`+in+`'); $i.Save('`+out+`', [System.Drawing.Imaging.ImageFormat]::Png); $i.Dispose()`).Run()
+			`Add-Type -AssemblyName System.Drawing; $i=[System.Drawing.Image]::FromFile(`+q(in)+`); $i.Save(`+q(out)+`, [System.Drawing.Imaging.ImageFormat]::Png); $i.Dispose()`).Run()
 	default:
-		err = exec.Command("convert", in, out).Run()
+		// ImageMagick is told the picture's kind (from its first bytes) instead of guessing it, so a file that is
+		// some other format (MVG, MSL, text: with commands and file names of its own) is not read as such
+		f := pictureKind(b)
+		if f == "" {
+			return b
+		}
+		err = exec.Command("convert", f+":"+in, "png:"+out).Run()
 	}
 	if err != nil {
 		return b
@@ -515,6 +523,24 @@ func toWebPicture(b []byte) []byte {
 		return p
 	}
 	return b
+}
+
+// the kind of a picture that ImageMagick may turn into a PNG, by its first bytes ("" for any other)
+func pictureKind(b []byte) string {
+	switch {
+	case bytes.HasPrefix(b, []byte("II*\x00")) || bytes.HasPrefix(b, []byte("MM\x00*")):
+		return "tiff"
+	case bytes.HasPrefix(b, []byte("BM")):
+		return "bmp"
+	case len(b) >= 12 && string(b[4:8]) == "ftyp":
+		switch string(b[8:12]) {
+		case "heic", "heix", "heim", "heis", "hevc", "hevx", "mif1", "msf1":
+			return "heic"
+		case "avif", "avis":
+			return "avif"
+		}
+	}
+	return ""
 }
 
 // the figure to copy: a file, or the clipboard's picture (macOS: AppleScript; Windows: PowerShell; Linux: xclip or wl-paste)

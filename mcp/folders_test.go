@@ -41,6 +41,18 @@ func TestCheckFile(t *testing.T) {
 			t.Errorf("%s write=%v: got %v want %v", c.p, c.w, got, c.want)
 		}
 	}
+	/* plain data files: new ones only, or again one this server made */
+	os.WriteFile(filepath.Join(h, "Documents", "package.json"), []byte("{}"), 0644)
+	if ok("~/Documents/package.json", true) || !ok("~/Documents/package.json", false) {
+		t.Errorf("an existing .json was writable, or not readable")
+	}
+	if !ok("~/Documents/answer.json", true) {
+		t.Errorf("a new .json was not writable")
+	}
+	os.WriteFile(filepath.Join(h, "Documents", "answer.json"), []byte("{}"), 0644)
+	if !ok("~/Documents/answer.json", true) {
+		t.Errorf("a .json made here was not writable again")
+	}
 	saveFolders([]string{filepath.Join(h, "Other")})
 	if !ok("~/Other/a.png", false) || ok("~/Documents/a.png", false) {
 		t.Errorf("saved list not used")
