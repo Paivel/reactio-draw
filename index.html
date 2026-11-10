@@ -38740,11 +38740,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       renderPlain = false;
     }
     const bb = drawnBox() || { x0: 0, y0: 0, x1: 100, y1: 100 };
+    /* whole-unit width and height, the box widened evenly: the viewBox then matches width/height exactly, so the
+     background fills the picture to its edges with no transparent pixel column or row */
     const pad = 20,
-      x0 = bb.x0 - pad,
-      y0 = bb.y0 - pad,
-      w = bb.x1 - bb.x0 + 2 * pad,
-      h = bb.y1 - bb.y0 + 2 * pad;
+      w = Math.ceil(bb.x1 - bb.x0 + 2 * pad),
+      h = Math.ceil(bb.y1 - bb.y0 + 2 * pad),
+      x0 = (bb.x0 + bb.x1 - w) / 2,
+      y0 = (bb.y0 + bb.y1 - h) / 2;
     const cs = getComputedStyle($('mol')),
       gv = v => cs.getPropertyValue(v).trim();
     const LIGHT = {
@@ -40186,9 +40188,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const c = document.createElement('canvas');
         c.width = Math.round(W * sc);
         c.height = Math.round(H * sc);
-        const g = c.getContext('2d');
-        g.scale(sc, sc);
-        g.drawImage(img, 0, 0, W, H);
+        /* drawn over the whole canvas (whole pixels), so its last row and column are not left half covered */
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         c.toBlob(async b => {
           if (!b) return rej(new Error('png'));
           res(new Blob([pngPhys(await b.arrayBuffer(), dpi)], { type: 'image/png' }));
