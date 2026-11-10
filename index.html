@@ -37134,10 +37134,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     });
     return parts.reverse().flat();
   }
+  /* a label's point size: a journal style's own letters against its 14.4 pt bond; the screen style 10 pt per label size */
+  const cdxLabSize = a => {
+    const st = STYo(a);
+    return +(st.pt ? (labPx(a) * 14.4) / 40 : (10 * labPx(a)) / (STY().label || 15)).toFixed(2);
+  };
   /* a label's characters as CDXML style runs, each with its own bold/italic/underline (a.lsty) */
   function cdxLabelRuns(a, shown, right, f) {
-    const st = shownStyles(a, right);
-    if (!st) return `<s font="3" size="10" color="0" face="${96 | f}">${xmlEsc(shown)}</s>`;
+    const st = shownStyles(a, right),
+      sz = cdxLabSize(a);
+    if (!st) return `<s font="3" size="${sz}" color="0" face="${96 | f}">${xmlEsc(shown)}</s>`;
     let out = '',
       k = 0;
     while (k < shown.length) {
@@ -37145,7 +37151,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         key = styKey(o);
       let j = k + 1;
       while (j < shown.length && styKey(st[j] || 0) === key) j++;
-      out += `<s font="3" size="10" color="0" face="${(o.sup ? 64 : o.sub ? 32 : 96) | f | (o.b ? 1 : 0) | (o.i ? 2 : 0) | (o.u ? 4 : 0)}">${xmlEsc(shown.slice(k, j))}</s>`;
+      out += `<s font="3" size="${sz}" color="0" face="${(o.sup ? 64 : o.sub ? 32 : 96) | f | (o.b ? 1 : 0) | (o.i ? 2 : 0) | (o.u ? 4 : 0)}">${xmlEsc(shown.slice(k, j))}</s>`;
       k = j;
     }
     return out;
@@ -37170,7 +37176,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           (t.length === 1 && h === 1 ? ' LineStarts="2 4"' : '');
     }
     /* a charge of 2 or more has no CDXML charge symbol: it is written in the label, superscript */
-    return `<t ${pos}><s font="3" size="10" color="0" face="${96 | f}">${xmlEsc(txt)}</s>${Math.abs(q) > 1 && !a.label ? `<s font="3" size="10" color="0" face="${64 | f}">${Math.abs(q)}${q > 0 ? '+' : '-'}</s>` : ''}</t>`;
+    const sz = cdxLabSize(a);
+    return `<t ${pos}><s font="3" size="${sz}" color="0" face="${96 | f}">${xmlEsc(txt)}</s>${Math.abs(q) > 1 && !a.label ? `<s font="3" size="${sz}" color="0" face="${64 | f}">${Math.abs(q)}${q > 0 ? '+' : '-'}</s>` : ''}</t>`;
   }
   /* a label whose bonds leave to the right ends at its atom (right-justified), as on the sheet */
   function labPos(a, P, x0, y0, nbs) {
@@ -38196,7 +38203,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const r of tblQueue) out.push(sgCdx(r, P, () => id++, fidOf));
     return cdxBoxes(
       cdxLatin(
-        `<?xml version="1.0" encoding="UTF-8" ?>\n<!DOCTYPE CDXML SYSTEM "http://www.cambridgesoft.com/xml/cdxml.dtd" >\n<CDXML BondLength="14.4" LabelFont="3" LabelSize="10" CaptionFont="3" CaptionSize="10" LineWidth="${(docLW() * 0.36).toFixed(2)}" BoldWidth="${(((STY().bold * docLW()) / STY().lw) * 0.36).toFixed(2)}" HashSpacing="2.5" MarginWidth="1.6" BondSpacing="18"><colortable>${CT.map(c => `<color r="${+c[0].toFixed(4)}" g="${+c[1].toFixed(4)}" b="${+c[2].toFixed(4)}"/>`).join('')}</colortable><fonttable><font id="3" charset="iso-8859-1" name="${xmlEsc(docFontName())}"/>${CDXF.map((f, i) => `<font id="${i + 4}" charset="iso-8859-1" name="${xmlEsc(f)}"/>`).join('')}</fonttable><page id="${id++}">${out.join('')}${scheme}</page></CDXML>\n`
+        `<?xml version="1.0" encoding="UTF-8" ?>\n<!DOCTYPE CDXML SYSTEM "http://www.cambridgesoft.com/xml/cdxml.dtd" >\n<CDXML BondLength="14.4" LabelFont="3" LabelSize="${cdxLabSize({})}" CaptionFont="3" CaptionSize="10" LineWidth="${(docLW() * 0.36).toFixed(2)}" BoldWidth="${(((STY().bold * docLW()) / STY().lw) * 0.36).toFixed(2)}" HashSpacing="2.5" MarginWidth="1.6" BondSpacing="18"><colortable>${CT.map(c => `<color r="${+c[0].toFixed(4)}" g="${+c[1].toFixed(4)}" b="${+c[2].toFixed(4)}"/>`).join('')}</colortable><fonttable><font id="3" charset="iso-8859-1" name="${xmlEsc(docFontName())}"/>${CDXF.map((f, i) => `<font id="${i + 4}" charset="iso-8859-1" name="${xmlEsc(f)}"/>`).join('')}</fonttable><page id="${id++}">${out.join('')}${scheme}</page></CDXML>\n`
       )
     );
   }
