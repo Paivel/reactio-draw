@@ -73760,9 +73760,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         major = true;
       }
       const g2 = R => (n - 1) * 2 * Math.asin(Math.min(1, Lb / (2 * R))) - 2 * Math.asin(Math.min(1, c / (2 * R)));
+      /* g falls as the circle grows, g2 rises: the root is searched on the side where the sign changes */
       for (let it = 0; it < 80; it++) {
         const m = (lo + hi) / 2,
-          v = major ? g2(m) : g(m);
+          v = major ? -g2(m) : g(m);
         if (v > 0) lo = m;
         else hi = m;
       }
