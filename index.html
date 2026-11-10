@@ -67703,10 +67703,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (a.tangentTo != null) {
       const r = mol.arrows.find(x => x.id === +a.tangentTo && !x.kind);
       if (!r) throw new Error('tangentTo: no arrow ' + a.tangentTo);
-      const Q = arrowPts(r, 160),
+      const Q0 = arrowPts(r, 160),
         mx = (A.x + B.x) / 2,
         my = (A.y + B.y) / 2,
         c = Math.hypot(B.x - A.x, B.y - A.y) || 1,
+        /* the other arrow sampled all along (a straight one gives only its two ends), so the touch is found between them */
+        Q = Q0.flatMap((q, i) => {
+          if (!i) return [q];
+          const p0 = Q0[i - 1],
+            k = Math.min(400, Math.ceil(Math.hypot(q.x - p0.x, q.y - p0.y) / Math.max(0.5, c / 200)));
+          return Array.from({ length: k }, (_, j) => ({ x: p0.x + ((q.x - p0.x) * (j + 1)) / k, y: p0.y + ((q.y - p0.y) * (j + 1)) / k }));
+        }),
         nx = -(B.y - A.y) / c,
         ny = (B.x - A.x) / c;
       /* circles through both ends, their centres along the line across the middle: the one that just touches the other
