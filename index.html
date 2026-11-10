@@ -37107,6 +37107,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         !!sch.ar
       );
       mol = mc;
+      /* CDXML keeps a configuration only in wedges: a structure with a 3D shape gets them from its 3D places */
+      try {
+        for (const f of fragments())
+          if (is3D(f) && !mol.bonds.some(b => (b.stereo === 'wedge' || b.stereo === 'hash') && f.some(a => a.id === b.a)))
+            wedges3D(f);
+      } catch (e) {}
       const cdxml = cdxmlOf(withGridsOut(mc), mc === m ? sch : schemeOrder());
       return { mol: all, sdf, rxn, smi, cml, cdxml };
     } finally {
@@ -47516,7 +47522,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (f.length < 4 || f.length > 2000 || f.some(a => a.z === undefined || (a.label && !a.grp))) return 0;
     const O = oclLoad(),
       k = L / 1.5,
-      heavy = f.filter(a => a.el !== 'H'),
+      heavy = f.filter(a => a.el !== 'H' || a.iso) /* a T or D tells a centre's substituents apart: it stays */,
       idx = new Map(heavy.map((a, i) => [a.id, i])),
       bs = mol.bonds.filter(b => idx.has(b.a) && idx.has(b.b));
     if (again) for (const b of mol.bonds) if ((idx.has(b.a) || idx.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash')) b.stereo = null;
@@ -47526,6 +47532,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       for (const a of heavy) {
         const i = m.addAtom(ZOF(a.el));
         if (a.chg) m.setAtomCharge(i, a.chg);
+        if (a.el === 'D' || a.iso) m.setAtomMass(i, a.el === 'D' ? 2 : a.iso);
         m.setAtomX(i, a.x / k);
         /* OpenChemLib keeps 2D drawings with y down (its Molfiles flip it), 3D shapes as they are */
         m.setAtomY(i, flat ? a.y / k : -a.y / k);
@@ -47541,8 +47548,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       m2.ensureHelperArrays(O.Molecule.cHelperParities);
       return heavy.map((a, i) => m2.getAtomParity(i));
     };
+    /* a centre drawn with a wavy bond has no configuration: it gets no wedge */
     const want = par(false),
-      centres = heavy.filter((a, i) => want[i] === 1 || want[i] === 2);
+      centres = heavy.filter(
+        (a, i) =>
+          (want[i] === 1 || want[i] === 2) &&
+          !mol.bonds.some(b => b.stereo === 'wavy' && (b.a === a.id || b.b === a.id))
+      );
     if (!centres.length) return 0;
     /* each centre: its single bonds, the deepest first, other centres last; one becomes a wedge (toward the viewer) or a
        hash; when the drawing does not give the 3D configuration, the next bond (or the other kind) is tried */
