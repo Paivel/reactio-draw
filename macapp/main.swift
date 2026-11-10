@@ -965,7 +965,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let devtools = UserDefaults.standard.bool(forKey: "rd.devtools") || CommandLine.arguments.contains("--devtools") || ProcessInfo.processInfo.environment["REACTIO_DEVTOOLS"] == "1"
         if devtools { cfg.preferences.setValue(true, forKey: "developerExtrasEnabled") }
         let rect = NSRect(x: 0, y: 0, width: 1440, height: 920)
-        web = WKWebView(frame: rect, configuration: cfg); web.autoresizingMask = [.width, .height]
+        let rv = RDWebView(frame: rect, configuration: cfg); rv.devtools = devtools
+        web = rv; web.autoresizingMask = [.width, .height]
         web.navigationDelegate = self
         bridge.web = web
         window = NSWindow(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
@@ -1095,3 +1096,19 @@ let delegate = AppDelegate()
 app.delegate = delegate
 app.setActivationPolicy(cliArgs == nil ? .regular : .accessory)
 app.run()
+
+/* the window's web view: the system's own right-click menu loses Reload, Back, Forward and Stop (Reload started the
+   whole app again, a pause of seconds and a risk to unsaved work); with the developer tools on, the menu stays whole */
+final class RDWebView: WKWebView {
+    var devtools = false
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        if !devtools {
+            let drop: Set<String> = ["WKMenuItemIdentifierReload", "WKMenuItemIdentifierGoBack", "WKMenuItemIdentifierGoForward", "WKMenuItemIdentifierStop"]
+            for item in menu.items where drop.contains(item.identifier?.rawValue ?? "") { menu.removeItem(item) }
+            // no separator left at either end or twice in a row
+            while let f = menu.items.first, f.isSeparatorItem { menu.removeItem(f) }
+            while let l = menu.items.last, l.isSeparatorItem { menu.removeItem(l) }
+        }
+        super.willOpenMenu(menu, with: event)
+    }
+}

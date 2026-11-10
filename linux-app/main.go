@@ -183,6 +183,16 @@ func main() {
 	app.view = webkit_web_view_new_with_ucm(ucm)
 	st := webkit_web_view_get_settings(app.view)
 	webkit_settings_set_dev_extras(st, devtoolsOn())
+	/* the system's own right-click menu only in a text field (Cut, Copy, Paste); elsewhere it held only Reload, Back and
+	   Forward, and Reload started the whole app again. With the developer tools on, it stays as it is */
+	if !devtoolsOn() {
+		g_signal_connect_data(app.view, "context-menu", purego.NewCallback(func(v, menu, ev, hit, data uintptr) uintptr {
+			if hit != 0 && webkit_hit_test_result_context_is_editable(hit) {
+				return 0
+			}
+			return 1
+		}), 0, 0, 0)
+	}
 	webkit_settings_set_js_clipboard(st, true)
 	gtk_container_add(app.win, app.view)
 

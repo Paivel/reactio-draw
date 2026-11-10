@@ -49,6 +49,7 @@ var (
 	webkit_web_view_get_settings                func(v uintptr) uintptr
 	webkit_settings_set_dev_extras              func(s uintptr, on bool)
 	webkit_settings_set_js_clipboard            func(s uintptr, on bool)
+	webkit_hit_test_result_context_is_editable  func(h uintptr) bool
 	webkit_web_view_evaluate_javascript         func(v uintptr, js string, n int64, world, src, cancel, cb, data uintptr)
 	webkit_web_view_run_javascript              func(v uintptr, js string, cancel, cb, data uintptr)
 	webkit_javascript_result_get_js_value       func(r uintptr) uintptr
@@ -123,6 +124,7 @@ func loadGTK() error {
 	r(&webkit_web_view_get_settings, wk, "webkit_web_view_get_settings")
 	r(&webkit_settings_set_dev_extras, wk, "webkit_settings_set_enable_developer_extras")
 	r(&webkit_settings_set_js_clipboard, wk, "webkit_settings_set_javascript_can_access_clipboard")
+	r(&webkit_hit_test_result_context_is_editable, wk, "webkit_hit_test_result_context_is_editable")
 	if sym(wk, "webkit_web_view_evaluate_javascript") {
 		r(&webkit_web_view_evaluate_javascript, wk, "webkit_web_view_evaluate_javascript")
 	} else {
