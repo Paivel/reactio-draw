@@ -45742,7 +45742,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         /* an R-group (R#) or a pseudo-atom (R, A, Q, X…): kept as a label */
         lab = el === 'R#' ? 'R' : !(el in AW) && el !== 'D' && /^[A-Z][a-z]?$/.test(el) ? el : '';
       if (!(el in AW) && el !== 'D') el = 'C';
-      atoms.push({ el, x: x / ANG, y: -y / ANG, z: z / ANG, chg: cc ? 4 - cc : 0, ...(lab ? { label: lab } : {}) });
+      /* the valence the file sets (vvv: 15 means none), so the atom gets the H it leaves and no more */
+      const vv = parseInt(l.slice(48, 51)) || 0;
+      atoms.push({ el, x: x / ANG, y: -y / ANG, z: z / ANG, chg: cc ? 4 - cc : 0, ...(lab ? { label: lab } : {}), ...(vv ? { val: vv === 15 ? 0 : vv } : {}) });
     }
     for (let i = 0; i < nb; i++) {
       const l = lines[start + 4 + na + i];
@@ -45882,6 +45884,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             order: b.order,
             stereo: b.stereo || null
           });
+      });
+      /* hydrogens as the file's valence counts them (kept until the atom's bonds change) */
+      f.atoms.forEach((a, i) => {
+        const na = map[i];
+        if (a.val == null || !na || a.label) return;
+        na.hUsed = usedVal(na);
+        na.hExp = Math.max(0, Math.floor(a.val - na.hUsed - (na.rad || 0) + 1e-9));
       });
       /* a polymer's repeat unit read from the file: its brackets and n, as one drawn here */
       for (const g of f.sgroups || []) {
