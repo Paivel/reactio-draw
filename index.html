@@ -34002,7 +34002,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
   }
   let tt;
+  /* how many error messages have been shown: File → Open tells by it that a file could not be read */
+  let toastErrs = 0;
   function toast(m, err, ms) {
+    if (err) toastErrs++;
     if (API_SCRATCH) return;
     const el = $('toast');
     el.textContent = macKeys(m);
@@ -50212,26 +50215,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   if (window.rdDesktop) {
     window.rdDesktop.onOpenFile(f => {
       /* a file opened from outside gets its own tab (whole Reactio Draw documents make one themselves) */
-      const whole = f.text && (/\.(json|reactio)$/i.test(f.name) || CMTRX.test(f.text));
-      if (!whole && (mol.atoms.length || mol.texts.length)) {
-        const t0 = startTab();
-        newTab(null, f.name.replace(/\.[^.]+$/, ''));
-        dropStartTab(t0);
-      } else if (!whole) {
-        const t = TABS.list.find(t => t.id === TABS.cur);
-        if (t && /^Document \d+$/.test(t.name)) {
-          t.name = f.name.replace(/\.[^.]+$/, '');
-          saveTabs();
-          renderTabs();
-        }
-      }
       if (f.bytes && /\.docx$/i.test(f.name)) {
         openExternal(f.name, new Uint8Array(f.bytes), '');
         return;
       }
-      if (f.bytes && /\.cdx$/i.test(f.name)) importCdxBytes(new Uint8Array(f.bytes), f.name);
-      else if (f.bytes) openZip(new Uint8Array(f.bytes).buffer, f.name);
-      else importText(f.name, f.text);
+      const whole = f.text && (/\.(json|reactio)$/i.test(f.name) || CMTRX.test(f.text));
+      openInFileTab(f.name, whole, () => {
+        if (f.bytes && /\.cdx$/i.test(f.name)) importCdxBytes(new Uint8Array(f.bytes), f.name);
+        else if (f.bytes) openZip(new Uint8Array(f.bytes).buffer, f.name);
+        else importText(f.name, f.text);
+      });
       fitOnOpen();
     });
     document.documentElement.classList.add('desktop');
@@ -50356,24 +50349,58 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } catch (e) {}
     }
     const whole = !!cdxDoc || (text != null && (/\.(json|reactio)$/i.test(name) || CMTRX.test(text)));
-    if (!whole && (mol.atoms.length || mol.texts.length || mol.arrows.length)) {
-      const t0 = startTab();
-      newTab(null, name.replace(/\.[^.]+$/, ''));
-      dropStartTab(t0);
-    }
-    else if (!whole) {
+    const ok = openInFileTab(name, whole, () => {
+      if (/\.cdx$/i.test(name)) importCdxBytes(u, name);
+      else if (/\.zip$/i.test(name)) openZip(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength), name);
+      else importText(name, text);
+    });
+    /* the tab now stands for this file: Save writes back to it (zips are only a container, so they stay unlinked) */
+    if (ok && !/\.zip$/i.test(name)) linkTab(curTab(), name, path);
+  }
+  /* a file opened from outside gets a tab of its own, named after it (an empty untitled tab is used as it is; whole
+     Reactio Draw documents make their own tab). When the file cannot be read (an error was shown and the sheet stayed
+     empty), that tab goes again and the tab the user was in comes back, so a failed open leaves nothing behind.
+     Returns false when the file could not be read. */
+  function openInFileTab(name, whole, run) {
+    const base = String(name).replace(/\.[^.]+$/, ''),
+      empty = () => !mol.atoms.length && !mol.texts.length && !mol.arrows.length && !(mol.fills && mol.fills.length);
+    let made = null,
+      t0 = null,
+      renamed = null;
+    const prev = TABS.cur;
+    if (!whole && !empty()) {
+      t0 = startTab();
+      made = newTab(null, base);
+    } else if (!whole) {
       const t = TABS.list.find(t => t.id === TABS.cur);
       if (t && /^Document \d+$/.test(t.name)) {
-        t.name = name.replace(/\.[^.]+$/, '');
+        renamed = { t, name: t.name };
+        t.name = base;
         saveTabs();
         renderTabs();
       }
     }
-    if (/\.cdx$/i.test(name)) importCdxBytes(u, name);
-    else if (/\.zip$/i.test(name)) openZip(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength), name);
-    else importText(name, text);
-    /* the tab now stands for this file: Save writes back to it (zips are only a container, so they stay unlinked) */
-    if (!/\.zip$/i.test(name)) linkTab(curTab(), name, path);
+    const e0 = toastErrs;
+    try {
+      run();
+    } catch (e) {
+      console.error(e);
+      toast('Could not open ' + name, true);
+    }
+    const failed = !whole && toastErrs !== e0 && (made ? TABS.cur === made : TABS.cur === prev) && empty();
+    if (!failed) {
+      dropStartTab(t0);
+      return true;
+    }
+    if (made) {
+      if (TABS.list.some(t => t.id === prev)) switchTab(prev);
+      closeTab(made);
+    } else if (renamed && TABS.list.includes(renamed.t)) {
+      renamed.t.name = renamed.name;
+      saveTabs();
+      renderTabs();
+    }
+    return false;
   }
   window.__rdOpenFile = (name, b64, path) => {
     try {
