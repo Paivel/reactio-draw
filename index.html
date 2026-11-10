@@ -19912,7 +19912,24 @@ function kdOf(st) {
   }
   /* SMILES with stereochemistry (@, @@ from wedges and hashes, / and \\ for E/Z) when the drawing defines it; plain otherwise.
    Made by OpenChemLib from the drawn coordinates, kept in a small cache so the SMILES box stays quick */
-  const SSMI = new Map();
+  const SSMI = new Map(),
+    SSMI_LOST = new Set();
+  /* atoms whose stereo could not be read or drawn (OpenChemLib did not start): their SMILES and InChI have no stereo, and
+     the user and the API are told so. Kept for this window only */
+  const STEREO_LOST = new WeakSet();
+  let stereoLostWhy = '',
+    stereoLostTold = false;
+  function stereoLost(atoms, e) {
+    for (const a of atoms) if (a) STEREO_LOST.add(a);
+    stereoLostWhy = String((e && e.message) || e || 'the stereo library could not run');
+    if (stereoLostTold) return;
+    stereoLostTold = true;
+    setTimeout(() => toast('Stereo (wedges, @, E/Z) is left out of the SMILES and InChI: ' + stereoLostWhy, true, 7000), 0);
+  }
+  /* what is said with a structure's SMILES or InChI when its stereo was lost ('' when it was not) */
+  function stereoNoteOf(fr) {
+    return fr && fr.some(a => STEREO_LOST.has(a)) ? 'stereo left out: ' + stereoLostWhy : '';
+  }
   /* ===== stereo groups (enhanced stereo, as in MDL V3000, CXSMILES and CDXML): a.esr is 'abs', '&N' (AND: a mixture,
    both configurations of the group present together, e.g. a racemate) or 'orN' (OR: one compound, but which of the two
    is not known). The wedges then give the relative configuration inside each &/or group. ===== */
@@ -20707,13 +20724,25 @@ function kdOf(st) {
       fr.map(a => a.id + ':' + Math.round(a.x) + ',' + Math.round(a.y) + (d3 ? ',' + Math.round(a.z) : '')).join(';') +
       '|' +
       bs.map(b => b.id + (b.stereo || '') + b.order + (b.dx ? 'x' : '')).join(';');
-    if (SSMI.has(key)) return SSMI.get(key);
+    if (SSMI.has(key)) {
+      if (SSMI_LOST.has(key)) stereoLost(fr, stereoLostWhy);
+      return SSMI.get(key);
+    }
     let out = plain;
     try {
       const ss = stereoSmilesList(ids, cx);
       if (ss && ss.length === 1 && /[@\/\\]/.test(ss[0])) out = ss[0];
-    } catch (e) {}
-    if (SSMI.size > 3000) SSMI.clear();
+    } catch (e) {
+      /* wedges or a 3D shape that could not be read: the SMILES is written without them, and that is said */
+      if (d3 || bs.some(b => b.stereo === 'wedge' || b.stereo === 'hash')) {
+        stereoLost(fr, e);
+        SSMI_LOST.add(key);
+      }
+    }
+    if (SSMI.size > 3000) {
+      SSMI.clear();
+      SSMI_LOST.clear();
+    }
     SSMI.set(key, out);
     return out;
   }
@@ -27588,6 +27617,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       wedgeTidy(map.slice());
     } catch (e) {
       console.warn('stereo', e);
+      stereoLost(map, e);
     }
   }
   /* wedges that say clearly which centre they belong to: a wedge or hash from a stereocentre to another stereocentre (its
@@ -63938,10 +63968,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const item = sch.list.find(x => x.fr && x.fr.some(a => a === fr[0]));
     const xs = fr.map(a => a.x),
       ys = fr.map(a => a.y);
-    const smi = fragSmilesS(fr, true);
+    const smi = fragSmilesS(fr, true),
+      sn = stereoNoteOf(fr);
     return {
       index: i,
       smiles: smi,
+      ...(sn ? { warning: sn } : {}),
       formula: formulaText(f),
       mw: +mwOf(f.c).toFixed(3),
       exact: +exactOf(f.c, f.q).toFixed(4),
@@ -72187,7 +72219,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const O = oclLoad();
         const mb = O.Molecule.fromSmiles(String(a.smiles).replace(/\s+\|[^|]*\|\s*$/, '')).toMolfile();
         r = (await inchiLib())(mb, '');
-      } else r = await inchiOf(new Set(apiAtomsOf((a && a.index) || 0).map(x => x.id)));
+      } else {
+        const at = apiAtomsOf((a && a.index) || 0);
+        r = await inchiOf(new Set(at.map(x => x.id)));
+        const sn = stereoNoteOf(at);
+        if (r && r.ok && sn) r.message = ((r.message || '') + ' Stereo was left out: ' + stereoLostWhy + '.').trim();
+      }
       if (!r || !r.ok) throw new Error((r && r.message) || 'No InChI for this structure');
       return { inchi: r.inchi, inchiKey: r.key, note: r.message || undefined };
     },
