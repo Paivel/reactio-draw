@@ -19238,7 +19238,7 @@ function kdOf(st) {
     b.dataset.show = kind;
     b.textContent = 'Show for ' + idScopeWord();
     b.title =
-      (kind === 'smi' ? 'Make the SMILES of ' : 'Make the InChI, InChIKey and CAS number of ') +
+      (kind === 'smi' ? 'Make the SMILES of ' : kind === 'cas' ? 'Look up the CAS number (by the InChIKey, made first) of ' : 'Make the InChI, InChIKey and CAS number of ') +
       (sel.size ? 'the selected structures' : 'everything on the sheet') +
       '. It is not made on every change, so large drawings stay fast';
     b.onclick = onClick;
@@ -19269,6 +19269,8 @@ function kdOf(st) {
       if (!idHasChem()) I.textContent = '';
       else idButton(I, 'inchi', () => idShowInchi());
       casFill(null, null);
+      /* the CAS number comes from the InChIKey: its own Show makes the InChI too */
+      if (idHasChem()) idButton($('casNo'), 'cas', () => idShowInchi());
     }
   }
   /* the SMILES of the scope, made at most once per state of the drawing: { text } or { error } */
