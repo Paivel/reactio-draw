@@ -467,8 +467,11 @@ func TestErrBridgeFolderAddNotSaved(t *testing.T) {
 	ePick = filepath.Join(d, "Chem")
 	os.Mkdir(ePick, 0755)
 	r := eSend(t, map[string]interface{}{"cmd": "aiFolderAdd"}, time.Second)
-	if r["error"] == nil && r["err"] == nil {
-		t.Skip("bug 80: aiFolderAdd/aiFolderRemove drop saveFolders' error: the folder silently does not appear, and nothing says why")
+	if r["err"] == nil || !strings.Contains(fmt.Sprint(r["err"]), "could not be saved") {
+		t.Errorf("bug 80: aiFolderAdd must report that allowed-folders.json could not be written: %v", r)
+	}
+	if r := eSend(t, map[string]interface{}{"cmd": "aiFolderRemove", "path": d}, time.Second); r["err"] == nil {
+		t.Errorf("bug 80: aiFolderRemove must report that allowed-folders.json could not be written: %v", r)
 	}
 }
 
@@ -674,7 +677,7 @@ func TestErrLocalAPIRequests(t *testing.T) {
 			go apiDeliver(id, `{"ok":true,"result":1}`)
 		}
 	}
-	p := startLocalAPI()
+	p, _ := startLocalAPI()
 	if p == 0 {
 		t.Skip("no free port for the local API here")
 	}
@@ -730,7 +733,7 @@ func TestErrLocalAPINoPort(t *testing.T) {
 	if len(ls) != 15 {
 		t.Skip("some of the API's ports are used by another program here")
 	}
-	if p := startLocalAPI(); p != 0 {
+	if p, _ := startLocalAPI(); p != 0 {
 		t.Errorf("no free port, yet the API says %d", p)
 	}
 	exe, _ := os.Executable()
@@ -759,15 +762,29 @@ func TestErrLocalAPIInfoNotWritten(t *testing.T) {
 	d := eSetup(t)
 	stopLocalAPI()
 	os.WriteFile(filepath.Join(d, "cfg"), []byte("a file where the config folder goes"), 0644)
-	p := startLocalAPI()
+	p, err := startLocalAPI()
 	defer stopLocalAPI()
-	if p == 0 {
+	if p == 0 && err == nil {
 		t.Skip("no free port here")
 	}
 	if _, err := os.Stat(apiInfoPath()); err == nil {
 		t.Fatalf("api.json was written after all")
 	}
-	t.Skip("bug 81: api.json could not be written, yet the local API starts and apiStart answers ok with its port")
+	if p != 0 || err == nil || !strings.Contains(err.Error(), "api.json") {
+		t.Errorf("bug 81: api.json could not be written, yet the local API answers port %d, error %v", p, err)
+	}
+	if apiLn != nil {
+		t.Errorf("bug 81: the API is left listening though no script can find it")
+	}
+	/* the page is told why (Settings shows "Could not start: …") */
+	exe, _ := os.Executable()
+	kit := filepath.Join(filepath.Dir(exe), "reactio-mcp")
+	if os.WriteFile(kit, []byte("x"), 0755) == nil {
+		defer os.Remove(kit)
+		if r := eSend(t, map[string]interface{}{"cmd": "apiStart"}, time.Second); r["ok"] != false || !strings.Contains(fmt.Sprint(r["err"]), "api.json") {
+			t.Errorf("bug 81: apiStart where api.json cannot be written: %v", r)
+		}
+	}
 }
 
 func TestErrStopLocalAPIKeepsOthers(t *testing.T) {

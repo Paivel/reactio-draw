@@ -76663,7 +76663,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           st.textContent =
             r && r.ok
               ? 'On: http://127.0.0.1:' + r.port + '/api (port and token in api.json)'
-              : 'Could not start: this copy of the app is older, or no free port';
+              : r && r.err
+                ? 'Could not start: ' + r.err
+                : 'Could not start: this copy of the app is older, or no free port';
         } else {
           await window.rdNative.call('apiStop', {});
           st.textContent = 'Off: nothing listens.';
@@ -76685,6 +76687,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const fl = $('aiFolders'),
       fadd = $('aiFolderAdd');
     const showFolders = r => {
+      if (r && r.err) toast('Could not change the folders: ' + r.err, true);
       if (!fl) return;
       const L = (r && r.folders) || [];
       fl.innerHTML = L.length

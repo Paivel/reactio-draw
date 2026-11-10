@@ -190,8 +190,8 @@ func TestWinErrFolderRemoveNotSaved(t *testing.T) {
 		t.Fatalf("saveFolders gave no error where it cannot write")
 	}
 	r := wSend(t, map[string]interface{}{"cmd": "aiFolderRemove", "path": d}, time.Second)
-	if r["error"] == nil && r["err"] == nil {
-		t.Skip("bug 80: aiFolderRemove drops saveFolders' error")
+	if r["err"] == nil || !strings.Contains(fmt.Sprint(r["err"]), "could not be saved") {
+		t.Errorf("bug 80: aiFolderRemove must report that allowed-folders.json could not be written: %v", r)
 	}
 }
 
@@ -272,15 +272,17 @@ func TestWinErrLocalAPIInfoNotWritten(t *testing.T) {
 	d := wSetup(t)
 	stopLocalAPI()
 	os.WriteFile(filepath.Join(d, "AppData"), []byte("x"), 0644)
-	p := startLocalAPI()
+	p, err := startLocalAPI()
 	defer stopLocalAPI()
-	if p == 0 {
+	if p == 0 && err == nil {
 		t.Skip("no free port here")
 	}
 	if _, err := os.Stat(apiInfoPath()); err == nil {
 		t.Fatalf("api.json was written after all")
 	}
-	t.Skip("bug 81: api.json could not be written, yet the local API starts and answers ok with its port")
+	if p != 0 || err == nil || !strings.Contains(err.Error(), "api.json") {
+		t.Errorf("bug 81: api.json could not be written, yet the local API answers port %d, error %v", p, err)
+	}
 }
 
 func TestWinErrCliDone(t *testing.T) {

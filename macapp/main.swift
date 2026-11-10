@@ -26,12 +26,15 @@ func allowedFolders() -> [String] {
           let o = (try? JSONSerialization.jsonObject(with: d)) as? [String: Any], let f = o["folders"] as? [String] else { return defaultFolders() }
     return f
 }
-func saveFolders(_ list: [String]) {
-    try? FileManager.default.createDirectory(atPath: rdConfigDir, withIntermediateDirectories: true)
-    if let d = try? JSONSerialization.data(withJSONObject: ["folders": list], options: [.prettyPrinted]) {
+/* nil when saved, else why allowed-folders.json could not be written */
+@discardableResult func saveFolders(_ list: [String]) -> String? {
+    do {
+        try FileManager.default.createDirectory(atPath: rdConfigDir, withIntermediateDirectories: true)
+        let d = try JSONSerialization.data(withJSONObject: ["folders": list], options: [.prettyPrinted])
         let p = rdConfigDir + "/allowed-folders.json"
-        try? d.write(to: URL(fileURLWithPath: p)); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: p)
-    }
+        try d.write(to: URL(fileURLWithPath: p)); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: p)
+        return nil
+    } catch { return error.localizedDescription }
 }
 let cliArgs: [String]? = CommandLine.arguments.count > 1 && CommandLine.arguments[1] == "--cli" ? Array(CommandLine.arguments.dropFirst(2)) : nil
 var cliOut = ""
@@ -283,6 +286,11 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         web?.evaluateJavaScript("window.__rdReply.apply(null,\(args))", completionHandler: nil)
     }
 
+    /* the folder list after a change; when allowed-folders.json could not be written the page is told why */
+    func replyFolders(_ id: String, _ failed: String?) {
+        if let e = failed { reply(id, ["folders": allowedFolders(), "err": "the folder list could not be saved: " + e]) } else { reply(id, ["folders": allowedFolders()]) }
+    }
+
     func userContentController(_ ucc: WKUserContentController, didReceive message: WKScriptMessage) {
         // only the app's own page, in the window's main frame, may use the bridge
         guard message.frameInfo.isMainFrame, message.frameInfo.securityOrigin.host == "app.reactiodraw.local" else { return }
@@ -399,7 +407,11 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             /* only with the AI add-on installed (reactio-mcp inside the app): without it the API never starts */
             if !aiKitInstalled() { reply(id, ["ok": false, "noKit": true]); return }
             if let w = web { LocalAPI.shared.start(web: w) }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.reply(id, ["ok": LocalAPI.shared.port > 0, "port": LocalAPI.shared.port]) }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                // api.json could not be written: no script could find the API, so it is not left on
+                if let e = LocalAPI.shared.infoErr { LocalAPI.shared.stop(); self.reply(id, ["ok": false, "port": 0, "err": e]); return }
+                self.reply(id, ["ok": LocalAPI.shared.port > 0, "port": LocalAPI.shared.port])
+            }
         case "apiStop":
             if cliArgs == nil { LocalAPI.shared.stop() }
             reply(id, ["ok": true])
@@ -415,15 +427,15 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             /* the only way a folder is added: this panel, chosen by the user */
             let o = NSOpenPanel(); o.canChooseDirectories = true; o.canChooseFiles = false; o.allowsMultipleSelection = false; o.canCreateDirectories = true
             o.message = "A folder the AI assistants may read and write"
+            var failed: String? = nil
             if o.runModal() == .OK, let u = o.url {
                 var list = allowedFolders()
-                if !list.contains(where: { $0.lowercased() == u.path.lowercased() }) { list.append(u.path); saveFolders(list) }
+                if !list.contains(where: { $0.lowercased() == u.path.lowercased() }) { list.append(u.path); failed = saveFolders(list) }
             }
-            reply(id, ["folders": allowedFolders()])
+            replyFolders(id, failed)
         case "aiFolderRemove":
             let p = (m["path"] as? String ?? "").lowercased()
-            saveFolders(allowedFolders().filter { $0.lowercased() != p })
-            reply(id, ["folders": allowedFolders()])
+            replyFolders(id, saveFolders(allowedFolders().filter { $0.lowercased() != p }))
         case "cliDone":
             cliDone(m["msg"] as? String ?? "")
         case "apiResult":
@@ -770,7 +782,7 @@ final class LocalAPI {
 
     var port = 0
     func start(web: WKWebView) {
-        self.web = web
+        self.web = web; infoErr = nil
         // already listening: write api.json again (another program may have replaced or removed it)
         if listener != nil { if port > 0 { writeInfo(port) }; return }
         token = (0..<16).map { _ in String(format: "%02x", UInt8.random(in: 0...255)) }.joined()
@@ -799,10 +811,16 @@ final class LocalAPI {
         listener = l
     }
 
+    /* why api.json could not be written (nil when it was): apiStart then answers not ok */
+    var infoErr: String?
     func writeInfo(_ p: Int) {
         let info: [String: Any] = ["port": p, "token": token, "url": "http://127.0.0.1:\(p)/api", "pid": Int(ProcessInfo.processInfo.processIdentifier)]
-        try? FileManager.default.createDirectory(at: infoURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        if let d = try? JSONSerialization.data(withJSONObject: info) { try? d.write(to: infoURL); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: infoURL.path) }
+        do {
+            try FileManager.default.createDirectory(at: infoURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let d = try JSONSerialization.data(withJSONObject: info)
+            try d.write(to: infoURL); try? FileManager.default.setAttributes([.posixPermissions: 0o600], ofItemAtPath: infoURL.path)
+            infoErr = nil
+        } catch { infoErr = "could not write " + infoURL.path + ": " + error.localizedDescription }
     }
 
     // api.json goes only if it is this app's own (not one another copy of the app wrote)

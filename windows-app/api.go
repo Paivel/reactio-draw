@@ -37,14 +37,21 @@ func apiInfoPath() string {
 	return filepath.Join(d, "ReactioDraw", "api.json")
 }
 
-func startLocalAPI() int {
+// startLocalAPI: the port the API listens on, or 0 (no free port), or an error when api.json cannot be written (no
+// script could then find the API: it is not left listening)
+func startLocalAPI() (int, error) {
 	apiMu.Lock()
 	if apiLn != nil {
 		// already listening: write api.json again (another program may have replaced or removed it)
 		p := apiPort
-		writeAPIInfo(p)
+		if err := writeAPIInfo(p); err != nil {
+			apiLn.Close()
+			apiLn = nil
+			apiMu.Unlock()
+			return 0, err
+		}
 		apiMu.Unlock()
-		return p
+		return p, nil
 	}
 	apiMu.Unlock()
 	b := make([]byte, 16)
@@ -61,9 +68,13 @@ func startLocalAPI() int {
 	}
 	if ln == nil {
 		logf("local API: no free port")
-		return 0
+		return 0, nil
 	}
-	writeAPIInfo(port)
+	if err := writeAPIInfo(port); err != nil {
+		ln.Close()
+		logf("local API: %v", err)
+		return 0, err
+	}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/api", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -122,7 +133,7 @@ func startLocalAPI() int {
 	apiMu.Unlock()
 	go http.Serve(ln, mux)
 	logf("local API on 127.0.0.1:%d", port)
-	return port
+	return port, nil
 }
 
 func apiDeliver(id, out string) {
@@ -154,8 +165,11 @@ func stopLocalAPI() {
 	os.Remove(apiInfoPath())
 }
 
-func writeAPIInfo(port int) {
+func writeAPIInfo(port int) error {
 	info, _ := json.Marshal(map[string]interface{}{"port": port, "token": apiToken, "url": fmt.Sprintf("http://127.0.0.1:%d/api", port), "pid": os.Getpid()})
 	os.MkdirAll(filepath.Dir(apiInfoPath()), 0755)
-	os.WriteFile(apiInfoPath(), info, 0600)
+	if err := os.WriteFile(apiInfoPath(), info, 0600); err != nil {
+		return fmt.Errorf("could not write %s: %v", apiInfoPath(), errReason(err))
+	}
+	return nil
 }

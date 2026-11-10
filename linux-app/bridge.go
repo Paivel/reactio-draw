@@ -151,7 +151,11 @@ func handle(s string) {
 			reply(r.ID, map[string]interface{}{"ok": false, "noKit": true})
 			return
 		}
-		p := startLocalAPI()
+		p, err := startLocalAPI()
+		if err != nil {
+			reply(r.ID, map[string]interface{}{"ok": false, "port": 0, "err": err.Error()})
+			return
+		}
 		reply(r.ID, map[string]interface{}{"ok": p > 0, "port": p})
 	case "aiKit":
 		reply(r.ID, map[string]interface{}{"installed": aiKitInstalled()})
@@ -184,6 +188,7 @@ func handle(s string) {
 	case "aiFolders":
 		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
 	case "aiFolderAdd":
+		var err error
 		if p := folderDialog("A folder the AI assistants may read and write"); p != "" {
 			list := allowedFolders()
 			has := false
@@ -194,10 +199,10 @@ func handle(s string) {
 			}
 			if !has {
 				list = append(list, p)
-				saveFolders(list)
+				err = saveFolders(list)
 			}
 		}
-		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+		replyFolders(r.ID, err)
 	case "aiFolderRemove":
 		list := []string{}
 		for _, q := range allowedFolders() {
@@ -205,8 +210,7 @@ func handle(s string) {
 				list = append(list, q)
 			}
 		}
-		saveFolders(list)
-		reply(r.ID, map[string]interface{}{"folders": allowedFolders()})
+		replyFolders(r.ID, saveFolders(list))
 	case "cliDone":
 		reply(r.ID, map[string]interface{}{"ok": true})
 		cliDone(r.Msg)
@@ -232,6 +236,16 @@ func aiKitInstalled() bool {
 	}
 	st, err := os.Stat(filepath.Join(filepath.Dir(exe), "reactio-mcp"))
 	return err == nil && !st.IsDir()
+}
+
+/* the folder list after a change; when allowed-folders.json could not be written the page is told why */
+func replyFolders(id string, err error) {
+	if err != nil {
+		logf("could not save the AI folders: %v", err)
+		reply(id, map[string]interface{}{"folders": allowedFolders(), "err": "the folder list could not be saved: " + err.Error()})
+		return
+	}
+	reply(id, map[string]interface{}{"folders": allowedFolders()})
 }
 
 // errReason: an error without the path in front of it ("permission denied", "is a directory")
