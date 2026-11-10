@@ -57,7 +57,7 @@ func handle(s string) {
 			reply(r.ID, map[string]interface{}{"ok": false})
 			return
 		}
-		if err := os.WriteFile(p, b64(r.B64), 0644); err != nil {
+		if err := saveFile(chosenTarget(p), b64(r.B64)); err != nil {
 			reply(r.ID, map[string]interface{}{"ok": false, "error": err.Error()})
 			return
 		}
@@ -105,13 +105,7 @@ func handle(s string) {
 			reply(r.ID, map[string]interface{}{"ok": false, "ask": true})
 			return
 		}
-		tmp, err := writeNew(r.Path, b64(r.B64))
-		if err != nil {
-			reply(r.ID, map[string]interface{}{"ok": false, "err": err.Error()})
-			return
-		}
-		if err := os.Rename(tmp, r.Path); err != nil {
-			os.Remove(tmp)
+		if err := saveFile(r.Path, b64(r.B64)); err != nil {
 			reply(r.ID, map[string]interface{}{"ok": false, "err": err.Error()})
 			return
 		}
@@ -233,20 +227,90 @@ func aiKitInstalled() bool {
 	return err == nil && !st.IsDir()
 }
 
+// chosenTarget: a link chosen in the Save dialog is the user's choice: the file it points to is replaced (the link
+// stays). Paths not chosen in a dialog are never resolved: saveFile replaces a link there, it does not write through it.
+func chosenTarget(p string) string {
+	if fi, err := os.Lstat(p); err == nil && fi.Mode()&os.ModeSymlink != 0 {
+		if t, err := filepath.EvalSymlinks(p); err == nil {
+			return t
+		}
+	}
+	return p
+}
+
+// saveFile puts data in place of path in one step: written in full to a new temporary file beside it (writeNew) and
+// flushed to the disk, then renamed over path. A write that fails (a full disk) leaves the old file whole and no
+// temporary file behind; a link at path is replaced, never followed. A device or a pipe (/dev/stdout) is written in
+// place.
+func saveFile(path string, data []byte) error {
+	if notAFile(path) {
+		return writeInPlace(path, data)
+	}
+	tmp, err := writeNew(path, data)
+	if err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	// the rename itself reaches the disk (best effort: not every file system lets a folder be synced)
+	if d, err := os.Open(filepath.Dir(path)); err == nil {
+		d.Sync()
+		d.Close()
+	}
+	return nil
+}
+
+// notAFile: path is a device or a pipe, or a link to one (/dev/stdout): there is no file to replace, so it is written
+// in place. A folder is not one (saving over a folder fails).
+func notAFile(path string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || fi.Mode().IsRegular() {
+		return false
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		st, err := os.Stat(path)
+		return err == nil && !st.Mode().IsRegular() && !st.IsDir()
+	}
+	return !fi.IsDir()
+}
+
+// writeInPlace writes over a device or a pipe (notAFile)
+func writeInPlace(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err2 := f.Close(); err == nil {
+		err = err2
+	}
+	return err
+}
+
 // writeNew writes data to a new temporary file beside path (created with O_EXCL and a random name, so a link left
-// at a fixed temporary name is never followed) and returns that file's name
+// at a fixed temporary name is never followed), flushes it to the disk and returns that file's name. It gets the
+// permissions of the file it is to replace (0644 for a new file)
 func writeNew(path string, data []byte) (string, error) {
+	mode := os.FileMode(0644)
+	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() {
+		mode = fi.Mode().Perm()
+	}
 	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.rdtmp")
 	if err != nil {
 		return "", err
 	}
 	tmp := f.Name()
 	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
 	if err2 := f.Close(); err == nil {
 		err = err2
 	}
 	if err == nil {
-		err = os.Chmod(tmp, 0644)
+		err = os.Chmod(tmp, mode)
 	}
 	if err != nil {
 		os.Remove(tmp)

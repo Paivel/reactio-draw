@@ -261,7 +261,10 @@ func TestErrBridgeSaveDiskFull(t *testing.T) {
 		t.Fatalf("disk full: the error is not reported: %v", r)
 	}
 	if got := eRead(ePick); got != old {
-		t.Skipf("bug 78: a failed Save leaves a truncated file (%d bytes) in place of the old one", len(got))
+		t.Errorf("bug 78: a failed Save leaves a truncated file (%d bytes) in place of the old one", len(got))
+	}
+	if m, _ := filepath.Glob(filepath.Join(d, "*.rdtmp")); len(m) != 0 {
+		t.Errorf("a failed Save left its temporary file behind: %v", m)
 	}
 }
 

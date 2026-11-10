@@ -422,6 +422,10 @@ func TestErrWriteOut(t *testing.T) {
 	mWantErr(t, "parent is a file", writeOut("picture", nil, filepath.Join(f, "file", "a.png"), res), "cannot write")
 	/* a device that is always full */
 	mWantErr(t, "disk full", writeOut("export", map[string]interface{}{"format": "mol"}, "/dev/full", json.RawMessage(`{"mol":"M  END"}`)), "no space left")
+	/* a device is written in place, never replaced by a file */
+	if fi, err := os.Lstat("/dev/full"); err != nil || fi.Mode()&os.ModeDevice == 0 {
+		t.Fatalf("/dev/full is no longer a device")
+	}
 	/* good, and the bytes written */
 	s, isErr := mText(t, writeOut("picture", nil, filepath.Join(f, "sub", "a.png"), res))
 	if isErr || !strings.Contains(s, `"bytes":7`) {
@@ -448,7 +452,10 @@ func TestErrWriteOutDiskFull(t *testing.T) {
 	mWantErr(t, "disk full", out, "file too large")
 	b, _ := os.ReadFile(p)
 	if string(b) != "old picture" {
-		t.Skipf("bug 78: a failed write of an answer leaves a cut-short file (%d bytes) in place of the old one", len(b))
+		t.Errorf("bug 78: a failed write of an answer leaves a cut-short file (%d bytes) in place of the old one", len(b))
+	}
+	if m, _ := filepath.Glob(filepath.Join(f, "*.rdtmp")); len(m) != 0 {
+		t.Errorf("a failed write left its temporary file behind: %v", m)
 	}
 }
 

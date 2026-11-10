@@ -458,7 +458,7 @@ func backgroundTool(t *tool, in map[string]interface{}) map[string]interface{} {
 			} else {
 				data = []byte(pic.SVG)
 			}
-			if err := os.WriteFile(pth, data, 0644); err != nil {
+			if err := saveFile(pth, data); err != nil {
 				return text("Cannot write "+pth+": "+err.Error(), true)
 			}
 			note = "wrote " + pth
@@ -947,11 +947,82 @@ func writeOut(op string, args map[string]interface{}, pth string, res json.RawMe
 	if dir := filepath.Dir(pth); dir != "" {
 		os.MkdirAll(dir, 0755)
 	}
-	if err := os.WriteFile(pth, data, 0644); err != nil {
+	if err := saveFile(pth, data); err != nil {
 		return text("cannot write "+pth+": "+err.Error(), true)
 	}
 	b, _ := json.Marshal(map[string]interface{}{"path": pth, "bytes": len(data)})
 	return text(string(b), false)
+}
+
+// saveFile puts data in place of path in one step: written in full to a new temporary file beside it (a random name,
+// created new, so a link left there is never followed) and flushed to the disk, then renamed over path. A write that
+// fails (a full disk) leaves the old file whole and no temporary file behind; a link at path is replaced, not followed.
+// A device or a pipe is written in place.
+// A file that is replaced keeps its permissions (a new one gets 0644).
+func saveFile(path string, data []byte) error {
+	if notAFile(path) {
+		return writeInPlace(path, data)
+	}
+	mode := os.FileMode(0644)
+	if fi, err := os.Lstat(path); err == nil && fi.Mode().IsRegular() {
+		mode = fi.Mode().Perm()
+	}
+	f, err := os.CreateTemp(filepath.Dir(path), "."+filepath.Base(path)+".*.rdtmp")
+	if err != nil {
+		return err
+	}
+	tmp := f.Name()
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	if err2 := f.Close(); err == nil {
+		err = err2
+	}
+	if err == nil {
+		err = os.Chmod(tmp, mode)
+	}
+	if err == nil {
+		err = os.Rename(tmp, path)
+	}
+	if err != nil {
+		os.Remove(tmp)
+		return err
+	}
+	if runtime.GOOS != "windows" { // the rename itself reaches the disk (best effort)
+		if d, err := os.Open(filepath.Dir(path)); err == nil {
+			d.Sync()
+			d.Close()
+		}
+	}
+	return nil
+}
+
+// notAFile: path is a device or a pipe, or a link to one (/dev/stdout): there is no file to replace, so it is written
+// in place. A folder is not one (saving over a folder fails).
+func notAFile(path string) bool {
+	fi, err := os.Lstat(path)
+	if err != nil || fi.Mode().IsRegular() {
+		return false
+	}
+	if fi.Mode()&os.ModeSymlink != 0 {
+		st, err := os.Stat(path)
+		return err == nil && !st.Mode().IsRegular() && !st.IsDir()
+	}
+	return !fi.IsDir()
+}
+
+// writeInPlace writes over a device or a pipe (notAFile)
+func writeInPlace(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_TRUNC, 0)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err2 := f.Close(); err == nil {
+		err = err2
+	}
+	return err
 }
 
 // ---------- MCP over stdio (JSON-RPC 2.0, one message a line) ----------

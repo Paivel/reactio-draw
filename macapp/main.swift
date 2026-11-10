@@ -74,7 +74,13 @@ func cliDone(_ msg: String) -> Never {
         if cliOut.isEmpty || !(p == cliOut || p.hasPrefix(root)) { err += "reactio: not written (outside -o): \(path)\n"; code = 1; continue }
         let data = Data(base64Encoded: w["b64"] as? String ?? "") ?? Data()
         try? FileManager.default.createDirectory(at: URL(fileURLWithPath: p).deletingLastPathComponent(), withIntermediateDirectories: true)
-        do { try data.write(to: URL(fileURLWithPath: p)) } catch { err += "reactio: \(error.localizedDescription)\n"; code = 1 }
+        // .atomic: written whole to a temporary file, then moved into place; a failed write leaves the old file as it was.
+        // A device or a pipe (/dev/stdout) has no file to replace: written as it is
+        let u = URL(fileURLWithPath: p)
+        let kind = (try? FileManager.default.attributesOfItem(atPath: u.resolvingSymlinksInPath().path))?[.type] as? FileAttributeType
+        let isFile = kind.map { $0 == .typeRegular } ?? true
+        let opts: Data.WritingOptions = isFile ? .atomic : []
+        do { try data.write(to: u, options: opts) } catch { err += "reactio: \(error.localizedDescription)\n"; code = 1 }
     }
     FileHandle.standardOutput.write((r["out"] as? String ?? "").data(using: .utf8) ?? Data())
     cliErr(err)
@@ -287,7 +293,15 @@ final class Bridge: NSObject, WKScriptMessageHandler, NSWindowDelegate {
         case "save":
             let p = NSSavePanel(); p.nameFieldStringValue = m["name"] as? String ?? "Reactio Draw"; p.canCreateDirectories = true
             if p.runModal() == .OK, let url = p.url, let b = m["b64"] as? String, let data = Data(base64Encoded: b) {
-                do { try data.write(to: url); allowPath(url.path); reply(id, ["ok": true, "path": url.path]) } catch { reply(id, ["ok": false, "error": "\(error)"]) }
+                // .atomic: written whole to a temporary file, then moved into place, so a failed write leaves the old file as
+                // it was; a link chosen in the panel is the user's choice: the file it points to is replaced, keeping its permissions
+                let target = url.resolvingSymlinksInPath()
+                let perms = (try? FileManager.default.attributesOfItem(atPath: target.path))?[.posixPermissions]
+                do {
+                    try data.write(to: target, options: .atomic)
+                    if let pm = perms { try? FileManager.default.setAttributes([.posixPermissions: pm], ofItemAtPath: target.path) }
+                    allowPath(url.path); reply(id, ["ok": true, "path": url.path])
+                } catch { reply(id, ["ok": false, "error": error.localizedDescription]) }
             } else { reply(id, ["ok": false]) }
         case "open":
             let o = NSOpenPanel(); o.allowsMultipleSelection = false; o.canChooseDirectories = false

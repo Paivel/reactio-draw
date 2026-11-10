@@ -43969,7 +43969,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       try {
         const d = data instanceof Blob ? new Uint8Array(await data.arrayBuffer()) : data;
         const r = await window.rdDesktop.save(filename, d);
+        /* r.error: the app could not write it (Windows shows its own message box and sends no reason) */
         if (r && r.ok) toast('Saved ' + r.path);
+        else if (r && (r.error || r.err)) toast('Could not save ' + filename + ': ' + (r.error || r.err), true);
       } catch (e) {
         toast('Could not save: ' + ((e && e.message) || e), true);
       }

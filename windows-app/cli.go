@@ -76,7 +76,7 @@ func cliDone(msg string) {
 		}
 		b, _ := base64.StdEncoding.DecodeString(w.B64)
 		os.MkdirAll(filepath.Dir(p), 0755)
-		if err := os.WriteFile(p, b, 0644); err != nil {
+		if err := saveFile(p, b); err != nil {
 			r.Err += "reactio: " + err.Error() + "\n"
 			r.Code = 1
 		}
