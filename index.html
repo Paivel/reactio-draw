@@ -34030,9 +34030,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   }
   let tt;
   /* how many error messages have been shown: File → Open tells by it that a file could not be read */
-  let toastErrs = 0;
+  let toastErrs = 0,
+    toastErrLast = '';
   function toast(m, err, ms) {
-    if (err) toastErrs++;
+    if (err) {
+      toastErrs++;
+      toastErrLast = String(m);
+    }
     if (API_SCRATCH) return;
     const el = $('toast');
     el.textContent = macKeys(m);
@@ -71765,6 +71769,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!String(a.text || '').trim()) throw new Error('import needs text: the content to add (SMILES, Molfile, SDF, RXN, CDXML, CIF…)');
       const fmt = String(a.format || 'smiles').toLowerCase(),
         name = 'api.' + (fmt === 'smiles' ? 'smi' : fmt);
+      /* the importers tell the user with an error message: that message is the API's error when nothing was added, and
+         its warning when only a part could be read */
+      const e0 = toastErrs,
+        n0 = mol.next,
+        tab0 = TABS.cur;
       if (fmt === 'xyz') importXyz(String(a.text || ''), name, { api: true, frame: a.frame });
       else {
         /* a long repeat drawn whole, without the question asked when pasting */
@@ -71775,6 +71784,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         } finally {
           REP_SKIP = skip0;
         }
+      }
+      if (toastErrs !== e0) {
+        const why = toastErrLast.replace(/^Could not read api\.\w+:?\s*/, '').replace(/\bapi\.\w+\b/g, 'the text');
+        if (mol.next === n0 && TABS.cur === tab0) throw new Error('Could not import the text as ' + fmt + (why ? ': ' + why : ''));
+        return { structures: fragments().length, warning: why };
       }
       return { structures: fragments().length };
     },
@@ -75609,7 +75623,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       addRadar: { d: 'a sensitivity screen (radar chart)', open: true, a: { axes: '[{label, value}]', x: '', y: '', size: '', shape: '', zones: '', fill: '', color: '', textSize: '', min: '', max: '', step: '' } },
       enumerate: { d: 'draw every compound of a Markush structure', a: { index: IX } },
       decompose: { d: 'write the R-group lists of a series', a: { scaffold: 'index of the structure with R1, X…', compounds: 'indices of the compounds (all others if left out)' } },
-      import: { d: 'add a file\'s content to the sheet', a: { text: 'the content', format: 'smiles, mol, sdf, rxn, cdxml, cif…', frame: 'xyz with several geometries: which (from 1), "last" or "all" (left out: all up to 10, else the last)' } },
+      import: { d: 'add a file\'s content to the sheet (an error when nothing in it can be read; a warning when only a part can)', a: { text: 'the content', format: 'smiles, mol, sdf, rxn, cdxml, cif…', frame: 'xyz with several geometries: which (from 1), "last" or "all" (left out: all up to 10, else the last)' } },
       set: { d: 'replace the whole sheet', a: { text: 'SMILES, Molfile, SDF, RXN, CDXML, CIF or a Reactio Draw document (required)', format: 'found from the text if left out' } },
       delete: { d: 'delete a structure, an arrow or a text', a: { index: IX, id: 'or its id (a structure drawn in parts goes whole)', ids: 'several ids', part: 'true: only the connected piece holding that atom id (a stray fragment of a group)' } },
       clear: { d: 'empty the sheet', a: { keepReference: 'true: the figure laid last stays (or give its id); any other picture goes', resetIds: 'true: the ids start again at 1 (a figure kept becomes 1), as on a new sheet' } },
