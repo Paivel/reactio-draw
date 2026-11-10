@@ -40618,6 +40618,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return out + texEsc(s.slice(last));
   }
+  /* a text's font as a LaTeX family (psnfss, in every TeX distribution): Helvetica for Arial and other sans fonts, Times, Courier */
+  const texFamily = fn => (/times/i.test(fn) ? 'ptm' : /courier/i.test(fn) ? 'pcr' : 'phv');
   const hasMark = s => /\[\[(?:[AaIi]:)?[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+(?:\.(?:letter|num|dash))?)?\]\]/.test(String(s || ''));
   /* name: the figure's file name without extension (name.pdf, name.tex); src: the drawing's file name for the first line */
   /* the .tex's first line names the drawing it is made from; a line break or ^ in a file name (^^5c is a backslash to
@@ -40691,7 +40693,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         W = textW(g),
         al = t.align || 'left',
         fs = Math.round(tSize(t) * k * 2) / 2,
+        /* the text's own font (as the CDX export reads it), as a LaTeX family: the numbers and the atoms one font */
+        fn = t.font === '=style' ? (STY0().pt && STY0().pt.font) || 'Arial' : t.font || docFontName(),
         font =
+          `\\reactiofigurefont{${texFamily(fn)}}` +
           `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont` +
           (t.bold ? '\\bfseries' : '') +
           (t.italic ? '\\itshape' : '') +
@@ -40708,6 +40713,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       head +
       `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
       fit +
+      /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble */
+      '\\providecommand\\reactiofigurefont[1]{\\fontfamily{#1}\\selectfont}%\n' +
       '\\begin{tikzpicture}\n' +
       `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${fitted}};\n` +
       '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +

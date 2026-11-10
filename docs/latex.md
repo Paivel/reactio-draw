@@ -23,6 +23,10 @@ For a drawing saved as `scheme.reactio` it writes, next to it:
   `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
   the same on the drawing and in the text.
 
+The texts set over the PDF use the drawing's font: Helvetica for Arial and other sans-serif fonts, Times, or Courier.
+To set them in another font in every figure, define `\reactiofigurefont` in the preamble, e.g.
+`\newcommand\reactiofigurefont[1]{\sffamily}`.
+
 Each mark becomes `\rcmpd{…}` with the mark's own text: `[[amine.a.num]]` is `\rcmpd{amine.a.num}`, `[[A:cat]]` is
 `\rcmpd{A:cat}`. The text writes the same, in any order. The definition of `\rcmpd` is a short block for the preamble, carried by
 the manifest in `preamble`; a LaTeX editor adds it once. The number style and chapters of a LaTeX document are
