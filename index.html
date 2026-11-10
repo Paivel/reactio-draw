@@ -26946,6 +26946,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return r.step != null && stepIds.has(r.step);
       }),
       texts: sub ? sub.texts : pick(mol.texts),
+      fills: sub ? sub.fills : pick(mol.fills || []),
       steps,
       text: cdx,
       n: 0
@@ -27101,6 +27102,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       sel.add(na.id);
     }
     for (const b of clip.bonds) mol.bonds.push({ ...b, id: mol.next++, a: map[b.a].id, b: map[b.b].id });
+    /* the ring fills of the copy, on the copies of their atoms */
+    for (const f of clip.fills || []) {
+      const ids = (f.ids || []).map(id => map[id] && map[id].id);
+      if (ids.length && ids.every(Boolean)) (mol.fills = mol.fills || []).push({ ...JSON.parse(JSON.stringify(f)), ids });
+    }
     const arrMap = new Map(),
       txtMap = new Map();
     for (const r of clip.arrows || []) {
