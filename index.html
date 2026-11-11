@@ -16736,6 +16736,16 @@ function kdOf(st) {
           continue;
         }
         /* a bold double or triple bond (as files from other editors have it): the main line bold, the others plain */
+        /* a bond from the side of a Haworth ring to its front edge: widening from a plain line to the edge's width */
+        if (b.stereo === 'bold' && b.order === 1 && b.hwt != null && (b.hwt === b.a || b.hwt === b.b)) {
+          const h0 = bw / 2,
+            h1 = (st.bold * wk) / 2,
+            [w1, w2] = b.hwt === b.a ? [h0, h1] : [h1, h0];
+          s +=
+            `<polygon points="${x1 + nx * w1},${y1 + ny * w1} ${x2 + nx * w2},${y2 + ny * w2} ${x2 - nx * w2},${y2 - ny * w2} ${x1 - nx * w1},${y1 - ny * w1}" style="fill:${bc}"/>` +
+            `<circle cx="${b.hwt === b.a ? x2 : x1}" cy="${b.hwt === b.a ? y2 : y1}" r="${h1}" style="fill:${bc}"/>`;
+          continue;
+        }
         if ((b.stereo === 'bold' && b.order === 1) || (b.hapFront && !b.stereo && b.order === 1)) {
           s += ln(0, 0, 0, '', (b.stereo === 'bold' ? st.bold : st.bold * 0.8) * wk);
           continue;
@@ -21123,7 +21133,8 @@ function kdOf(st) {
       if (fr.some(a => a.z !== undefined)) continue;
       const ids = new Set(fr.map(a => a.id)),
         bs = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
-      if (bs.length < 3) continue;
+      /* a Haworth projection: its ring drawn larger on purpose */
+      if (bs.length < 3 || bs.some(b => b.hwf)) continue;
       const poly = bs.length - fr.length + 1 >= 2,
         ringB = poly
           ? new Set(
@@ -58817,16 +58828,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      bold, the O at the back on the right (a furanose's: at the back), C1 on the right; the two groups of each ring atom
      straight up and down. The one up comes toward the viewer, the one down goes away: one of them keeps that as a wedge
      or a hash, drawn as a plain line while it stands upright. null when made, else why not */
-  /* the ring drawn larger than a bond (its groups' labels stand inside it), its width (a furanose wider) and its depth on
-     the sheet, and how long the bonds up and down are (in bonds): out of the ring, into it (from the front atoms up,
-     from the back ones down), and down from a furanose's atoms at the sides */
-  const HW_S = 1.4,
-    HW_W = 1.1,
-    HW_W5 = 1.45,
-    HW_K = 0.72,
-    HW_OUT = 0.75,
-    HW_IN = 0.58,
-    HW_SIDE5 = 1.05;
+  /* how long the bonds up and down are (in bonds): out of the ring, into it (from the front atoms up, from the back ones
+     down), and down from a furanose's atoms at the sides (past the front ones' groups up) */
+  const HW_OUT = 0.8,
+    HW_IN = 0.7,
+    HW_SIDE5 = 1.05,
+    /* the ring larger than the bonds around it, so the labels of its groups stand clear of its bonds (larger with its
+       H written) */
+    HW_S = 1.4,
+    HW_SH = 1.75;
   const hwVert = b => {
     if (!b.hwv) return false;
     const A = atomById(b.a),
@@ -58837,7 +58847,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ids = new Set(f.map(a => a.id));
     return mol.bonds.some(b => b.hwv && ids.has(b.a) && hwVert(b));
   };
-  function haworthMake(f) {
+  /* withH: every ring carbon's H written (as books draw it), CH2OH written as text; else no H (as journals draw it), the
+     CH2OH drawn with its OH at an angle */
+  function haworthMake(f, withH) {
     const key0 = projKey(f),
       orig = projCopy(f),
       bx0 = fragBox(f),
@@ -58915,20 +58927,29 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         }
       cyc.splice(0, n, ...bestR);
     }
-    /* the places in the ring's plane (across, and toward the viewer), in bonds: O at the back right (a furanose's: at the
-       back), C1 on the right, the front edge between the next two */
-    const R5 = 1 / (2 * Math.sin(Math.PI / 5)),
-      P =
-        n === 6
-          ? [[0.5, -0.866], [1, 0], [0.5, 0.866], [-0.5, 0.866], [-1, 0], [-0.5, -0.866]]
-          : [-90, -18, 54, 126, 198].map(d => [R5 * Math.cos((d * Math.PI) / 180), R5 * Math.sin((d * Math.PI) / 180)]);
+    /* the places on the sheet, in bonds from the ring's middle (down is toward the viewer): O at the back right (a
+       furanose's: at the back), C1 on the right, the front edge between the next two, a little longer than a
+       bond (two OH under it stay apart); the ring wide and flat, as it is drawn in books */
+    const P =
+      n === 6
+        ? [[0.6, -0.55], [1.3, 0], [0.6, 0.55], [-0.6, 0.55], [-1.3, 0], [-0.6, -0.55]]
+        : [[0, -0.55], [1.1, -0.12], [0.6, 0.45], [-0.6, 0.45], [-1.1, -0.12]];
     const k = cyc[0].ss || 1,
       Lk = L * k,
       X = (bx0.x0 + bx0.x1) / 2,
       Y = (bx0.y0 + bx0.y1) / 2,
       put = new Map();
-    const W = n === 5 ? HW_W5 : HW_W;
-    cyc.forEach((a, i) => put.set(a.id, [X + P[i][0] * Lk * HW_S * W, Y + P[i][1] * Lk * HW_S * HW_K]));
+    const S = withH ? HW_SH : HW_S,
+      Hr = (n === 6 ? 1.1 : 1) * S;
+    cyc.forEach((a, i) => put.set(a.id, [X + P[i][0] * Lk * S, Y + P[i][1] * Lk * S]));
+    /* with H: a ring carbon with one group and one H has its H written, to stand on the other side */
+    if (withH)
+      for (const c of cyc)
+        if (c.el === 'C' && implicitH(c) === 1 && exo(c).length === 1 && bondsOf(c).every(b => b.order === 1)) {
+          const h = newAtom(c.x + 1, c.y + 1, 'H');
+          h.pjH = 1;
+          mol.bonds.push({ id: mol.next++, a: c.id, b: h.id, order: 1, stereo: null });
+        }
     /* the groups on each ring atom: a branch is everything reached from its first atom away from the ring */
     const branch = (c, s) => {
       const seen = new Set([s.id]),
@@ -58944,13 +58965,6 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
       return [...seen].map(atomById);
     };
-    /* a ring carbon with one group and one H: its H written, to stand on the other side */
-    for (const c of cyc)
-      if (c.el === 'C' && implicitH(c) === 1 && exo(c).length === 1 && bondsOf(c).every(b => b.order === 1)) {
-        const h = newAtom(c.x + 1, c.y + 1, 'H');
-        h.pjH = 1;
-        mol.bonds.push({ id: mol.next++, a: c.id, b: h.id, order: 1, stereo: null });
-      }
     /* a group laid on: its drawing turned (never mirrored) so its first bond points along d, len bonds from the ring atom */
     const lay = (c, s, B, d, len) => {
       const cp = put.get(c.id),
@@ -58974,27 +58988,31 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         G = exo(c).map(s => [s, branch(c, s)]);
       if (G.some(([, g]) => !g)) return fail('Haworth: a group joins the ring twice (a bridge across it)');
       if (G.length > 2) return fail('Haworth: a ring atom carries more than two groups');
-      if (G.length === 1 && !(c.el === 'C' && implicitH(c) === 0 && bondsOf(c).every(b => b.order === 1))) {
+      if (G.length === 1 && !(implicitH(c) && bondsOf(c).every(b => b.order === 1))) {
         /* one group, no other place for one (C=O, a ring N): out of the ring, in its plane */
-        const v = [P[i][0] * W, P[i][1] * HW_K],
+        const v = P[i],
           l = Math.hypot(...v) || 1;
         lay(c, G[0][0], G[0][1], [v[0] / l, v[1] / l], 1);
         continue;
       }
+      /* the H are not written (the groups' labels then stand clear of the bonds) */
       if (G.length === 2) {
-        /* the H down to start with; the configuration decides below */
+        /* an H drawn by hand down to start with; the configuration decides below */
         G.sort(([p], [q]) => (p.el === 'H' ? 1 : 0) - (q.el === 'H' ? 1 : 0));
         UD.set(c.id, { i, up: G[0], dn: G[1] });
       } else if (G.length === 1) UD.set(c.id, { i, up: G[0], dn: null });
     }
     /* a larger group (OMe aside, an NHAc, another sugar) turned about its first atom away from the ring: up or down, and
        out to its side; not about a stereocentre (that would turn it over) */
+    /* (one atom more, as the OH of CH2OH or the Me of OMe: at 120° to the bond, to the ring atom's side, on the left
+       from the middle) */
     const away = (c, s, B, d, i) => {
       const rest = B.filter(a => a !== s && a.el !== 'H');
-      if (rest.length < 2 || isSt(s) || neighbors(s).filter(o => o.el !== 'H').length > 2) return;
+      if (!rest.length || isSt(s) || neighbors(s).filter(o => o.el !== 'H').length > 2) return;
       const s0 = put.get(s.id),
         px = P[i][0],
-        o = [d[0] * 0.8 + (Math.abs(px) > 0.3 ? Math.sign(px) : 0), d[1] * 0.8],
+        sd = Math.abs(px) > 0.3 ? Math.sign(px) : -1,
+        o = rest.length === 1 ? [sd * Math.sin(Math.PI / 3), d[1] * Math.cos(Math.PI / 3)] : [d[0] * 0.8 + (Math.abs(px) > 0.3 ? sd : 0), d[1] * 0.8],
         cx = rest.reduce((t, a) => t + put.get(a.id)[0], 0) / rest.length - s0[0],
         cy = rest.reduce((t, a) => t + put.get(a.id)[1], 0) / rest.length - s0[1],
         t = Math.atan2(o[1], o[0]) - Math.atan2(cy, cx),
@@ -59008,13 +59026,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         put.set(a.id, [s0[0] + x * co - y * si, s0[1] + x * si + y * co]);
       }
     };
+    /* a group into the ring with another one into it across from it (front up, back down, one above the other): both
+       shorter, so their labels keep apart */
+    const ACROSS = n === 6 ? { 0: 2, 2: 0, 3: 5, 5: 3 } : {},
+      inLen = i => {
+        const j = ACROSS[i],
+          o = j != null && UD.get(cyc[j].id);
+        return o && (P[j][1] < 0 ? o.dn : o.up) ? Math.min(HW_IN, (Hr - 0.6) / 2) : HW_IN;
+      };
     const layUD = c => {
       const u = UD.get(c.id),
         pd = P[u.i][1],
-        /* a furanose's atoms at the sides are a little to the back: their bonds down go well past the front ones' up */
-        side = n === 5 && Math.abs(P[u.i][0]) > 0.6,
-        lUp = pd > 0.3 ? HW_IN : HW_OUT,
-        lDn = pd < -0.3 && !side ? HW_IN : side ? HW_SIDE5 : HW_OUT;
+        lUp = pd > 0.2 ? inLen(u.i) : HW_OUT,
+        lDn = pd < -0.2 ? inLen(u.i) : n === 5 && Math.abs(P[u.i][0]) > 0.8 ? HW_SIDE5 : HW_OUT;
       if (u.up) {
         lay(c, u.up[0], u.up[1], [0, -1], lUp);
         away(c, u.up[0], u.up[1], [0, -1], u.i);
@@ -59033,32 +59057,35 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         a.y = p[1];
       }
     }
-    /* the bonds: the ring's front edge bold; at a stereocentre the bond up a wedge and the bond down a hash (from the
-       ring atom), drawn plain while upright */
-    const front = new Set();
-    for (const [i, j] of n === 6 ? [[1, 2], [2, 3], [3, 4]] : [[1, 2], [2, 3], [3, 4]]) {
+    /* the bonds: the ring's front edge bold, the bonds to it from the sides widening toward it (hwt: their narrow end);
+       at a stereocentre a bond up a wedge or a bond down a hash (from the ring atom), drawn plain while upright */
+    const front = new Map();
+    for (const [i, j, t] of [[1, 2, cyc[1].id], [2, 3, null], [3, 4, cyc[4].id]]) {
       const b = bondBetween(cyc[i], cyc[j]);
-      if (b) front.add(b);
+      if (b) front.set(b, t);
     }
     const ids = new Set(projFrag(cyc[0].id).map(a => a.id));
     for (const b of mol.bonds) {
       if (!ids.has(b.a)) continue;
       delete b.hwv;
       delete b.hwf;
+      delete b.hwt;
       if (rs.has(b.a) && rs.has(b.b)) {
         if (b.stereo === 'wedge' || b.stereo === 'hash' || b.stereo === 'bold') b.stereo = null;
         if (front.has(b) && b.order === 1) {
           b.stereo = 'bold';
           b.hwf = 1;
+          if (front.get(b) != null) b.hwt = front.get(b);
         }
         continue;
       }
       /* a wedge from a ring atom out: drawn so for the ring, and the ring is drawn anew */
       if ((rs.has(b.a) || rs.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash') && rs.has(b.a)) b.stereo = null;
     }
-    /* one stereo bond a centre, the one that reads as the ring is seen: on a back atom a hash on the bond down, else a
-       wedge on the bond up (the other way round, read flat, they would give the mirror image; a wedge and a hash in one
-       line across a centre are read as nothing) */
+    /* one stereo bond a centre, the one that reads as the ring is seen: with one group (its H not written) a wedge on it
+       up or a hash on it down; with two, on a back atom a hash on the bond down, else a wedge on the bond up (the other
+       way round, read flat, they would give the mirror image; a wedge and a hash in one line across a centre are read
+       as nothing) */
     const wedgeUD = c => {
       const u = UD.get(c.id);
       for (const g of [u.up, u.dn]) {
@@ -59068,12 +59095,13 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           delete b.hwv;
         }
       }
-      const back = P[u.i][1] < -0.3,
-        g = back ? u.dn : u.up,
+      const one = !u.up || !u.dn,
+        down = one ? !u.up : P[u.i][1] < -0.2,
+        g = down ? u.dn : u.up,
         b = g && bondBetween(c, g[0]);
       if (!b) return;
       if (b.a !== c.id) [b.a, b.b] = [b.b, b.a];
-      b.stereo = back ? 'hash' : 'wedge';
+      b.stereo = down ? 'hash' : 'wedge';
       b.hwv = 1;
     };
     const St = cyc.filter(c => UD.has(c.id) && isSt(c));
@@ -59102,11 +59130,35 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         });
         if (projKey(projFrag(cyc[0].id)) === key0) break;
       }
-    /* the groups on the ring written as groups where they are one: CH2OH, CHO, CH3 */
+    /* every group laid again where the configuration put it (one up across from one down: both shorter) */
+    for (const c of cyc) if (UD.has(c.id)) layUD(c);
+    for (const c of cyc)
+      if (UD.has(c.id)) for (const g of [UD.get(c.id).up, UD.get(c.id).dn]) if (g) for (const a of g[1]) [a.x, a.y] = put.get(a.id);
+    /* an OH (NH2, SH) out of the ring on the left written HO, else OH; into the ring toward its middle (HO on the right
+       half), so it runs clear of the bonds at the sides */
+    for (const c of cyc) {
+      const u = UD.get(c.id);
+      if (!u) continue;
+      const i = u.i;
+      for (const [g, up] of [
+        [u.up, true],
+        [u.dn, false]
+      ]) {
+        const o = g && g[0];
+        if (!o || o.label || !'O N S'.split(' ').includes(o.el) || !implicitH(o) || o.hPos) continue;
+        const inner = up ? P[i][1] > 0.2 : P[i][1] < -0.2;
+        o.hPos = inner ? (P[i][0] > 0 ? 'l' : 'r') : P[i][0] < -0.3 ? 'l' : 'r';
+        o.hwh = 1;
+      }
+    }
+    /* with H, the groups on the ring written as groups where they are one (CH2OH, CHO, CH3); without, a methyl written
+       CH3 (Me when the drawing had Me), a CH2OH drawn with its OH at an angle */
     for (const c of cyc)
       for (const s of exo(c))
-        if (s.el === 'C' && !s.pjH)
-          projCondense(s, (branch(c, s) || []).filter(a => a !== s), o => o.id !== c.id);
+        if (withH) {
+          if (s.el === 'C' && !s.pjH) projCondense(s, (branch(c, s) || []).filter(a => a !== s), o => o.id !== c.id);
+        } else if (s.el === 'C' && !s.label && !s.chg && !s.iso && neighbors(s).length === 1 && implicitH(s) === 3)
+          setLabel(s, PJ_ABBR.Me ? 'Me' : 'CH3');
     f2 = projFrag(cyc[0].id);
     if (projKey(f2) !== key0) {
       projDrop(f2);
@@ -59138,12 +59190,17 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       delete a.pjo;
       delete a.nd;
       delete a.pjH;
+      if (a.hwh) {
+        delete a.hPos;
+        delete a.hwh;
+      }
     }
     /* a Haworth ring's front edge: plain again */
     for (const b of mol.bonds)
       if (b.hwf && ids.has(b.a)) {
         if (b.stereo === 'bold') b.stereo = null;
         delete b.hwf;
+        delete b.hwt;
       }
     /* the H written for the projection go again: in 3D at once (the centres are read from the other atoms' places); on a
        flat drawing after the layout, each only where taking it keeps the configuration */
@@ -59319,6 +59376,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .filter(f => f.length > 1)
       .filter(f => f.some(a => sel.has(a.id)));
   }
+  /* a Haworth projection made with its H written (the right-click menu's Show H) */
+  let HW_WITH_H = false;
   function projAct(kind, shift, frs0, turnBy, front) {
     let frs = frs0 || projTargets();
     let ax = null;
@@ -59381,7 +59440,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!f.length) continue;
       }
       const useAx = ax && f.some(a => a.id === ax.a) && mol.bonds.includes(ax) ? ax : null;
-      let m = kind === 'fischer' ? fischerMake(f) : kind === 'haworth' ? haworthMake(f) : newmanMake(f, useAx);
+      let m = kind === 'fischer' ? fischerMake(f) : kind === 'haworth' ? haworthMake(f, HW_WITH_H) : newmanMake(f, useAx);
       if (!m && kind === 'sawhorse') {
         const f2 = projFrag(useAx ? useAx.a : f[0].id);
         newmanScan();
@@ -60138,6 +60197,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       (k === 'fischer' || k === 'haworth' ? it('newman', 'Newman projection') + it('sawhorse', 'Sawhorse projection') : '') +
       (k === 'fischer' ? '' : it('fischer', 'Fischer projection')) +
       (k === 'haworth' ? '' : it('haworth', 'Haworth projection')) +
+      (k === 'haworth' ? it('hwH', f.some(a => a.pjH) ? 'Hide H' : 'Show H (as books draw it)') : '') +
       (k === 'fischer' ? it('fisins', 'Add H–C–OH to the chain (below this carbon)') : '') +
       it('back', 'Back to the drawing');
     Object.assign(projPop.style, { position: 'fixed', left: e.clientX + 2 + 'px', top: e.clientY + 2 + 'px', zIndex: 60 });
@@ -60165,6 +60225,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } else {
         commit();
         toast('One carbon more in the chain');
+      }
+      return;
+    }
+    if (d === 'hwH') {
+      /* the same Haworth projection made again with its H written, or without */
+      const withH = !f.some(a => a.pjH),
+        id = (f.find(a => !a.pjH) || f[0]).id;
+      snap();
+      projBack(f);
+      const m = haworthMake(projFrag(id), withH);
+      if (m) {
+        undo();
+        redoSt.pop();
+        toast(m, true);
+      } else {
+        clearSel();
+        commit();
+        toast(withH ? 'Haworth projection with its H written' : 'Haworth projection without H');
       }
       return;
     }
@@ -75938,6 +76016,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const num = new Map(fr.slice().sort((p, q) => p.id - q.id).map((q, k) => [q.id, k + 1]));
         for (const b of mol.bonds) {
           if (b.stereo !== 'wedge' && b.stereo !== 'hash') continue;
+          /* drawn as a plain line (a Fischer cross, a bond up or down in a Haworth projection) */
+          if ((b.fis && fisCross(b)) || (b.hwv && hwVert(b))) continue;
           if (!num.has(b.a)) continue;
           const A = atomById(b.a),
             B = atomById(b.b),
