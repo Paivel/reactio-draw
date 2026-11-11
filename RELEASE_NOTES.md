@@ -11,6 +11,8 @@
 
 ## Fixed
 
+- **Copy for LaTeX: the compound numbers of a wide figure.** A figure wider than the line was shrunk, but its numbers kept their size and could overlap the structures. Now they shrink with it by default, the whole picture scaled as one; or, chosen by right-clicking the Copy for LaTeX button, they keep the document's text size, centred where they were. The choice is kept in the drawing, so saving rewrites the figure the same way. A figure that fits the line is as before.
+- **Copy for LaTeX in XeLaTeX and LuaLaTeX**: the compound numbers in a figure were set in Latin Modern (Helvetica has no Unicode-font version by that name) and lost their bold in XeLaTeX; they are set in the document's sans, roman or typewriter font, bold kept.
 - **R/S labels** could be read from the wrong atom when a structure had H atoms drawn with a wedge or hash on them among its first atoms; they are read in the order OpenChemLib numbers the atoms.
 
 # Reactio Draw 1.14.1

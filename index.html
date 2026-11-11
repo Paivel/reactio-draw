@@ -3228,7 +3228,7 @@ html {
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="pageSet" title="Pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across; Print can print on them"><svg viewBox="0 0 22 22"><rect x="5.5" y="2.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8 20.5h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
-          <button class="tb" data-act="copyTex" title="Copy for LaTeX: paste with files in Lattice; other editors get the \input line"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
+          <button class="tb" data-act="copyTex" title="Copy for LaTeX: paste with files in Lattice; other editors get the \input line. Right-click: the compound numbers of a figure wider than the line shrink with it, or keep the text size"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -40686,7 +40686,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
     const N = cmpdNumberer('{n}', 1);
     for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
-    const nodes = [];
+    /* the numbers when the figure is shrunk to the line: with it (the whole picture scaled, so it looks as drawn), or at
+       the document's text size, centred where they were (S.doc.texMarks 'text', kept in the drawing); a figure that fits
+       is as drawn either way */
+    const atText = texMarksMode() === 'text',
+      nodes = [];
     for (const t of T) {
       const tpl = String(t.ctpl || t.text),
         lines = tLines({ ...t, text: tpl }),
@@ -40700,7 +40704,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         fn = t.font === '=style' ? (STY0().pt && STY0().pt.font) || 'Arial' : t.font || docFontName(),
         font =
           `\\reactiofigurefont{${texFamily(fn)}}` +
-          `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont` +
+          (atText ? `\\rdfs{${f(fs)}}{${f(fs * 1.2)}}` : `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont`) +
           (t.bold ? '\\bfseries' : '') +
           (t.italic ? '\\itshape' : '') +
           ' ';
@@ -40708,21 +40712,41 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!String(l).trim()) return;
         const lw = lineW(g, gl[i]),
           x = (al === 'center' ? g.x + (W - lw) / 2 : al === 'right' ? g.x + W - lw : g.x) + lw / 2,
-          y = t.y + i * tLH(t);
+          /* at the text size: anchored at the line's middle (a little above its baseline), so it stays on its structure */
+          y = t.y + i * tLH(t) - (atText ? tSize(t) * 0.35 : 0);
         nodes.push(`    \\node at (${f((x - X0) / VW)},${f((Y0 + VH - y) / VH)}) {${font}${texLine(l, N)}};`);
       });
     }
+    const pic = img =>
+      '\\begin{tikzpicture}\n' +
+      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${img}};\n` +
+      `  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=${atText ? 'center' : 'base'}}]\n` +
+      nodes.join('\n') +
+      '\n  \\end{scope}\n\\end{tikzpicture}';
     const tex =
       head +
       `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
       fit +
-      /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble */
-      '\\providecommand\\reactiofigurefont[1]{\\fontfamily{#1}\\selectfont}%\n' +
-      '\\begin{tikzpicture}\n' +
-      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${fitted}};\n` +
-      '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
-      nodes.join('\n') +
-      '\n  \\end{scope}\n\\end{tikzpicture}%\n\\endgroup%\n';
+      /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble. XeLaTeX
+         and LuaLaTeX (Unicode fonts) have no Helvetica, Times or Courier by those names: their sans, roman and
+         typewriter fonts instead */
+      '\\def\\rdtuphv{\\sffamily}\\def\\rdtuptm{\\rmfamily}\\def\\rdtupcr{\\ttfamily}%\n' +
+      '\\providecommand\\reactiofigurefont[1]{\\ifnum0\\ifcsname XeTeXrevision\\endcsname1\\fi\\ifcsname directlua\\endcsname1\\fi>0 \\csname rdtu#1\\endcsname\\else\\fontfamily{#1}\\selectfont\\fi}%\n' +
+      /* how wide the drawing comes out on the page (\\rdW), and whether that is smaller than drawn (\\rdS), read before
+         the picture is set (which may use the scratch boxes) */
+      `\\sbox2{${fitted}}%\n` +
+      '\\edef\\rdW{\\the\\wd2}%\n' +
+      (atText
+        ? /* the numbers at the text size only when the drawing is shrunk; as drawn otherwise */
+          '\\edef\\rdS{\\ifdim\\wd2<\\dimexpr\\wd0-.01pt\\relax 1\\else 0\\fi}%\n' +
+          '\\def\\rdfs#1#2{\\ifnum\\rdS=0 \\fontsize{#1}{#2}\\selectfont\\fi}%\n' +
+          pic(fitted) +
+          '%\n'
+        : /* the drawing at its own size with its numbers, then all of it scaled to the size the drawing comes out at */
+          '\\resizebox{\\rdW}{!}{%\n' +
+          pic(`\\includegraphics{${name}.pdf}`) +
+          '}%\n') +
+      '\\endgroup%\n';
     return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
   }
   /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
@@ -40852,6 +40876,52 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const text = `\\begin{figure}\n  \\centering\n  \\input{figures/${man.entry.replace(/\.tex$/, '')}}\n  \\caption{}\n  \\label{fig:}\n\\end{figure}`;
     return { man, text, html: `<div data-editable-figure="${esc(JSON.stringify(man))}">${esc(text)}</div>` };
   }
+  /* Copy for LaTeX, its right-click menu: the compound numbers of a figure shrunk to the line scale with it (as drawn),
+     or keep the document's text size; kept in the drawing, so a Save rewrites the figure the same way */
+  const texMarksMode = () => (S.doc && S.doc.texMarks === 'text' ? 'text' : 'scale');
+  function setTexMarks(m) {
+    snap();
+    if (!S.doc) S.doc = {};
+    if (m === 'text') S.doc.texMarks = 'text';
+    else delete S.doc.texMarks;
+    commit();
+    toast(
+      m === 'text'
+        ? 'Copy for LaTeX: in a figure shrunk to the line, the compound numbers keep the text size'
+        : 'Copy for LaTeX: in a figure shrunk to the line, the compound numbers shrink with it'
+    );
+  }
+  const texPop = document.createElement('div');
+  texPop.className = 'pop thpop';
+  texPop.id = 'texpop';
+  texPop.hidden = true;
+  document.body.appendChild(texPop);
+  document.addEventListener('contextmenu', e => {
+    const b = e.target.closest('[data-act=copyTex]');
+    if (!b) return;
+    e.preventDefault();
+    const m = texMarksMode(),
+      opt = (v, l) => `<button type="button" data-texmarks="${v}" role="menuitemradio" aria-checked="${m === v}" class="${m === v ? 'on' : ''}"><span>${l}</span></button>`;
+    texPop.innerHTML =
+      '<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">Compound numbers in a figure wider than the line</span>' +
+      opt('scale', 'Shrink with the figure') +
+      opt('text', 'Keep the text size');
+    const r = b.getBoundingClientRect();
+    texPop.style.position = 'fixed';
+    texPop.style.left = r.left + 'px';
+    texPop.style.top = r.bottom + 4 + 'px';
+    texPop.style.minWidth = '220px';
+    texPop.hidden = false;
+  });
+  texPop.addEventListener('click', e => {
+    const b = e.target.closest('[data-texmarks]');
+    if (!b) return;
+    texPop.hidden = true;
+    setTexMarks(b.dataset.texmarks);
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!texPop.hidden && !texPop.contains(e.target)) texPop.hidden = true;
+  });
   async function copyLatex() {
     const done = c =>
       toast(

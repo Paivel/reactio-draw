@@ -27,9 +27,18 @@ For a drawing saved as `scheme.reactio` it writes, next to it:
   `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
   the same on the drawing and in the text.
 
-The texts set over the PDF use the drawing's font: Helvetica for Arial and other sans-serif fonts, Times, or Courier.
+The texts set over the PDF use the drawing's font: Helvetica for Arial and other sans-serif fonts, Times, or Courier
+(in XeLaTeX and LuaLaTeX, whose Unicode fonts have no Helvetica by that name, the document's sans, roman or typewriter font).
 To set them in another font in every figure, define `\reactiofigurefont` in the preamble, e.g.
 `\newcommand\reactiofigurefont[1]{\sffamily}`.
+
+With something selected, Copy for LaTeX makes the figure of the selection only; a Save afterwards makes it of the whole
+drawing again.
+
+A figure is at most the line wide and 80% of the text high, as large as drawn otherwise. When a wider figure is shrunk to
+the line, its compound numbers either shrink with it (the default: the whole picture is scaled, so it looks as drawn) or
+keep the document's text size, centred where they were. Right-click the Copy for LaTeX button to choose; the choice is
+kept in the drawing, so a Save rewrites the figure the same way. A figure that fits is the same either way.
 
 Each mark becomes `\rcmpd{…}` with the mark's own text: `[[amine.a.num]]` is `\rcmpd{amine.a.num}`, `[[A:cat]]` is
 `\rcmpd{A:cat}`. The text writes the same, in any order. The definition of `\rcmpd` is a short block for the preamble, carried by
