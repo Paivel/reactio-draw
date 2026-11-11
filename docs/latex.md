@@ -37,8 +37,9 @@ drawing again.
 
 A figure is at most the line wide and 80% of the text high, as large as drawn otherwise. When a wider figure is shrunk to
 the line, its compound numbers either shrink with it (the default: the whole picture is scaled, so it looks as drawn) or
-keep the document's text size, centred where they were. Right-click the Copy for LaTeX button to choose; the choice is
-kept in the drawing, so a Save rewrites the figure the same way. A figure that fits is the same either way.
+keep the document's text size, centred where they were. Right-click the Copy for LaTeX button to choose, or use the commands
+*Copy for LaTeX, numbers shrink with a wide figure* and *…, numbers at the text size* (command palette, Ctrl+K; each can
+have a key of its own in Settings → Hotkeys), which choose and copy at once; the choice is kept in the drawing, so a Save rewrites the figure the same way. A figure that fits is the same either way.
 
 Each mark becomes `\rcmpd{…}` with the mark's own text: `[[amine.a.num]]` is `\rcmpd{amine.a.num}`, `[[A:cat]]` is
 `\rcmpd{A:cat}`. The text writes the same, in any order. The definition of `\rcmpd` is a short block for the preamble, carried by

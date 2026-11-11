@@ -26050,6 +26050,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cmd:copyPicBg', 'Copy as a picture with the background', ''],
       ['cmd:copyOle', 'Copy for Word / PowerPoint as an embedded object', 'Ctrl+Shift+KeyD'],
       ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', ''],
+      ['cmd:copyTexScale', 'Copy for LaTeX, numbers shrink with a wide figure', ''],
+      ['cmd:copyTexText', 'Copy for LaTeX, numbers at the text size', ''],
       ['cmd:newDoc', 'New document (new tab)', 'Ctrl+KeyN'],
       ['cmd:closeDoc', 'Close document (tab)', 'Ctrl+KeyW'],
       ['cmd:reopenDoc', 'Reopen closed document', 'Ctrl+Shift+KeyT'],
@@ -52308,6 +52310,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     },
     'cmd:copyOle': () => {
       copyOle();
+    },
+    /* the mode set (and kept in the drawing), then copied */
+    'cmd:copyTexScale': () => {
+      if (texMarksMode() !== 'scale') setTexMarks('scale');
+      copyLatex();
+    },
+    'cmd:copyTexText': () => {
+      if (texMarksMode() !== 'text') setTexMarks('text');
+      copyLatex();
     },
     'cmd:copyTex': () => {
       copyLatex();
