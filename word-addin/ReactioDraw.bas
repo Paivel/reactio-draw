@@ -14,7 +14,9 @@ Attribute VB_Name = "ReactioDraw"
 '                         come before [[#format ...]] and [[#start ...]] lines in the text
 '   Remove marks          a copy with the numbers as plain text and no marks left (drawings stay Reactio Draw drawings), opened in Word
 '   Final copy            the same with plain vector pictures too: the copy to send
-' Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
+' Reactio Draw (c) 2026 Pavel Sakharov. This Source Code Form is subject to the terms of the Mozilla
+' Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at
+' https://mozilla.org/MPL/2.0/.
 Option Explicit
 
 Private Const TTL As String = "Reactio Draw"

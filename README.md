@@ -147,13 +147,15 @@ BibTeX, from `CITATION.cff`.
 
 Copyright © 2026 Pavel Sakharov and contributors (see `CONTRIBUTORS.md`).
 
-Reactio Draw is free software: you can redistribute it and/or modify it under the terms of the
-GNU Affero General Public License as published by the Free Software Foundation, either version 3
-of the License, or (at your option) any later version. See `LICENSE`.
+Reactio Draw is free software under the Mozilla Public License 2.0 (MPL-2.0). See `LICENSE`.
 
-Anyone who distributes Reactio Draw or a modified version, or offers a modified version to others
-over a network, must make its complete source code available under the same licence.
+You may use, share and change it, also as part of another program, open or closed. Anyone who
+distributes Reactio Draw keeps its files under the MPL-2.0 and makes the source code of any changes
+to them available under the same licence; their own files beside it may be under any licence.
 Drawings, files and schemes you make with the program are yours; the licence does not cover them.
+
+Versions up to 1.14.1 were released under the GNU Affero General Public License v3.0 or later and
+stay under it.
 
 Third-party components and their licences: `THIRD-PARTY-NOTICES.md` and the `LICENSES/` folder.
 

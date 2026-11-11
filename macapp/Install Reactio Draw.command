@@ -54,7 +54,7 @@ cat > "$b/Info.plist" <<PL
 <plist version="1.0"><dict>
 <key>CFBundleName</key><string>Reactio Draw</string>
 <key>CFBundleDisplayName</key><string>Reactio Draw</string>
-<key>CFBundleIdentifier</key><string>org.reactiodraw.editor</string><key>NSAppleEventsUsageDescription</key><string>Reactio Draw puts a drawing you edited back into Word (Reactio Draw tab in Word).</string><key>NSHumanReadableCopyright</key><string>© 2026 Pavel Sakharov. GNU AGPL v3 or later.</string>
+<key>CFBundleIdentifier</key><string>org.reactiodraw.editor</string><key>NSAppleEventsUsageDescription</key><string>Reactio Draw puts a drawing you edited back into Word (Reactio Draw tab in Word).</string><key>NSHumanReadableCopyright</key><string>© 2026 Pavel Sakharov. Mozilla Public License 2.0.</string>
 <key>CFBundleExecutable</key><string>ReactioDraw</string>
 <key>CFBundleIconFile</key><string>ReactioDraw</string>
 <key>CFBundlePackageType</key><string>APPL</string>

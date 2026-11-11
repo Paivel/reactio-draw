@@ -2,8 +2,9 @@
 // It speaks MCP over stdin/stdout and passes each tool call on to the app's local API (127.0.0.1, with the token from
 // api.json). The app answers only while Info → MCP is on there; nothing here reaches the network.
 //
-// Reactio Draw (c) 2026 Pavel Sakharov and contributors. Free software under the GNU Affero General Public License v3.0
-// or later.
+// Reactio Draw (c) 2026 Pavel Sakharov and contributors.
+// This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not
+// distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 package main
 
 import (

@@ -1,7 +1,8 @@
 -- Reactio Draw tabs in Word and Excel on a Mac. Their macros may run other programs only through a script in
 -- ~/Library/Application Scripts/com.microsoft.Word (or .Excel); "Install Word tab.command" and "Install Excel tab.command"
 -- put this one there.
--- Reactio Draw (c) 2026 Pavel Sakharov. Free software under the GNU Affero General Public License v3.0 or later.
+-- Reactio Draw (c) 2026 Pavel Sakharov. This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
+-- If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/.
 property appPath : "__APP__"
 -- the handler is written |rd| because rd alone is AppleScript's ordinal suffix (3rd); Word calls it as "rd"
 -- the call is "command<tab>a<tab>b"; the answer is "" when all went well, a message otherwise

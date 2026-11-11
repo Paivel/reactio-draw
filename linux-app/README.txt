@@ -28,4 +28,4 @@ Where things are
   Remove: ./uninstall.sh, then delete this folder (and ~/.local/share/ReactioDraw to remove your data too).
 
 Every function and button is described in "Reactio Draw - Getting started.pdf".
-License: GNU AGPL v3 or later (LICENSE.txt); third-party parts: THIRD-PARTY-NOTICES.md and LICENSES/.
+License: Mozilla Public License 2.0 (LICENSE.txt); third-party parts: THIRD-PARTY-NOTICES.md and LICENSES/.

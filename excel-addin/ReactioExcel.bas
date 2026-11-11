@@ -7,7 +7,9 @@ Attribute VB_Name = "ReactioExcel"
 '                         header names any, all of them into the first free columns, with the headers written above
 '   =REACTIO(A2, "MW")    - one property in any cell: MW, formula, exact mass, cLogP, TPSA, HBD, HBA, rotatable bonds, InChIKey
 ' The work is done by Reactio Draw's command line (reactio table), all rows in one run.
-' Reactio Draw (c) 2026 Pavel Sakharov and contributors. Free software under the GNU Affero General Public License v3.0 or later.
+' Reactio Draw (c) 2026 Pavel Sakharov and contributors. This Source Code Form is subject to the terms of the Mozilla
+' Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at
+' https://mozilla.org/MPL/2.0/.
 Option Explicit
 
 Private Const TTL As String = "Reactio Draw"

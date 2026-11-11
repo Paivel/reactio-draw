@@ -14,7 +14,7 @@ authors:
 doi: "10.5281/zenodo.23547490"
 repository-code: "https://github.com/Paivel/reactio-draw"
 url: "https://paivel.github.io/reactio-draw/web/"
-license: AGPL-3.0-or-later
+license: MPL-2.0
 keywords:
   - chemistry
   - chemical structure editor

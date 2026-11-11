@@ -23,7 +23,7 @@ def verinfo(exe):
     vs='%d.%d.%d.%d'%VER
     fixed=struct.pack('<13I',0xFEEF04BD,0x00010000,(VER[0]<<16)|VER[1],(VER[2]<<16)|VER[3],(VER[0]<<16)|VER[1],(VER[2]<<16)|VER[3],0x3F,0,0x40004,1,0,0,0)
     st=node('040904B0',children=[s('CompanyName','Reactio Draw project'),s('FileDescription','Reactio Draw - chemical structure editor'),s('FileVersion',vs),
-        s('InternalName','ReactioDraw'),s('LegalCopyright','Free software, GNU AGPL v3 or later'),s('OriginalFilename',exe),s('ProductName','Reactio Draw'),s('ProductVersion',vs)])
+        s('InternalName','ReactioDraw'),s('LegalCopyright','Free software, Mozilla Public License 2.0'),s('OriginalFilename',exe),s('ProductName','Reactio Draw'),s('ProductVersion',vs)])
     sfi=node('StringFileInfo',children=[st])
     vfi=node('VarFileInfo',children=[node('Translation',struct.pack('<HH',0x0409,1200),0)])
     return node('VS_VERSION_INFO',fixed,0,[sfi,vfi])

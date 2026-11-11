@@ -6,6 +6,7 @@
 
 ## Changed
 
+- **Licence: Mozilla Public License 2.0** (MPL-2.0) instead of the GNU Affero General Public License v3.0 or later. Reactio Draw can now be used as part of another program, open or closed; changes to its own files are published under the MPL-2.0 by whoever distributes them. The contributor whose code is in it agreed (issue #1). Versions up to 1.14.1 stay under the AGPL.
 - **Highlight colors** has a clearer icon: bonds under a yellow marker.
 
 ## Fixed

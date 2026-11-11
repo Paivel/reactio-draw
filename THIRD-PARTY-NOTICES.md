@@ -1,6 +1,6 @@
 # Third-party components
 
-Reactio Draw is licensed under the GNU Affero General Public License v3.0 or later (see `LICENSE`).
+Reactio Draw is licensed under the Mozilla Public License 2.0 (see `LICENSE`).
 It includes or uses the components below; each keeps its own license. Full texts are in `LICENSES/`.
 
 ## Included in the program

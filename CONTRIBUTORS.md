@@ -1,8 +1,8 @@
 # Contributors
 
 Reactio Draw is written by Pavel Sakharov. These people contributed code to it; each keeps the copyright to their
-part, which is licensed under the GNU Affero General Public License v3.0 or later together with the rest of
-Reactio Draw.
+part, which is licensed under the Mozilla Public License 2.0 together with the rest of Reactio Draw (each
+contributor has agreed to it; versions up to 1.14.1 were under the GNU Affero General Public License v3.0 or later).
 
 - **Onelightayear** ([@Onelightayear](https://github.com/Onelightayear)): XYZ export for quantum chemistry — the
   conformer search (OpenChemLib, MMFF94s+, the lowest of up to 20 conformers kept), the charge and spin multiplicity
