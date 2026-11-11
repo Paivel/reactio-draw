@@ -3268,6 +3268,7 @@ html {
           <button class="tb" data-act="newman" title="Newman projection: the selected structure (or the one pointed at) seen along a bond — the bond pointed at, the two selected atoms', or its central one; every bond seen end-on becomes a circle (a chair: two). Its 3D shape keeps the configuration. Right-click it to turn the back carbon by 30° or 60° or to make it a sawhorse; click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M11 11V3.5M11 11l-6.5 3.75M11 11l6.5 3.75M7.5 8L3.6 5.8M14.5 8l3.9-2.2M11 16v4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
           <button class="tb" data-act="sawhorse" title="Sawhorse projection: the selected structure (or the one pointed at) drawn along a bond seen from the side, the back carbon up and to the left — from a drawing, or from its Newman projection. The configuration is kept. Right-click it to turn the back carbon by 30° or 60° (staggered, eclipsed) or to make it a Newman projection; click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M7 7l9 9M7 7V2.5M7 7L3 9.5M7 7l4 2.5M16 16v-4.5M16 16l-4 2.5M16 16l4 2.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
           <button class="tb" data-act="fischer" title="Fischer projection: the open chain of the selected structure through its stereocentres stood upright, C1 at the top; at each centre the groups left and right come toward you. The configuration is kept. Click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M11 2v18M5 7.5h12M5 14.5h12" stroke="currentColor" stroke-width="1.4" fill="none"/></svg></button>
+          <button class="tb" data-act="haworth" title="Haworth projection: the ring of the selected sugar (five or six atoms, one of them O) laid flat and seen from a little above, its front edge bold, the O at the back on the right and C1 on the right; the groups of each ring atom straight up and down, the ones up toward you. The configuration is kept. With nothing selected, click the sheet for a blank one (β-D-glucopyranose). Click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M2 12.5L6.5 8.5H12M18 8.5L20 12.5" fill="none" stroke="currentColor" stroke-width="1.3"/><text x="15" y="10.6" font-size="7" font-family="Arial,Helvetica,sans-serif" font-weight="700" text-anchor="middle" fill="currentColor">O</text><path d="M2 12.5L6.5 16.5H15.5L20 12.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="tbg" aria-label="Colors">
           <button class="tb" data-act="hlPop" title="Highlight colors (atoms and bonds)"><svg viewBox="0 0 22 22"><path d="M2.5 14.5l5.5-6 6 6 5.5-6" fill="none" stroke="#ffc53d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/><path d="M2.5 14.5l5.5-6 6 6 5.5-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
@@ -16550,7 +16551,8 @@ function kdOf(st) {
       if (V3S && V3S.ids.has(b1.a) && V3S.ids.has(b1.b)) continue;
       if (NWAX.size && NWAX.has(b1.id)) continue;
       /* a horizontal bond of a Fischer cross: a plain line (its wedge, toward the viewer, is what the cross means) */
-      const b = b1.fis && b1.stereo && fisCross(b1) ? { ...b1, stereo: null } : b1;
+      /* and a bond up or down from a Haworth ring: a plain line too (its wedge or hash, toward or away from the viewer) */
+      const b = (b1.fis && b1.stereo && fisCross(b1)) || (b1.hwv && b1.stereo && hwVert(b1)) ? { ...b1, stereo: null } : b1;
       const s0 = s.length;
       let preH = '';
       do {
@@ -25998,6 +26000,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['act:newman', 'Newman projection', ''],
       ['act:sawhorse', 'Sawhorse projection', ''],
       ['act:fischer', 'Fischer projection', ''],
+      ['act:haworth', 'Haworth projection', ''],
       ['act:bondSel', 'Bond the two selected atoms and clean up', 'Ctrl+Shift+KeyL'],
       ['act:stereoGrp', 'Stereo group (abs, &, or)', ''],
       ['act:chemTxt', 'Count selected text as a compound', ''],
@@ -31290,7 +31293,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (a === 'clean') doClean();
     else if (a === 'clean2d') {
       if (!projClean2D()) doClean(true);
-    } else if (a === 'newman' || a === 'sawhorse' || a === 'fischer') {
+    } else if (a === 'newman' || a === 'sawhorse' || a === 'fischer' || a === 'haworth') {
       /* with structures selected: they become projections; with nothing selected: a blank one is drawn where the sheet is
          clicked next */
       if (sel.size) projAct(a, !!(e && e.shiftKey));
@@ -52518,7 +52521,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (id === 'cmd:newDoc' || id === 'cmd:closeDoc' || id === 'cmd:reopenDoc') return 'File';
     if (/^cmd:/.test(id)) return 'Edit';
     if (
-      /^(clean|act:(cleanRxn|clean2d|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|newman|sawhorse|fischer|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
+      /^(clean|act:(cleanRxn|clean2d|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|newman|sawhorse|fischer|haworth|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
         id
       )
     )
@@ -58810,6 +58813,310 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     projKeep(f2, 'fischer', orig);
     return null;
   }
+  /* Haworth: the ring of f (a sugar's: five or six atoms, one of them O) flat and seen from a little above, its front edge
+     bold, the O at the back on the right (a furanose's: at the back), C1 on the right; the two groups of each ring atom
+     straight up and down. The one up comes toward the viewer, the one down goes away: one of them keeps that as a wedge
+     or a hash, drawn as a plain line while it stands upright. null when made, else why not */
+  /* the ring drawn larger than a bond (its groups' labels stand inside it), its width (a furanose wider) and its depth on
+     the sheet, and how long the bonds up and down are (in bonds): out of the ring, into it (from the front atoms up,
+     from the back ones down), and down from a furanose's atoms at the sides */
+  const HW_S = 1.4,
+    HW_W = 1.1,
+    HW_W5 = 1.45,
+    HW_K = 0.72,
+    HW_OUT = 0.75,
+    HW_IN = 0.58,
+    HW_SIDE5 = 1.05;
+  const hwVert = b => {
+    if (!b.hwv) return false;
+    const A = atomById(b.a),
+      B = atomById(b.b);
+    return !!A && !!B && Math.abs(B.x - A.x) < 0.06 * Math.abs(B.y - A.y);
+  };
+  const isHaworth = f => {
+    const ids = new Set(f.map(a => a.id));
+    return mol.bonds.some(b => b.hwv && ids.has(b.a) && hwVert(b));
+  };
+  function haworthMake(f) {
+    const key0 = projKey(f),
+      orig = projCopy(f),
+      bx0 = fragBox(f),
+      fail = m => {
+        projRestore(projFrag(f[0].id), orig, true);
+        return m;
+      };
+    if (is3D(f)) {
+      flatten3D(f);
+      for (const a of f) {
+        delete a.z;
+        delete a.zx;
+        delete a.zy;
+      }
+    }
+    if (projKey(f) !== key0) return fail('Haworth: laying the 3D shape flat changed the configuration; nothing was changed');
+    const cip0 = new Map(cipMarks().atoms),
+      sig0 = stereoSig(f.map(a => a.id)),
+      /* and an atom a wedge starts from (cis and trans on a ring: myo-inositol, 1,4-dimethylcyclohexane) */
+      wedged = new Set(mol.bonds.filter(b => b.stereo === 'wedge' || b.stereo === 'hash').map(b => b.a)),
+      isSt = a => cip0.has(a.id) || sig0.has('a' + a.id) || wedged.has(a.id);
+    /* the ring: five or six atoms, none shared with another ring, not aromatic; with an O (a sugar's) first, then the one
+       with most stereocentres */
+    const rings = molRings(f),
+      inN = new Map();
+    for (const r of rings) for (const a of r) inN.set(a.id, (inN.get(a.id) || 0) + 1);
+    let ring = null,
+      best = -1;
+    for (const r of rings) {
+      if ((r.length !== 5 && r.length !== 6) || r.some(a => inN.get(a.id) !== 1 || a.label || a.ar)) continue;
+      const rs = new Set(r.map(a => a.id));
+      if (mol.bonds.some(b => rs.has(b.a) && rs.has(b.b) && (b.ar || b.order !== 1 && b.order !== 2))) continue;
+      const nSt = r.filter(isSt).length;
+      if (!nSt) continue;
+      const sc = (r.some(a => a.el === 'O') ? 100 : r.some(a => a.el !== 'C') ? 50 : 0) + nSt;
+      if (sc > best) {
+        best = sc;
+        ring = r;
+      }
+    }
+    if (!ring) return fail('Haworth: no ring of five or six atoms (not fused, not aromatic) with a stereocentre');
+    const rs = new Set(ring.map(a => a.id)),
+      n = ring.length;
+    /* the ring in order round it, from its O (or another heteroatom), toward C1: the neighbour with a heteroatom on it
+       (the anomeric carbon), else the one with less on it */
+    const hetRank = a => ({ O: 0, N: 1, S: 2 }[a.el] ?? (a.el !== 'C' ? 3 : 9));
+    const start = ring.slice().sort((p, q) => hetRank(p) - hetRank(q))[0],
+      exo = a => neighbors(a).filter(o => !rs.has(o.id)),
+      rnb = a => neighbors(a).filter(o => rs.has(o.id)),
+      c1Score = a => exo(a).filter(o => o.el !== 'C' && o.el !== 'H').length * 10 - exo(a).filter(o => o.el === 'C').length;
+    const [p0, q0] = rnb(start);
+    if (!p0 || !q0) return fail('Haworth: the ring could not be followed round');
+    const cyc = [start, c1Score(q0) > c1Score(p0) ? q0 : p0];
+    while (cyc.length < n) {
+      const nx = rnb(cyc[cyc.length - 1]).find(o => o !== cyc[cyc.length - 2]);
+      if (!nx || cyc.includes(nx)) return fail('Haworth: the ring could not be followed round');
+      cyc.push(nx);
+    }
+    /* a ring of carbons only: turned round so that the atoms with groups on them sit at the sides and the back, not on
+       the front edge (whose groups up would stand in the ring) */
+    if (start.el === 'C') {
+      const pen = n === 6 ? [1, 0, 2, 2, 0, 1] : [1, 0, 2, 2, 0],
+        heavy = a => exo(a).some(o => o.el !== 'H'),
+        score = r => r.reduce((t, a, i) => t + (heavy(a) ? pen[i] : 0), 0);
+      let bestR = cyc.slice(),
+        bs = score(bestR);
+      for (let k = 0; k < n; k++)
+        for (const dir of [1, -1]) {
+          const r = cyc.map((_, i) => cyc[(((k + dir * i) % n) + n) % n]),
+            sc = score(r);
+          if (sc < bs) {
+            bs = sc;
+            bestR = r;
+          }
+        }
+      cyc.splice(0, n, ...bestR);
+    }
+    /* the places in the ring's plane (across, and toward the viewer), in bonds: O at the back right (a furanose's: at the
+       back), C1 on the right, the front edge between the next two */
+    const R5 = 1 / (2 * Math.sin(Math.PI / 5)),
+      P =
+        n === 6
+          ? [[0.5, -0.866], [1, 0], [0.5, 0.866], [-0.5, 0.866], [-1, 0], [-0.5, -0.866]]
+          : [-90, -18, 54, 126, 198].map(d => [R5 * Math.cos((d * Math.PI) / 180), R5 * Math.sin((d * Math.PI) / 180)]);
+    const k = cyc[0].ss || 1,
+      Lk = L * k,
+      X = (bx0.x0 + bx0.x1) / 2,
+      Y = (bx0.y0 + bx0.y1) / 2,
+      put = new Map();
+    const W = n === 5 ? HW_W5 : HW_W;
+    cyc.forEach((a, i) => put.set(a.id, [X + P[i][0] * Lk * HW_S * W, Y + P[i][1] * Lk * HW_S * HW_K]));
+    /* the groups on each ring atom: a branch is everything reached from its first atom away from the ring */
+    const branch = (c, s) => {
+      const seen = new Set([s.id]),
+        st = [s];
+      while (st.length) {
+        const u = st.pop();
+        for (const o of neighbors(u))
+          if (o !== c && !seen.has(o.id)) {
+            if (rs.has(o.id)) return null;
+            seen.add(o.id);
+            st.push(o);
+          }
+      }
+      return [...seen].map(atomById);
+    };
+    /* a ring carbon with one group and one H: its H written, to stand on the other side */
+    for (const c of cyc)
+      if (c.el === 'C' && implicitH(c) === 1 && exo(c).length === 1 && bondsOf(c).every(b => b.order === 1)) {
+        const h = newAtom(c.x + 1, c.y + 1, 'H');
+        h.pjH = 1;
+        mol.bonds.push({ id: mol.next++, a: c.id, b: h.id, order: 1, stereo: null });
+      }
+    /* a group laid on: its drawing turned (never mirrored) so its first bond points along d, len bonds from the ring atom */
+    const lay = (c, s, B, d, len) => {
+      const cp = put.get(c.id),
+        ux = s.x - c.x,
+        uy = s.y - c.y,
+        l0 = Math.hypot(ux, uy) || 1,
+        t = Math.atan2(d[1], d[0]) - Math.atan2(uy, ux),
+        co = Math.cos(t),
+        si = Math.sin(t),
+        sc = Lk / l0,
+        s0 = [cp[0] + d[0] * len * Lk, cp[1] + d[1] * len * Lk];
+      for (const a of B) {
+        const x = a.x - s.x,
+          y = a.y - s.y;
+        put.set(a.id, [s0[0] + (x * co - y * si) * sc, s0[1] + (x * si + y * co) * sc]);
+      }
+    };
+    const UD = new Map();
+    for (let i = 0; i < n; i++) {
+      const c = cyc[i],
+        G = exo(c).map(s => [s, branch(c, s)]);
+      if (G.some(([, g]) => !g)) return fail('Haworth: a group joins the ring twice (a bridge across it)');
+      if (G.length > 2) return fail('Haworth: a ring atom carries more than two groups');
+      if (G.length === 1 && !(c.el === 'C' && implicitH(c) === 0 && bondsOf(c).every(b => b.order === 1))) {
+        /* one group, no other place for one (C=O, a ring N): out of the ring, in its plane */
+        const v = [P[i][0] * W, P[i][1] * HW_K],
+          l = Math.hypot(...v) || 1;
+        lay(c, G[0][0], G[0][1], [v[0] / l, v[1] / l], 1);
+        continue;
+      }
+      if (G.length === 2) {
+        /* the H down to start with; the configuration decides below */
+        G.sort(([p], [q]) => (p.el === 'H' ? 1 : 0) - (q.el === 'H' ? 1 : 0));
+        UD.set(c.id, { i, up: G[0], dn: G[1] });
+      } else if (G.length === 1) UD.set(c.id, { i, up: G[0], dn: null });
+    }
+    /* a larger group (OMe aside, an NHAc, another sugar) turned about its first atom away from the ring: up or down, and
+       out to its side; not about a stereocentre (that would turn it over) */
+    const away = (c, s, B, d, i) => {
+      const rest = B.filter(a => a !== s && a.el !== 'H');
+      if (rest.length < 2 || isSt(s) || neighbors(s).filter(o => o.el !== 'H').length > 2) return;
+      const s0 = put.get(s.id),
+        px = P[i][0],
+        o = [d[0] * 0.8 + (Math.abs(px) > 0.3 ? Math.sign(px) : 0), d[1] * 0.8],
+        cx = rest.reduce((t, a) => t + put.get(a.id)[0], 0) / rest.length - s0[0],
+        cy = rest.reduce((t, a) => t + put.get(a.id)[1], 0) / rest.length - s0[1],
+        t = Math.atan2(o[1], o[0]) - Math.atan2(cy, cx),
+        co = Math.cos(t),
+        si = Math.sin(t);
+      for (const a of B) {
+        if (a === s) continue;
+        const p = put.get(a.id),
+          x = p[0] - s0[0],
+          y = p[1] - s0[1];
+        put.set(a.id, [s0[0] + x * co - y * si, s0[1] + x * si + y * co]);
+      }
+    };
+    const layUD = c => {
+      const u = UD.get(c.id),
+        pd = P[u.i][1],
+        /* a furanose's atoms at the sides are a little to the back: their bonds down go well past the front ones' up */
+        side = n === 5 && Math.abs(P[u.i][0]) > 0.6,
+        lUp = pd > 0.3 ? HW_IN : HW_OUT,
+        lDn = pd < -0.3 && !side ? HW_IN : side ? HW_SIDE5 : HW_OUT;
+      if (u.up) {
+        lay(c, u.up[0], u.up[1], [0, -1], lUp);
+        away(c, u.up[0], u.up[1], [0, -1], u.i);
+      }
+      if (u.dn) {
+        lay(c, u.dn[0], u.dn[1], [0, 1], lDn);
+        away(c, u.dn[0], u.dn[1], [0, 1], u.i);
+      }
+    };
+    for (const c of cyc) if (UD.has(c.id)) layUD(c);
+    /* the rest of the structure (on no ring atom: there is none) */
+    for (const a of projFrag(cyc[0].id)) {
+      const p = put.get(a.id);
+      if (p) {
+        a.x = p[0];
+        a.y = p[1];
+      }
+    }
+    /* the bonds: the ring's front edge bold; at a stereocentre the bond up a wedge and the bond down a hash (from the
+       ring atom), drawn plain while upright */
+    const front = new Set();
+    for (const [i, j] of n === 6 ? [[1, 2], [2, 3], [3, 4]] : [[1, 2], [2, 3], [3, 4]]) {
+      const b = bondBetween(cyc[i], cyc[j]);
+      if (b) front.add(b);
+    }
+    const ids = new Set(projFrag(cyc[0].id).map(a => a.id));
+    for (const b of mol.bonds) {
+      if (!ids.has(b.a)) continue;
+      delete b.hwv;
+      delete b.hwf;
+      if (rs.has(b.a) && rs.has(b.b)) {
+        if (b.stereo === 'wedge' || b.stereo === 'hash' || b.stereo === 'bold') b.stereo = null;
+        if (front.has(b) && b.order === 1) {
+          b.stereo = 'bold';
+          b.hwf = 1;
+        }
+        continue;
+      }
+      /* a wedge from a ring atom out: drawn so for the ring, and the ring is drawn anew */
+      if ((rs.has(b.a) || rs.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash') && rs.has(b.a)) b.stereo = null;
+    }
+    /* one stereo bond a centre, the one that reads as the ring is seen: on a back atom a hash on the bond down, else a
+       wedge on the bond up (the other way round, read flat, they would give the mirror image; a wedge and a hash in one
+       line across a centre are read as nothing) */
+    const wedgeUD = c => {
+      const u = UD.get(c.id);
+      for (const g of [u.up, u.dn]) {
+        const b = g && bondBetween(c, g[0]);
+        if (b && b.hwv) {
+          b.stereo = null;
+          delete b.hwv;
+        }
+      }
+      const back = P[u.i][1] < -0.3,
+        g = back ? u.dn : u.up,
+        b = g && bondBetween(c, g[0]);
+      if (!b) return;
+      if (b.a !== c.id) [b.a, b.b] = [b.b, b.a];
+      b.stereo = back ? 'hash' : 'wedge';
+      b.hwv = 1;
+    };
+    const St = cyc.filter(c => UD.has(c.id) && isSt(c));
+    for (const c of St) wedgeUD(c);
+    const swap = c => {
+      const u = UD.get(c.id);
+      [u.up, u.dn] = [u.dn, u.up];
+      layUD(c);
+      for (const g of [u.up, u.dn]) if (g) for (const a of g[1]) [a.x, a.y] = put.get(a.id);
+      wedgeUD(c);
+    };
+    /* a centre that came out the other way round: its groups change places, up and down */
+    for (let round = 0; round < 3; round++) {
+      const cip1 = cipMarks().atoms,
+        wrong = St.filter(c => cip0.has(c.id) && cip1.get(c.id) !== cip0.get(c.id));
+      if (!wrong.length) break;
+      wrong.forEach(swap);
+    }
+    /* centres without R/S (cis and trans on a ring) tried both ways, until the configuration is the drawing's */
+    const free = St.filter(c => !cip0.has(c.id));
+    let f2 = projFrag(cyc[0].id);
+    if (free.length && free.length <= 6 && projKey(f2) !== key0)
+      for (let m = 1; m < 1 << free.length; m++) {
+        free.forEach((c, j) => {
+          if ((m ^ (m - 1)) & (1 << j)) swap(c);
+        });
+        if (projKey(projFrag(cyc[0].id)) === key0) break;
+      }
+    /* the groups on the ring written as groups where they are one: CH2OH, CHO, CH3 */
+    for (const c of cyc)
+      for (const s of exo(c))
+        if (s.el === 'C' && !s.pjH)
+          projCondense(s, (branch(c, s) || []).filter(a => a !== s), o => o.id !== c.id);
+    f2 = projFrag(cyc[0].id);
+    if (projKey(f2) !== key0) {
+      projDrop(f2);
+      projRestore([], orig, true);
+      return 'Haworth: the projection did not keep the configuration; nothing was changed';
+    }
+    for (const a of f2) delete a.nd;
+    projKeep(f2, 'haworth', orig);
+    return null;
+  }
   /* back from a projection: the drawing it was made from, or (changed since) a flat drawing with its configuration */
   function projBack(f) {
     const piv = f.find(a => a.pjo);
@@ -58832,6 +59139,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       delete a.nd;
       delete a.pjH;
     }
+    /* a Haworth ring's front edge: plain again */
+    for (const b of mol.bonds)
+      if (b.hwf && ids.has(b.a)) {
+        if (b.stereo === 'bold') b.stereo = null;
+        delete b.hwf;
+      }
     /* the H written for the projection go again: in 3D at once (the centres are read from the other atoms' places); on a
        flat drawing after the layout, each only where taking it keeps the configuration */
     const dropH = (h, check) => {
@@ -58920,6 +59233,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!ids.has(b.a)) continue;
       delete b.nm;
       delete b.fis;
+      delete b.hwv;
       delete b.sh;
     }
     /* a Newman projection turned a little first, so no bond is seen end-on when it is laid flat */
@@ -58982,7 +59296,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       frs = a ? frs.filter(f => f.includes(a)) : [];
     }
     newmanScan();
-    if (!frs.length || !frs.every(f => isNewman(f) || isSawhorse(f) || isFischer(f))) return false;
+    if (!frs.length || !frs.every(f => isNewman(f) || isSawhorse(f) || isFischer(f) || isHaworth(f))) return false;
     snap();
     let bad = 0;
     for (const f of frs) if (projBack(f) === 'changed') bad++;
@@ -58997,6 +59311,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (isNewman(f)) return 'newman';
     if (isSawhorse(f)) return 'sawhorse';
     if (isFischer(f)) return 'fischer';
+    if (isHaworth(f)) return 'haworth';
     return null;
   }
   function projTargets() {
@@ -59011,7 +59326,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast('Select a structure (or point at one; for Newman, at the bond to look along)', true);
       return;
     }
-    if (kind !== 'fischer' && sel.size === 2) {
+    const flatK = kind === 'fischer' || kind === 'haworth';
+    if (!flatK && sel.size === 2) {
       const [p, q] = [...sel].map(atomById);
       if (p && q) ax = bondBetween(p, q) || null;
     }
@@ -59041,7 +59357,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const f0 of frs) {
       let f = f0;
       const now = projKind(f);
-      if (kind !== 'fischer' && (now === 'newman' || now === 'sawhorse') && (shift || turnBy)) {
+      if (!flatK && (now === 'newman' || now === 'sawhorse') && (shift || turnBy)) {
         const m = newmanTurn(f, turnBy || 60, !!front);
         if (m) msgs.push(m);
         else turned++;
@@ -59065,7 +59381,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!f.length) continue;
       }
       const useAx = ax && f.some(a => a.id === ax.a) && mol.bonds.includes(ax) ? ax : null;
-      let m = kind === 'fischer' ? fischerMake(f) : newmanMake(f, useAx);
+      let m = kind === 'fischer' ? fischerMake(f) : kind === 'haworth' ? haworthMake(f) : newmanMake(f, useAx);
       if (!m && kind === 'sawhorse') {
         const f2 = projFrag(useAx ? useAx.a : f[0].id);
         newmanScan();
@@ -59110,6 +59426,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast(
         kind === 'fischer'
           ? 'Fischer projection: the groups left and right come toward you; Fischer again brings the drawing back'
+          : kind === 'haworth'
+          ? 'Haworth projection: the ring seen from a little above, its front edge bold, the groups up and down; Haworth again brings the drawing back'
           : (kind === 'newman' ? 'Newman' : 'Sawhorse') +
               ' projection: right-click it to turn the back carbon or change the projection; ' +
               (kind === 'newman' ? 'Newman' : 'Sawhorse') +
@@ -59121,7 +59439,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      Newman and sawhorse: ethane, staggered, its H written out to be typed over; Fischer: D-glyceraldehyde, a chain with
      CHO at the top, a centre with H and OH, CH2OH at the bottom (its groups typed over as needed) */
   let PJBLANK = null;
-  const PJ_BLANKS = { newman: 'CC', sawhorse: 'CC', fischer: 'O=C[C@H](O)CO' };
+  /* Haworth: β-D-glucopyranose */
+  const PJ_BLANKS = { newman: 'CC', sawhorse: 'CC', fischer: 'O=C[C@H](O)CO', haworth: 'OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O' };
   /* a projection's H as bare bonds (sticks), the H they stand for kept in mind (a.stk): a Newman's 1.3 bonds long from the
      middle, so that past the circle its back bonds stand out and a group written on a stick stays off the circle */
   function projSticks(f, kind) {
@@ -59647,11 +59966,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     $('mol').style.cursor = 'copy';
     const btn = document.querySelector('[data-act=' + kind + ']');
     if (btn) btn.setAttribute('aria-pressed', 'true');
-    const nm = { newman: 'Newman', sawhorse: 'sawhorse', fischer: 'Fischer' }[kind],
+    const nm = { newman: 'Newman', sawhorse: 'sawhorse', fischer: 'Fischer', haworth: 'Haworth' }[kind],
       opt = (v, t) => `<button type="button" class="btn ghost sm" data-pjc="${v}" aria-pressed="${PJCONF === v}">${t}</button>`;
     pjBlankPop.innerHTML =
       `<span style="font-size:12px;opacity:.7;padding:0 4px">Blank ${nm}</span>` +
-      (kind === 'fischer' ? '' : opt('st', 'Staggered') + opt('ec', 'Eclipsed')) +
+      (kind === 'fischer' || kind === 'haworth' ? '' : opt('st', 'Staggered') + opt('ec', 'Eclipsed')) +
       '<button type="button" class="btn ghost sm" data-pjc="end" title="Stop (Esc)">Done</button>';
     pjBlankPop.hidden = false;
     const R = btn && btn.getBoundingClientRect();
@@ -59710,7 +60029,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* Newman and sawhorse blanks: bare bonds (sticks), not H, to write the groups on; a Newman's 1.3 bonds long from the
          middle, so that past the circle its back bonds stand out and a group written on a stick stays off the circle;
          eclipsed when so chosen (the back carbon turned by 60°) */
-      if (kind !== 'fischer') {
+      if (kind !== 'fischer' && kind !== 'haworth') {
         if (PJCONF === 'ec') {
           newmanScan();
           newmanTurn(projFrag(fresh[0].id), 60);
@@ -59794,11 +60113,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     e.preventDefault();
     e.stopPropagation();
     projAt = a.id;
-    const X = k === 'fischer' ? null : projAxis(f),
+    const X = k === 'fischer' || k === 'haworth' ? null : projAxis(f),
       it = (d, t, off) => `<button type="button" class="btn ghost sm" style="justify-content:flex-start" data-pj="${d}"${off ? ' disabled' : ''}>${t}</button>`;
     projPop.innerHTML =
-      `<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">${{ newman: 'Newman', sawhorse: 'Sawhorse', fischer: 'Fischer' }[k]} projection</span>` +
-      (k === 'fischer'
+      `<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">${{ newman: 'Newman', sawhorse: 'Sawhorse', fischer: 'Fischer', haworth: 'Haworth' }[k]} projection</span>` +
+      (k === 'fischer' || k === 'haworth'
         ? ''
         : [
             ['turn', 'Turn the back carbon'],
@@ -59816,7 +60135,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             .join('')) +
       (k === 'newman' ? it('sawhorse', 'Sawhorse projection', !(X && X.side)) : '') +
       (k === 'sawhorse' ? it('newman', 'Newman projection') : '') +
-      (k === 'fischer' ? it('newman', 'Newman projection') + it('sawhorse', 'Sawhorse projection') : it('fischer', 'Fischer projection')) +
+      (k === 'fischer' || k === 'haworth' ? it('newman', 'Newman projection') + it('sawhorse', 'Sawhorse projection') : '') +
+      (k === 'fischer' ? '' : it('fischer', 'Fischer projection')) +
+      (k === 'haworth' ? '' : it('haworth', 'Haworth projection')) +
       (k === 'fischer' ? it('fisins', 'Add H–C–OH to the chain (below this carbon)') : '') +
       it('back', 'Back to the drawing');
     Object.assign(projPop.style, { position: 'fixed', left: e.clientX + 2 + 'px', top: e.clientY + 2 + 'px', zIndex: 60 });
@@ -79932,6 +80253,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const sg = document.querySelector('#topbar [aria-label="Structure"]');
     if (sg) {
       sg.appendChild(tb.firstElementChild);
+      /* Haworth, added after it, at the end of the group */
+      const hw = sg.querySelector('[data-act=haworth]');
+      if (hw) sg.appendChild(hw);
     } else $('topbar').appendChild(tb);
   }
   {

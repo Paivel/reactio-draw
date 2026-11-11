@@ -1,3 +1,17 @@
+# Next version
+
+## New
+
+- **Haworth projection** (the last button of the Structure group): the ring of the selected sugar (five or six atoms, one of them O) laid flat and seen from a little above, its front edge bold, the O at the back on the right (a furanose's at the back) and C1 on the right; the two groups of each ring atom straight up and down, H written where a carbon has one. The configuration is kept: β-D-glucose comes out with OH up at C1, down at C2, up at C3, down at C4 and CH2OH up. A ring of carbons only (inositol, menthol) is turned so its groups stand at the sides and the back. Larger groups (OMe, NHAc, a second sugar) turn away from the ring. Pressed again, or Clean Up 2D, it brings back the drawing it was made from; right-click it for Newman, sawhorse or Fischer, or Back to the drawing. With nothing selected, a click on the sheet puts a blank one there: β-D-glucopyranose, its groups to type over. A disaccharide gets one ring in Haworth projection, the other one drawn as before.
+
+## Changed
+
+- **Highlight colors** has a clearer icon: bonds under a yellow marker.
+
+## Fixed
+
+- **R/S labels** could be read from the wrong atom when a structure had H atoms drawn with a wedge or hash on them among its first atoms; they are read in the order OpenChemLib numbers the atoms.
+
 # Reactio Draw 1.14.1
 
 ## Changed
