@@ -18597,7 +18597,9 @@ function kdOf(st) {
         /* a structure in 3D (3D shape, a crystal structure): the configuration from its 3D places */
         const d3 = is3D(f);
         if (!d3 && f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
-        const fb = fragBonds(m, f);
+        /* plain H last, as OpenChemLib puts them: its atom numbers are then ours */
+        const [f1, fb] = hLast(f, fragBonds(m, f));
+        f.splice(0, f.length, ...f1);
         if (!d3 && !fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
         const mb = (d3 ? molBlock3D(f, fb, '') : molBlock(f, fb, '')).replace(CHIRAL_RX, CHIRAL_ON);
         const M = O.Molecule.fromMolfile(mb);
