@@ -26005,7 +26005,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cage9', 'Cyclohexane boat', ''],
       ['cage10', 'Cyclohexane twist-boat', ''],
       ['act:cleanRxn', 'Clean Up Reaction', 'Ctrl+Shift+KeyX'],
-      ['act:clean2d', 'Clean Up 2D (flat)', ''],
+      ['act:clean2d', 'Clean Up 2D (flat)', 'Ctrl+Shift+KeyF'],
       ['act:expand', 'Expand Label', ''],
       ['act:contract', 'Contract Labels', ''],
       ['act:mirrorLab', 'Mirror label', ''],
@@ -26018,9 +26018,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['act:chemTxt', 'Count selected text as a compound', ''],
       ['act:txtStruct', 'Count text as a structure', ''],
       ['act:markOrd', 'Order of the [[key]] marks for numbering in Word', 'Ctrl+Shift+KeyO'],
-      ['act:rotL', 'Rotate 90° left', ''],
-      ['act:rotR', 'Rotate 90° right', ''],
-      ['act:rot180', 'Rotate 180°', ''],
+      ['act:rotL', 'Rotate 90° left', 'Ctrl+Shift+Comma'],
+      ['act:rotR', 'Rotate 90° right', 'Ctrl+Shift+Period'],
+      ['act:rot180', 'Rotate 180°', 'Ctrl+Shift+Semicolon'],
       ['act:flipH', 'Flip horizontal', 'Ctrl+Shift+KeyH'],
       ['act:flipV', 'Flip vertical', 'Ctrl+Shift+KeyV'],
       ['act:alL', 'Align left', ''],
@@ -26049,7 +26049,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cmd:copyPic', 'Copy as a picture for Word / PowerPoint', 'Ctrl+Shift+KeyC'],
       ['cmd:copyPicBg', 'Copy as a picture with the background', ''],
       ['cmd:copyOle', 'Copy for Word / PowerPoint as an embedded object', 'Ctrl+Shift+KeyD'],
-      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', ''],
+      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', 'Ctrl+Shift+KeyE'],
       ['cmd:copyTexScale', 'Copy for LaTeX, numbers shrink with a wide figure', ''],
       ['cmd:copyTexText', 'Copy for LaTeX, numbers at the text size', ''],
       ['cmd:newDoc', 'New document (new tab)', 'Ctrl+KeyN'],
@@ -52556,6 +52556,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   document
     .querySelectorAll('#cageTools [data-cage]')
     .forEach((b, i) => (TARGET['cage' + i] = '#cageTools [data-cage]:nth-child(' + (i + 1) + ')'));
+  /* the File menu's items that are commands of their own (Save, Save as, Open, Copy as a picture, as an embedded object,
+     for LaTeX, InChI, the order of the marks) */
+  const FX_DUP = new Set(['save', 'saveas', 'open', 'c-pic', 'c-ole', 'c-tex', 'c-inchi', 'w-ord']);
   const EXTRA = [
     ...ELS.map(el => ['el:' + el, 'Atom tool: ' + el, '']),
     ['ptable', 'Periodic table (pick an element)', ''],
@@ -52567,10 +52570,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['sty:doc', 'Next drawing style', ''],
     ['sty:fsUp', 'Larger font', ''],
     ['sty:fsDown', 'Smaller font', ''],
-    ['sty:bold', 'Bold text', ''],
-    ['sty:italic', 'Italic text', ''],
+    ['sty:bold', 'Bold text', 'Ctrl+KeyB'],
+    ['sty:italic', 'Italic text', 'Ctrl+KeyI'],
     ['sty:fs', 'Formula style (subscript digits)', ''],
-    ['sty:ul', 'Underline', ''],
+    ['sty:ul', 'Underline', 'Ctrl+KeyU'],
     ['sty:alL', 'Align text left', ''],
     ['sty:alC', 'Align text center', ''],
     ['sty:alR', 'Align text right', ''],
@@ -52584,11 +52587,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       'Show panel: ' + document.querySelector(`[data-tab=${t}]`).textContent.trim(),
       ''
     ]),
-    ...[...document.querySelectorAll('#filepop [data-fx]')].map(b => [
-      'fx:' + b.dataset.fx,
-      'File: ' + b.textContent.trim(),
-      ''
-    ])
+    /* not the File menu's items that are a command of their own already: their key is that command's, and a second
+       line without one only puzzles */
+    ...[...document.querySelectorAll('#filepop [data-fx]')]
+      .filter(b => !FX_DUP.has(b.dataset.fx))
+      .map(b => ['fx:' + b.dataset.fx, 'File: ' + b.textContent.trim(), ''])
   ];
   EXTRA.forEach(([id, l, d]) => {
     if (!ACTIONS.some(a => a.id === 'tool:' + id))
