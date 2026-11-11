@@ -1,4 +1,5 @@
 <meta charset="utf-8">
+<!-- Reactio Draw (c) 2026 Pavel Sakharov and contributors. This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0. If a copy of the MPL was not distributed with this file, You can obtain one at https://mozilla.org/MPL/2.0/. -->
 <title>Reactio Draw — free open-source chemical structure editor</title>
 <meta name="description" content="Draw molecules and reactions in the browser: reagent tables, NMR prediction, HRMS check, ChemDraw CDX/CDXML files. Free and open source, works offline.">
 <link rel="canonical" href="https://paivel.github.io/reactio-draw/web/">
@@ -3241,7 +3242,7 @@ html {
           <button class="tb" data-act="copyPicBg" title="Copy as a picture with the sheet's background color (for dark or colored paper): the selection, or everything"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="currentColor" opacity=".35" stroke="currentColor" stroke-width="1.5"/><path d="M5 15l3-4 2 2.5 1.5-2 2 3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M7.5 5V3.5h12v12.5H14.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="fPrint" title="Print the drawing (Ctrl+P)"><svg viewBox="0 0 22 22"><path d="M6 8V3h10v5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="3" y="8" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 13h10v6H6z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="pageSet" title="Pages: where sheets of paper (A4, A5) or slides (4:3, 16:9) fall on the sheet, upright or across; Print can print on them"><svg viewBox="0 0 22 22"><rect x="5.5" y="2.5" width="11" height="15" rx="1" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 2"/><path d="M8 20.5h6" stroke="currentColor" stroke-width="1.5"/></svg></button>
-          <button class="tb" data-act="copyTex" title="Copy for LaTeX: paste with files in Lattice; other editors get the \input line"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
+          <button class="tb" data-act="copyTex" title="Copy for LaTeX: paste with files in Lattice; other editors get the \input line. Right-click: the compound numbers of a figure wider than the line shrink with it, or keep the text size"><svg viewBox="0 0 22 22"><rect x="2.5" y="5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 5V3.5h11.5v12H14.5" fill="none" stroke="currentColor" stroke-width="1.5"/><text x="8.5" y="15" text-anchor="middle" font-size="6.5" font-weight="700" font-family="Georgia,serif" fill="currentColor">TeX</text></svg></button>
         </div>
         <div class="tbg" aria-label="Object">
           <button class="tb" data-act="rotL" title="Rotate 90° counterclockwise"><svg viewBox="0 0 22 22"><path d="M7 4.5H3.5V1M3.8 4.7A8 8 0 1 1 3 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><text x="11" y="15.4" text-anchor="middle" font-size="8.5" font-weight="700" font-family="Arial,Helvetica,sans-serif" fill="currentColor">90</text></svg></button>
@@ -3282,9 +3283,10 @@ html {
           <button class="tb" data-act="newman" title="Newman projection: the selected structure (or the one pointed at) seen along a bond — the bond pointed at, the two selected atoms', or its central one; every bond seen end-on becomes a circle (a chair: two). Its 3D shape keeps the configuration. Right-click it to turn the back carbon by 30° or 60° or to make it a sawhorse; click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><circle cx="11" cy="11" r="5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M11 11V3.5M11 11l-6.5 3.75M11 11l6.5 3.75M7.5 8L3.6 5.8M14.5 8l3.9-2.2M11 16v4.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
           <button class="tb" data-act="sawhorse" title="Sawhorse projection: the selected structure (or the one pointed at) drawn along a bond seen from the side, the back carbon up and to the left — from a drawing, or from its Newman projection. The configuration is kept. Right-click it to turn the back carbon by 30° or 60° (staggered, eclipsed) or to make it a Newman projection; click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M7 7l9 9M7 7V2.5M7 7L3 9.5M7 7l4 2.5M16 16v-4.5M16 16l-4 2.5M16 16l4 2.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg></button>
           <button class="tb" data-act="fischer" title="Fischer projection: the open chain of the selected structure through its stereocentres stood upright, C1 at the top; at each centre the groups left and right come toward you. The configuration is kept. Click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M11 2v18M5 7.5h12M5 14.5h12" stroke="currentColor" stroke-width="1.4" fill="none"/></svg></button>
+          <button class="tb" data-act="haworth" title="Haworth projection: the ring of the selected sugar (five or six atoms, one of them O) laid flat and seen from a little above, its front edge bold, the O at the back on the right and C1 on the right; the groups of each ring atom straight up and down, the ones up toward you. The configuration is kept. With nothing selected, click the sheet for a blank one (β-D-glucopyranose). Click again (or Clean Up 2D) for the drawing back"><svg viewBox="0 0 22 22"><path d="M2 12.5L6.5 8.5H12M18 8.5L20 12.5" fill="none" stroke="currentColor" stroke-width="1.3"/><text x="15" y="10.6" font-size="7" font-family="Arial,Helvetica,sans-serif" font-weight="700" text-anchor="middle" fill="currentColor">O</text><path d="M2 12.5L6.5 16.5H15.5L20 12.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linejoin="round"/></svg></button>
         </div>
         <div class="tbg" aria-label="Colors">
-          <button class="tb" data-act="hlPop" title="Highlight colors (atoms and bonds)"><svg viewBox="0 0 22 22"><path d="M4 15l7-11 7 11" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2 19h18" stroke="#ffc53d" stroke-width="4"/></svg></button>
+          <button class="tb" data-act="hlPop" title="Highlight colors (atoms and bonds)"><svg viewBox="0 0 22 22"><path d="M2.5 14.5l5.5-6 6 6 5.5-6" fill="none" stroke="#ffc53d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" opacity=".75"/><path d="M2.5 14.5l5.5-6 6 6 5.5-6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></button>
           <button class="tb" data-act="colPop" title="Color of lines, labels, arrows and text (selection, or everything)"><svg viewBox="0 0 22 22"><path d="M4 18l9-12 3 2-9 12z" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="2" y="19" width="18" height="2.5" rx="1" fill="#e5484d"/></svg></button>
           <select id="lineW" title="Line width of bonds (wedges and bold bonds scale with it) and arrows: the selection, or what you draw next" aria-label="Line width"><option value="0.5">0.5</option><option value="0.8">0.8</option><option value="1">1</option><option value="1.2">1.2</option><option value="1.5">1.5</option><option value="1.8" selected>1.8</option><option value="2.4">2.4</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="custom">Custom…</option></select>
           <button class="tb" data-act="rfPop" title="Ring fill colors"><svg viewBox="0 0 22 22"><polygon points="11,2 19,6.5 19,15.5 11,20 3,15.5 3,6.5" fill="#0090ff" fill-opacity=".35" stroke="currentColor" stroke-width="1.5"/></svg></button>
@@ -3468,7 +3470,7 @@ html {
         <div class="note">Reactio Draw asks GitHub for the newest release only when you press this button; it never looks by itself. In the app for Windows, Mac and Linux, a newer version is downloaded and installed only when you say Update.</div>
         <span class="tlabel" style="margin-top:6px">Credits and sources</span>
         <ul class="note credits" style="margin:0;padding-left:16px;display:grid;gap:4px">
-          <li>Reactio Draw (© 2026 Pavel Sakharov and contributors) is free software under the GNU Affero General Public License v3.0 or later: you may use, share and change it, and anyone who distributes it or a modified version, or runs a modified version for others over a network, must publish the complete source code under the same license. Your drawings and files are yours. Third-party components keep their own licenses (THIRD-PARTY-NOTICES.md and LICENSES/ with the source code).</li>
+          <li>Reactio Draw (© 2026 Pavel Sakharov and contributors) is free software under the Mozilla Public License 2.0: you may use, share and change it, also as part of another program, open or closed; anyone who distributes it keeps its files under the same license and publishes the source code of any changes to them. Your drawings and files are yours. Third-party components keep their own licenses (THIRD-PARTY-NOTICES.md and LICENSES/ with the source code).</li>
           <li>The editor itself (drawing, reading labels, layout, files, the reagent table, NMR prediction) is code written for this project. Parts made by others are listed here with their licenses; their full license texts are under <a href="#" data-licenses>Licenses</a>. <a href="https://github.com/cheminfo/openchemlib-js" target="_blank" rel="noopener">OpenChemLib</a> 9.25.1 (openchemlib-js, the JavaScript build of Thomas Sander's OpenChemLib), included unchanged except for packaging as a plain script, is used for 3D shapes and rotation (a likely conformer from its torsion data, then relaxed with its MMFF94s+ force field, the MMFF94s variant of MMFF94: T. A. Halgren, J. Comput. Chem. 1996, 17, 490; MMFF94s: J. Comput. Chem. 1999, 20, 720), for stereochemistry in SMILES (reading @/@@, writing stereo SMILES) and for comparing structures; licensed BSD-3-Clause.</li>
           <li>The journal drawing styles, the color themes Publication, Presentation, Pastel and Jmol, and the CDX property table are taken from <a href="https://github.com/Ameyanagi/ReShiki" target="_blank" rel="noopener">ReShiki</a> (© 2026 Ameyanagi and ReShiki contributors, MIT OR Apache-2.0, used under MIT; ReShiki takes the CDX table from the published CDX documentation of CambridgeSoft); the Jmol element colors come from <a href="https://jmol.sourceforge.net/jscolors/" target="_blank" rel="noopener">Jmol</a>.</li>
           <li>The look of the 3D styles (Ball and stick, Tubes, Spheres: ball, bond and outline sizes, shading and depth fog) follows the presets of <a href="https://github.com/aligfellow/xyzrender" target="_blank" rel="noopener">xyzrender</a> (© 2026 Alister S. Goodfellow, MIT); only these values were taken, the drawing is this project's own code.</li>
@@ -4465,7 +4467,7 @@ function kdOf(st) {
     SMI_WAIT = 300;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.14.1';
+  const RD_VERSION = '1.15';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -16564,7 +16566,8 @@ function kdOf(st) {
       if (V3S && V3S.ids.has(b1.a) && V3S.ids.has(b1.b)) continue;
       if (NWAX.size && NWAX.has(b1.id)) continue;
       /* a horizontal bond of a Fischer cross: a plain line (its wedge, toward the viewer, is what the cross means) */
-      const b = b1.fis && b1.stereo && fisCross(b1) ? { ...b1, stereo: null } : b1;
+      /* and a bond up or down from a Haworth ring: a plain line too (its wedge or hash, toward or away from the viewer) */
+      const b = (b1.fis && b1.stereo && fisCross(b1)) || (b1.hwv && b1.stereo && hwVert(b1)) ? { ...b1, stereo: null } : b1;
       const s0 = s.length;
       let preH = '';
       do {
@@ -16748,6 +16751,16 @@ function kdOf(st) {
           continue;
         }
         /* a bold double or triple bond (as files from other editors have it): the main line bold, the others plain */
+        /* a bond from the side of a Haworth ring to its front edge: widening from a plain line to the edge's width */
+        if (b.stereo === 'bold' && b.order === 1 && b.hwt != null && (b.hwt === b.a || b.hwt === b.b)) {
+          const h0 = bw / 2,
+            h1 = (st.bold * wk) / 2,
+            [w1, w2] = b.hwt === b.a ? [h0, h1] : [h1, h0];
+          s +=
+            `<polygon points="${x1 + nx * w1},${y1 + ny * w1} ${x2 + nx * w2},${y2 + ny * w2} ${x2 - nx * w2},${y2 - ny * w2} ${x1 - nx * w1},${y1 - ny * w1}" style="fill:${bc}"/>` +
+            `<circle cx="${b.hwt === b.a ? x2 : x1}" cy="${b.hwt === b.a ? y2 : y1}" r="${h1}" style="fill:${bc}"/>`;
+          continue;
+        }
         if ((b.stereo === 'bold' && b.order === 1) || (b.hapFront && !b.stereo && b.order === 1)) {
           s += ln(0, 0, 0, '', (b.stereo === 'bold' ? st.bold : st.bold * 0.8) * wk);
           continue;
@@ -18611,7 +18624,9 @@ function kdOf(st) {
         /* a structure in 3D (3D shape, a crystal structure): the configuration from its 3D places */
         const d3 = is3D(f);
         if (!d3 && f.some(a => a.z !== undefined && Math.abs(a.z) > 1e-6)) continue;
-        const fb = fragBonds(m, f);
+        /* plain H last, as OpenChemLib puts them: its atom numbers are then ours */
+        const [f1, fb] = hLast(f, fragBonds(m, f));
+        f.splice(0, f.length, ...f1);
         if (!d3 && !fb.some(b => b.order === 2 || b.stereo === 'wedge' || b.stereo === 'hash')) continue;
         const mb = (d3 ? molBlock3D(f, fb, '') : molBlock(f, fb, '')).replace(CHIRAL_RX, CHIRAL_ON);
         const M = O.Molecule.fromMolfile(mb);
@@ -21133,7 +21148,8 @@ function kdOf(st) {
       if (fr.some(a => a.z !== undefined)) continue;
       const ids = new Set(fr.map(a => a.id)),
         bs = mol.bonds.filter(b => ids.has(b.a) && ids.has(b.b));
-      if (bs.length < 3) continue;
+      /* a Haworth projection: its ring drawn larger on purpose */
+      if (bs.length < 3 || bs.some(b => b.hwf)) continue;
       const poly = bs.length - fr.length + 1 >= 2,
         ringB = poly
           ? new Set(
@@ -26003,21 +26019,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cage9', 'Cyclohexane boat', ''],
       ['cage10', 'Cyclohexane twist-boat', ''],
       ['act:cleanRxn', 'Clean Up Reaction', 'Ctrl+Shift+KeyX'],
-      ['act:clean2d', 'Clean Up 2D (flat)', ''],
+      ['act:clean2d', 'Clean Up 2D (flat)', 'Ctrl+Shift+KeyF'],
       ['act:expand', 'Expand Label', ''],
       ['act:contract', 'Contract Labels', ''],
       ['act:mirrorLab', 'Mirror label', ''],
       ['act:newman', 'Newman projection', ''],
       ['act:sawhorse', 'Sawhorse projection', ''],
       ['act:fischer', 'Fischer projection', ''],
+      ['act:haworth', 'Haworth projection', ''],
       ['act:bondSel', 'Bond the two selected atoms and clean up', 'Ctrl+Shift+KeyL'],
       ['act:stereoGrp', 'Stereo group (abs, &, or)', ''],
       ['act:chemTxt', 'Count selected text as a compound', ''],
       ['act:txtStruct', 'Count text as a structure', ''],
       ['act:markOrd', 'Order of the [[key]] marks for numbering in Word', 'Ctrl+Shift+KeyO'],
-      ['act:rotL', 'Rotate 90° left', ''],
-      ['act:rotR', 'Rotate 90° right', ''],
-      ['act:rot180', 'Rotate 180°', ''],
+      ['act:rotL', 'Rotate 90° left', 'Ctrl+Shift+Comma'],
+      ['act:rotR', 'Rotate 90° right', 'Ctrl+Shift+Period'],
+      ['act:rot180', 'Rotate 180°', 'Ctrl+Shift+Semicolon'],
       ['act:flipH', 'Flip horizontal', 'Ctrl+Shift+KeyH'],
       ['act:flipV', 'Flip vertical', 'Ctrl+Shift+KeyV'],
       ['act:alL', 'Align left', ''],
@@ -26046,7 +26063,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       ['cmd:copyPic', 'Copy as a picture for Word / PowerPoint', 'Ctrl+Shift+KeyC'],
       ['cmd:copyPicBg', 'Copy as a picture with the background', ''],
       ['cmd:copyOle', 'Copy for Word / PowerPoint as an embedded object', 'Ctrl+Shift+KeyD'],
-      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', ''],
+      ['cmd:copyTex', 'Copy for LaTeX (an editable figure)', 'Ctrl+Shift+KeyE'],
+      ['cmd:copyTexScale', 'Copy for LaTeX, numbers shrink with a wide figure', ''],
+      ['cmd:copyTexText', 'Copy for LaTeX, numbers at the text size', ''],
       ['cmd:newDoc', 'New document (new tab)', 'Ctrl+KeyN'],
       ['cmd:closeDoc', 'Close document (tab)', 'Ctrl+KeyW'],
       ['cmd:reopenDoc', 'Reopen closed document', 'Ctrl+Shift+KeyT'],
@@ -31302,7 +31321,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     } else if (a === 'clean') doClean();
     else if (a === 'clean2d') {
       if (!projClean2D()) doClean(true);
-    } else if (a === 'newman' || a === 'sawhorse' || a === 'fischer') {
+    } else if (a === 'newman' || a === 'sawhorse' || a === 'fischer' || a === 'haworth') {
       /* with structures selected: they become projections; with nothing selected: a blank one is drawn where the sheet is
          clicked next */
       if (sel.size) projAct(a, !!(e && e.shiftKey));
@@ -40656,6 +40675,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fills: (mol.fills || []).filter(f => f.ids.every(x => ids.has(x)))
     });
   }
+  /* what a document needs for a figure, as comment lines straight after its source line: an editor (Lattice, the VS Code
+     extension) adds what is missing when the figure changes on disk, as when marks are added after the first paste. Each
+     preamble line exactly as it goes into the preamble (an empty one left out) */
+  function figNeedsLines(packages, preamble) {
+    return (
+      `% editable-figure packages: ${packages.join(' ')}\n` +
+      (preamble || [])
+        .map(l => String(l).replace(/\s+$/, ''))
+        .filter(l => l)
+        .map(l => `% editable-figure preamble: ${l}\n`)
+        .join('')
+    );
+  }
   async function latexFigureOf0(name, src) {
     const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
     let svg;
@@ -40679,11 +40711,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '\\edef\\rdh{\\the\\ifdim\\ht0>.8\\textheight\\dimexpr.8\\textheight\\relax\\else\\ht0\\fi}%\n',
       fitted = `\\includegraphics[width=\\rdw,height=\\rdh,keepaspectratio]{${name}.pdf}`;
     if (!T.length)
-      return { pdf, tex: head + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
+      return { pdf, tex: head + figNeedsLines(['graphicx']) + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
     /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
     const N = cmpdNumberer('{n}', 1);
     for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
-    const nodes = [];
+    /* the numbers when the figure is shrunk to the line: with it (the whole picture scaled, so it looks as drawn), or at
+       the document's text size, centred where they were (S.doc.texMarks 'text', kept in the drawing); a figure that fits
+       is as drawn either way */
+    const atText = texMarksMode() === 'text',
+      nodes = [];
     for (const t of T) {
       const tpl = String(t.ctpl || t.text),
         lines = tLines({ ...t, text: tpl }),
@@ -40697,7 +40733,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         fn = t.font === '=style' ? (STY0().pt && STY0().pt.font) || 'Arial' : t.font || docFontName(),
         font =
           `\\reactiofigurefont{${texFamily(fn)}}` +
-          `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont` +
+          (atText ? `\\rdfs{${f(fs)}}{${f(fs * 1.2)}}` : `\\fontsize{${f(fs)}}{${f(fs * 1.2)}}\\selectfont`) +
           (t.bold ? '\\bfseries' : '') +
           (t.italic ? '\\itshape' : '') +
           ' ';
@@ -40705,22 +40741,44 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!String(l).trim()) return;
         const lw = lineW(g, gl[i]),
           x = (al === 'center' ? g.x + (W - lw) / 2 : al === 'right' ? g.x + W - lw : g.x) + lw / 2,
-          y = t.y + i * tLH(t);
+          /* at the text size: anchored at the line's middle (a little above its baseline), so it stays on its structure */
+          y = t.y + i * tLH(t) - (atText ? tSize(t) * 0.35 : 0);
         nodes.push(`    \\node at (${f((x - X0) / VW)},${f((Y0 + VH - y) / VH)}) {${font}${texLine(l, N)}};`);
       });
     }
-    const tex =
-      head +
+    const pic = img =>
+      '\\begin{tikzpicture}\n' +
+      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${img}};\n` +
+      `  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=${atText ? 'center' : 'base'}}]\n` +
+      nodes.join('\n') +
+      '\n  \\end{scope}\n\\end{tikzpicture}';
+    const body =
       `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
       fit +
-      /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble */
-      '\\providecommand\\reactiofigurefont[1]{\\fontfamily{#1}\\selectfont}%\n' +
-      '\\begin{tikzpicture}\n' +
-      `  \\node[inner sep=0pt,anchor=south west] (rdfig) at (0,0) {${fitted}};\n` +
-      '  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=base}]\n' +
-      nodes.join('\n') +
-      '\n  \\end{scope}\n\\end{tikzpicture}%\n\\endgroup%\n';
-    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
+      /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble. XeLaTeX
+         and LuaLaTeX (Unicode fonts) have no Helvetica, Times or Courier by those names: their sans, roman and
+         typewriter fonts instead */
+      '\\def\\rdtuphv{\\sffamily}\\def\\rdtuptm{\\rmfamily}\\def\\rdtupcr{\\ttfamily}%\n' +
+      '\\providecommand\\reactiofigurefont[1]{\\ifnum0\\ifcsname XeTeXrevision\\endcsname1\\fi\\ifcsname directlua\\endcsname1\\fi>0 \\csname rdtu#1\\endcsname\\else\\fontfamily{#1}\\selectfont\\fi}%\n' +
+      /* how wide the drawing comes out on the page (\\rdW), and whether that is smaller than drawn (\\rdS), read before
+         the picture is set (which may use the scratch boxes) */
+      `\\sbox2{${fitted}}%\n` +
+      '\\edef\\rdW{\\the\\wd2}%\n' +
+      (atText
+        ? /* the numbers at the text size only when the drawing is shrunk; as drawn otherwise */
+          '\\edef\\rdS{\\ifdim\\wd2<\\dimexpr\\wd0-.01pt\\relax 1\\else 0\\fi}%\n' +
+          '\\def\\rdfs#1#2{\\ifnum\\rdS=0 \\fontsize{#1}{#2}\\selectfont\\fi}%\n' +
+          pic(fitted) +
+          '%\n'
+        : /* the drawing at its own size with its numbers, then all of it scaled to the size the drawing comes out at */
+          '\\resizebox{\\rdW}{!}{%\n' +
+          pic(`\\includegraphics{${name}.pdf}`) +
+          '}%\n') +
+      '\\endgroup%\n';
+    const packages = ['graphicx', 'tikz', 'chemnum'],
+      preamble = body.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined,
+      tex = head + figNeedsLines(packages, preamble) + body;
+    return { pdf, tex, packages, preamble };
   }
   /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
      figure a LaTeX editor pastes, without changing Ctrl+C. The clipboard gets HTML holding the editable-figure manifest (a
@@ -40849,6 +40907,52 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const text = `\\begin{figure}\n  \\centering\n  \\input{figures/${man.entry.replace(/\.tex$/, '')}}\n  \\caption{}\n  \\label{fig:}\n\\end{figure}`;
     return { man, text, html: `<div data-editable-figure="${esc(JSON.stringify(man))}">${esc(text)}</div>` };
   }
+  /* Copy for LaTeX, its right-click menu: the compound numbers of a figure shrunk to the line scale with it (as drawn),
+     or keep the document's text size; kept in the drawing, so a Save rewrites the figure the same way */
+  const texMarksMode = () => (S.doc && S.doc.texMarks === 'text' ? 'text' : 'scale');
+  function setTexMarks(m) {
+    snap();
+    if (!S.doc) S.doc = {};
+    if (m === 'text') S.doc.texMarks = 'text';
+    else delete S.doc.texMarks;
+    commit();
+    toast(
+      m === 'text'
+        ? 'Copy for LaTeX: in a figure shrunk to the line, the compound numbers keep the text size'
+        : 'Copy for LaTeX: in a figure shrunk to the line, the compound numbers shrink with it'
+    );
+  }
+  const texPop = document.createElement('div');
+  texPop.className = 'pop thpop';
+  texPop.id = 'texpop';
+  texPop.hidden = true;
+  document.body.appendChild(texPop);
+  document.addEventListener('contextmenu', e => {
+    const b = e.target.closest('[data-act=copyTex]');
+    if (!b) return;
+    e.preventDefault();
+    const m = texMarksMode(),
+      opt = (v, l) => `<button type="button" data-texmarks="${v}" role="menuitemradio" aria-checked="${m === v}" class="${m === v ? 'on' : ''}"><span>${l}</span></button>`;
+    texPop.innerHTML =
+      '<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">Compound numbers in a figure wider than the line</span>' +
+      opt('scale', 'Shrink with the figure') +
+      opt('text', 'Keep the text size');
+    const r = b.getBoundingClientRect();
+    texPop.style.position = 'fixed';
+    texPop.style.left = r.left + 'px';
+    texPop.style.top = r.bottom + 4 + 'px';
+    texPop.style.minWidth = '220px';
+    texPop.hidden = false;
+  });
+  texPop.addEventListener('click', e => {
+    const b = e.target.closest('[data-texmarks]');
+    if (!b) return;
+    texPop.hidden = true;
+    setTexMarks(b.dataset.texmarks);
+  });
+  document.addEventListener('pointerdown', e => {
+    if (!texPop.hidden && !texPop.contains(e.target)) texPop.hidden = true;
+  });
   async function copyLatex() {
     const done = c =>
       toast(
@@ -48982,7 +49086,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return d && d.state && docStateOk(d.state) ? d : null;
   }
-  function importText(name, text) {
+  /* asFile: a file being opened (not the API, a paste or a part of one): an empty .reactio or an empty CDXML opens as an
+     empty drawing (an editor made it for a new figure), not as an error */
+  function importText(name, text, asFile) {
     if (/\.cif$/i.test(name) || /^\s*(#.*\n\s*)*data_/i.test(text)) {
       importCif(text, name);
       return;
@@ -49009,6 +49115,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (ext === 'json' || ext === 'reactio') {
+      /* an empty .reactio (an editor made it for a new figure): an empty drawing, its tab linked to the file */
+      if (asFile && ext === 'reactio' && !text.trim()) {
+        openInTab(blankDoc(), name);
+        toast('Opened ' + name + ': empty, ready to draw');
+        return;
+      }
       let d;
       try {
         d = JSON.parse(text);
@@ -49044,7 +49156,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return;
       }
       if (mol.next === n0) {
-        toast('Nothing to draw in ' + name, true);
+        if (asFile && ext === 'cdxml') toast('Opened ' + name + ': empty, ready to draw');
+        else toast('Nothing to draw in ' + name, true);
         return;
       }
       toast('Opened ' + name);
@@ -50448,7 +50561,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ok = openInFileTab(name, whole, () => {
       if (/\.cdx$/i.test(name)) importCdxBytes(u, name);
       else if (/\.zip$/i.test(name)) openZip(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength), name);
-      else importText(name, text);
+      else importText(name, text, true);
     });
     /* the tab now stands for this file: Save writes back to it (zips are only a container, so they stay unlinked) */
     if (ok && !/\.zip$/i.test(name)) linkTab(curTab(), name, path);
@@ -52236,6 +52349,15 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     'cmd:copyOle': () => {
       copyOle();
     },
+    /* the mode set (and kept in the drawing), then copied */
+    'cmd:copyTexScale': () => {
+      if (texMarksMode() !== 'scale') setTexMarks('scale');
+      copyLatex();
+    },
+    'cmd:copyTexText': () => {
+      if (texMarksMode() !== 'text') setTexMarks('text');
+      copyLatex();
+    },
     'cmd:copyTex': () => {
       copyLatex();
     },
@@ -52472,6 +52594,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   document
     .querySelectorAll('#cageTools [data-cage]')
     .forEach((b, i) => (TARGET['cage' + i] = '#cageTools [data-cage]:nth-child(' + (i + 1) + ')'));
+  /* the File menu's items that are commands of their own (Save, Save as, Open, Copy as a picture, as an embedded object,
+     for LaTeX, InChI, the order of the marks) */
+  const FX_DUP = new Set(['save', 'saveas', 'open', 'c-pic', 'c-ole', 'c-tex', 'c-inchi', 'w-ord']);
   const EXTRA = [
     ...ELS.map(el => ['el:' + el, 'Atom tool: ' + el, '']),
     ['ptable', 'Periodic table (pick an element)', ''],
@@ -52483,10 +52608,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     ['sty:doc', 'Next drawing style', ''],
     ['sty:fsUp', 'Larger font', ''],
     ['sty:fsDown', 'Smaller font', ''],
-    ['sty:bold', 'Bold text', ''],
-    ['sty:italic', 'Italic text', ''],
+    ['sty:bold', 'Bold text', 'Ctrl+KeyB'],
+    ['sty:italic', 'Italic text', 'Ctrl+KeyI'],
     ['sty:fs', 'Formula style (subscript digits)', ''],
-    ['sty:ul', 'Underline', ''],
+    ['sty:ul', 'Underline', 'Ctrl+KeyU'],
     ['sty:alL', 'Align text left', ''],
     ['sty:alC', 'Align text center', ''],
     ['sty:alR', 'Align text right', ''],
@@ -52500,11 +52625,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       'Show panel: ' + document.querySelector(`[data-tab=${t}]`).textContent.trim(),
       ''
     ]),
-    ...[...document.querySelectorAll('#filepop [data-fx]')].map(b => [
-      'fx:' + b.dataset.fx,
-      'File: ' + b.textContent.trim(),
-      ''
-    ])
+    /* not the File menu's items that are a command of their own already: their key is that command's, and a second
+       line without one only puzzles */
+    ...[...document.querySelectorAll('#filepop [data-fx]')]
+      .filter(b => !FX_DUP.has(b.dataset.fx))
+      .map(b => ['fx:' + b.dataset.fx, 'File: ' + b.textContent.trim(), ''])
   ];
   EXTRA.forEach(([id, l, d]) => {
     if (!ACTIONS.some(a => a.id === 'tool:' + id))
@@ -52530,7 +52655,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (id === 'cmd:newDoc' || id === 'cmd:closeDoc' || id === 'cmd:reopenDoc') return 'File';
     if (/^cmd:/.test(id)) return 'Edit';
     if (
-      /^(clean|act:(cleanRxn|clean2d|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|newman|sawhorse|fischer|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
+      /^(clean|act:(cleanRxn|clean2d|check|expand|contract|bondSel|stereoGrp|merge|chemTxt|txtStruct|newman|sawhorse|fischer|haworth|rot|flip|al|di|group|ungroup|toFront|toBack|fwd|bwd))/.test(
         id
       )
     )
@@ -58822,6 +58947,351 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     projKeep(f2, 'fischer', orig);
     return null;
   }
+  /* Haworth: the ring of f (a sugar's: five or six atoms, one of them O) flat and seen from a little above, its front edge
+     bold, the O at the back on the right (a furanose's: at the back), C1 on the right; the two groups of each ring atom
+     straight up and down. The one up comes toward the viewer, the one down goes away: one of them keeps that as a wedge
+     or a hash, drawn as a plain line while it stands upright. null when made, else why not */
+  /* how long the bonds up and down are (in bonds): out of the ring, into it (from the front atoms up, from the back ones
+     down), and down from a furanose's atoms at the sides (past the front ones' groups up) */
+  const HW_OUT = 0.8,
+    HW_IN = 0.7,
+    HW_SIDE5 = 1.05,
+    /* the ring larger than the bonds around it, so the labels of its groups stand clear of its bonds (larger with its
+       H written) */
+    HW_S = 1.4,
+    HW_SH = 1.75;
+  const hwVert = b => {
+    if (!b.hwv) return false;
+    const A = atomById(b.a),
+      B = atomById(b.b);
+    return !!A && !!B && Math.abs(B.x - A.x) < 0.06 * Math.abs(B.y - A.y);
+  };
+  const isHaworth = f => {
+    const ids = new Set(f.map(a => a.id));
+    return mol.bonds.some(b => b.hwv && ids.has(b.a) && hwVert(b));
+  };
+  /* withH: every ring carbon's H written (as books draw it), CH2OH written as text; else no H (as journals draw it), the
+     CH2OH drawn with its OH at an angle */
+  function haworthMake(f, withH) {
+    const key0 = projKey(f),
+      orig = projCopy(f),
+      bx0 = fragBox(f),
+      fail = m => {
+        projRestore(projFrag(f[0].id), orig, true);
+        return m;
+      };
+    if (is3D(f)) {
+      flatten3D(f);
+      for (const a of f) {
+        delete a.z;
+        delete a.zx;
+        delete a.zy;
+      }
+    }
+    if (projKey(f) !== key0) return fail('Haworth: laying the 3D shape flat changed the configuration; nothing was changed');
+    const cip0 = new Map(cipMarks().atoms),
+      sig0 = stereoSig(f.map(a => a.id)),
+      /* and an atom a wedge starts from (cis and trans on a ring: myo-inositol, 1,4-dimethylcyclohexane) */
+      wedged = new Set(mol.bonds.filter(b => b.stereo === 'wedge' || b.stereo === 'hash').map(b => b.a)),
+      isSt = a => cip0.has(a.id) || sig0.has('a' + a.id) || wedged.has(a.id);
+    /* the ring: five or six atoms, none shared with another ring, not aromatic; with an O (a sugar's) first, then the one
+       with most stereocentres */
+    const rings = molRings(f),
+      inN = new Map();
+    for (const r of rings) for (const a of r) inN.set(a.id, (inN.get(a.id) || 0) + 1);
+    let ring = null,
+      best = -1;
+    for (const r of rings) {
+      if ((r.length !== 5 && r.length !== 6) || r.some(a => inN.get(a.id) !== 1 || a.label || a.ar)) continue;
+      const rs = new Set(r.map(a => a.id));
+      if (mol.bonds.some(b => rs.has(b.a) && rs.has(b.b) && (b.ar || b.order !== 1 && b.order !== 2))) continue;
+      const nSt = r.filter(isSt).length;
+      if (!nSt) continue;
+      const sc = (r.some(a => a.el === 'O') ? 100 : r.some(a => a.el !== 'C') ? 50 : 0) + nSt;
+      if (sc > best) {
+        best = sc;
+        ring = r;
+      }
+    }
+    if (!ring) return fail('Haworth: no ring of five or six atoms (not fused, not aromatic) with a stereocentre');
+    const rs = new Set(ring.map(a => a.id)),
+      n = ring.length;
+    /* the ring in order round it, from its O (or another heteroatom), toward C1: the neighbour with a heteroatom on it
+       (the anomeric carbon), else the one with less on it */
+    const hetRank = a => ({ O: 0, N: 1, S: 2 }[a.el] ?? (a.el !== 'C' ? 3 : 9));
+    const start = ring.slice().sort((p, q) => hetRank(p) - hetRank(q))[0],
+      exo = a => neighbors(a).filter(o => !rs.has(o.id)),
+      rnb = a => neighbors(a).filter(o => rs.has(o.id)),
+      c1Score = a => exo(a).filter(o => o.el !== 'C' && o.el !== 'H').length * 10 - exo(a).filter(o => o.el === 'C').length;
+    const [p0, q0] = rnb(start);
+    if (!p0 || !q0) return fail('Haworth: the ring could not be followed round');
+    const cyc = [start, c1Score(q0) > c1Score(p0) ? q0 : p0];
+    while (cyc.length < n) {
+      const nx = rnb(cyc[cyc.length - 1]).find(o => o !== cyc[cyc.length - 2]);
+      if (!nx || cyc.includes(nx)) return fail('Haworth: the ring could not be followed round');
+      cyc.push(nx);
+    }
+    /* a ring of carbons only: turned round so that the atoms with groups on them sit at the sides and the back, not on
+       the front edge (whose groups up would stand in the ring) */
+    if (start.el === 'C') {
+      const pen = n === 6 ? [1, 0, 2, 2, 0, 1] : [1, 0, 2, 2, 0],
+        heavy = a => exo(a).some(o => o.el !== 'H'),
+        score = r => r.reduce((t, a, i) => t + (heavy(a) ? pen[i] : 0), 0);
+      let bestR = cyc.slice(),
+        bs = score(bestR);
+      for (let k = 0; k < n; k++)
+        for (const dir of [1, -1]) {
+          const r = cyc.map((_, i) => cyc[(((k + dir * i) % n) + n) % n]),
+            sc = score(r);
+          if (sc < bs) {
+            bs = sc;
+            bestR = r;
+          }
+        }
+      cyc.splice(0, n, ...bestR);
+    }
+    /* the places on the sheet, in bonds from the ring's middle (down is toward the viewer): O at the back right (a
+       furanose's: at the back), C1 on the right, the front edge between the next two, a little longer than a
+       bond (two OH under it stay apart); the ring wide and flat, as it is drawn in books */
+    const P =
+      n === 6
+        ? [[0.6, -0.55], [1.3, 0], [0.6, 0.55], [-0.6, 0.55], [-1.3, 0], [-0.6, -0.55]]
+        : [[0, -0.55], [1.1, -0.12], [0.6, 0.45], [-0.6, 0.45], [-1.1, -0.12]];
+    const k = cyc[0].ss || 1,
+      Lk = L * k,
+      X = (bx0.x0 + bx0.x1) / 2,
+      Y = (bx0.y0 + bx0.y1) / 2,
+      put = new Map();
+    const S = withH ? HW_SH : HW_S,
+      Hr = (n === 6 ? 1.1 : 1) * S;
+    cyc.forEach((a, i) => put.set(a.id, [X + P[i][0] * Lk * S, Y + P[i][1] * Lk * S]));
+    /* with H: a ring carbon with one group and one H has its H written, to stand on the other side */
+    if (withH)
+      for (const c of cyc)
+        if (c.el === 'C' && implicitH(c) === 1 && exo(c).length === 1 && bondsOf(c).every(b => b.order === 1)) {
+          const h = newAtom(c.x + 1, c.y + 1, 'H');
+          h.pjH = 1;
+          mol.bonds.push({ id: mol.next++, a: c.id, b: h.id, order: 1, stereo: null });
+        }
+    /* the groups on each ring atom: a branch is everything reached from its first atom away from the ring */
+    const branch = (c, s) => {
+      const seen = new Set([s.id]),
+        st = [s];
+      while (st.length) {
+        const u = st.pop();
+        for (const o of neighbors(u))
+          if (o !== c && !seen.has(o.id)) {
+            if (rs.has(o.id)) return null;
+            seen.add(o.id);
+            st.push(o);
+          }
+      }
+      return [...seen].map(atomById);
+    };
+    /* a group laid on: its drawing turned (never mirrored) so its first bond points along d, len bonds from the ring atom */
+    const lay = (c, s, B, d, len) => {
+      const cp = put.get(c.id),
+        ux = s.x - c.x,
+        uy = s.y - c.y,
+        l0 = Math.hypot(ux, uy) || 1,
+        t = Math.atan2(d[1], d[0]) - Math.atan2(uy, ux),
+        co = Math.cos(t),
+        si = Math.sin(t),
+        sc = Lk / l0,
+        s0 = [cp[0] + d[0] * len * Lk, cp[1] + d[1] * len * Lk];
+      for (const a of B) {
+        const x = a.x - s.x,
+          y = a.y - s.y;
+        put.set(a.id, [s0[0] + (x * co - y * si) * sc, s0[1] + (x * si + y * co) * sc]);
+      }
+    };
+    const UD = new Map();
+    for (let i = 0; i < n; i++) {
+      const c = cyc[i],
+        G = exo(c).map(s => [s, branch(c, s)]);
+      if (G.some(([, g]) => !g)) return fail('Haworth: a group joins the ring twice (a bridge across it)');
+      if (G.length > 2) return fail('Haworth: a ring atom carries more than two groups');
+      if (G.length === 1 && !(implicitH(c) && bondsOf(c).every(b => b.order === 1))) {
+        /* one group, no other place for one (C=O, a ring N): out of the ring, in its plane */
+        const v = P[i],
+          l = Math.hypot(...v) || 1;
+        lay(c, G[0][0], G[0][1], [v[0] / l, v[1] / l], 1);
+        continue;
+      }
+      /* the H are not written (the groups' labels then stand clear of the bonds) */
+      if (G.length === 2) {
+        /* an H drawn by hand down to start with; the configuration decides below */
+        G.sort(([p], [q]) => (p.el === 'H' ? 1 : 0) - (q.el === 'H' ? 1 : 0));
+        UD.set(c.id, { i, up: G[0], dn: G[1] });
+      } else if (G.length === 1) UD.set(c.id, { i, up: G[0], dn: null });
+    }
+    /* a larger group (OMe aside, an NHAc, another sugar) turned about its first atom away from the ring: up or down, and
+       out to its side; not about a stereocentre (that would turn it over) */
+    /* (one atom more, as the OH of CH2OH or the Me of OMe: at 120° to the bond, to the ring atom's side, on the left
+       from the middle) */
+    const away = (c, s, B, d, i) => {
+      const rest = B.filter(a => a !== s && a.el !== 'H');
+      if (!rest.length || isSt(s) || neighbors(s).filter(o => o.el !== 'H').length > 2) return;
+      const s0 = put.get(s.id),
+        px = P[i][0],
+        sd = Math.abs(px) > 0.3 ? Math.sign(px) : -1,
+        o = rest.length === 1 ? [sd * Math.sin(Math.PI / 3), d[1] * Math.cos(Math.PI / 3)] : [d[0] * 0.8 + (Math.abs(px) > 0.3 ? sd : 0), d[1] * 0.8],
+        cx = rest.reduce((t, a) => t + put.get(a.id)[0], 0) / rest.length - s0[0],
+        cy = rest.reduce((t, a) => t + put.get(a.id)[1], 0) / rest.length - s0[1],
+        t = Math.atan2(o[1], o[0]) - Math.atan2(cy, cx),
+        co = Math.cos(t),
+        si = Math.sin(t);
+      for (const a of B) {
+        if (a === s) continue;
+        const p = put.get(a.id),
+          x = p[0] - s0[0],
+          y = p[1] - s0[1];
+        put.set(a.id, [s0[0] + x * co - y * si, s0[1] + x * si + y * co]);
+      }
+    };
+    /* a group into the ring with another one into it across from it (front up, back down, one above the other): both
+       shorter, so their labels keep apart */
+    const ACROSS = n === 6 ? { 0: 2, 2: 0, 3: 5, 5: 3 } : {},
+      inLen = i => {
+        const j = ACROSS[i],
+          o = j != null && UD.get(cyc[j].id);
+        return o && (P[j][1] < 0 ? o.dn : o.up) ? Math.min(HW_IN, (Hr - 0.6) / 2) : HW_IN;
+      };
+    const layUD = c => {
+      const u = UD.get(c.id),
+        pd = P[u.i][1],
+        lUp = pd > 0.2 ? inLen(u.i) : HW_OUT,
+        lDn = pd < -0.2 ? inLen(u.i) : n === 5 && Math.abs(P[u.i][0]) > 0.8 ? HW_SIDE5 : HW_OUT;
+      if (u.up) {
+        lay(c, u.up[0], u.up[1], [0, -1], lUp);
+        away(c, u.up[0], u.up[1], [0, -1], u.i);
+      }
+      if (u.dn) {
+        lay(c, u.dn[0], u.dn[1], [0, 1], lDn);
+        away(c, u.dn[0], u.dn[1], [0, 1], u.i);
+      }
+    };
+    for (const c of cyc) if (UD.has(c.id)) layUD(c);
+    /* the rest of the structure (on no ring atom: there is none) */
+    for (const a of projFrag(cyc[0].id)) {
+      const p = put.get(a.id);
+      if (p) {
+        a.x = p[0];
+        a.y = p[1];
+      }
+    }
+    /* the bonds: the ring's front edge bold, the bonds to it from the sides widening toward it (hwt: their narrow end);
+       at a stereocentre a bond up a wedge or a bond down a hash (from the ring atom), drawn plain while upright */
+    const front = new Map();
+    for (const [i, j, t] of [[1, 2, cyc[1].id], [2, 3, null], [3, 4, cyc[4].id]]) {
+      const b = bondBetween(cyc[i], cyc[j]);
+      if (b) front.set(b, t);
+    }
+    const ids = new Set(projFrag(cyc[0].id).map(a => a.id));
+    for (const b of mol.bonds) {
+      if (!ids.has(b.a)) continue;
+      delete b.hwv;
+      delete b.hwf;
+      delete b.hwt;
+      if (rs.has(b.a) && rs.has(b.b)) {
+        if (b.stereo === 'wedge' || b.stereo === 'hash' || b.stereo === 'bold') b.stereo = null;
+        if (front.has(b) && b.order === 1) {
+          b.stereo = 'bold';
+          b.hwf = 1;
+          if (front.get(b) != null) b.hwt = front.get(b);
+        }
+        continue;
+      }
+      /* a wedge from a ring atom out: drawn so for the ring, and the ring is drawn anew */
+      if ((rs.has(b.a) || rs.has(b.b)) && (b.stereo === 'wedge' || b.stereo === 'hash') && rs.has(b.a)) b.stereo = null;
+    }
+    /* one stereo bond a centre, the one that reads as the ring is seen: with one group (its H not written) a wedge on it
+       up or a hash on it down; with two, on a back atom a hash on the bond down, else a wedge on the bond up (the other
+       way round, read flat, they would give the mirror image; a wedge and a hash in one line across a centre are read
+       as nothing) */
+    const wedgeUD = c => {
+      const u = UD.get(c.id);
+      for (const g of [u.up, u.dn]) {
+        const b = g && bondBetween(c, g[0]);
+        if (b && b.hwv) {
+          b.stereo = null;
+          delete b.hwv;
+        }
+      }
+      const one = !u.up || !u.dn,
+        down = one ? !u.up : P[u.i][1] < -0.2,
+        g = down ? u.dn : u.up,
+        b = g && bondBetween(c, g[0]);
+      if (!b) return;
+      if (b.a !== c.id) [b.a, b.b] = [b.b, b.a];
+      b.stereo = down ? 'hash' : 'wedge';
+      b.hwv = 1;
+    };
+    const St = cyc.filter(c => UD.has(c.id) && isSt(c));
+    for (const c of St) wedgeUD(c);
+    const swap = c => {
+      const u = UD.get(c.id);
+      [u.up, u.dn] = [u.dn, u.up];
+      layUD(c);
+      for (const g of [u.up, u.dn]) if (g) for (const a of g[1]) [a.x, a.y] = put.get(a.id);
+      wedgeUD(c);
+    };
+    /* a centre that came out the other way round: its groups change places, up and down */
+    for (let round = 0; round < 3; round++) {
+      const cip1 = cipMarks().atoms,
+        wrong = St.filter(c => cip0.has(c.id) && cip1.get(c.id) !== cip0.get(c.id));
+      if (!wrong.length) break;
+      wrong.forEach(swap);
+    }
+    /* centres without R/S (cis and trans on a ring) tried both ways, until the configuration is the drawing's */
+    const free = St.filter(c => !cip0.has(c.id));
+    let f2 = projFrag(cyc[0].id);
+    if (free.length && free.length <= 6 && projKey(f2) !== key0)
+      for (let m = 1; m < 1 << free.length; m++) {
+        free.forEach((c, j) => {
+          if ((m ^ (m - 1)) & (1 << j)) swap(c);
+        });
+        if (projKey(projFrag(cyc[0].id)) === key0) break;
+      }
+    /* every group laid again where the configuration put it (one up across from one down: both shorter) */
+    for (const c of cyc) if (UD.has(c.id)) layUD(c);
+    for (const c of cyc)
+      if (UD.has(c.id)) for (const g of [UD.get(c.id).up, UD.get(c.id).dn]) if (g) for (const a of g[1]) [a.x, a.y] = put.get(a.id);
+    /* an OH (NH2, SH) out of the ring on the left written HO, else OH; into the ring toward its middle (HO on the right
+       half), so it runs clear of the bonds at the sides */
+    for (const c of cyc) {
+      const u = UD.get(c.id);
+      if (!u) continue;
+      const i = u.i;
+      for (const [g, up] of [
+        [u.up, true],
+        [u.dn, false]
+      ]) {
+        const o = g && g[0];
+        if (!o || o.label || !'O N S'.split(' ').includes(o.el) || !implicitH(o) || o.hPos) continue;
+        const inner = up ? P[i][1] > 0.2 : P[i][1] < -0.2;
+        o.hPos = inner ? (P[i][0] > 0 ? 'l' : 'r') : P[i][0] < -0.3 ? 'l' : 'r';
+        o.hwh = 1;
+      }
+    }
+    /* with H, the groups on the ring written as groups where they are one (CH2OH, CHO, CH3); without, a methyl written
+       CH3 (Me when the drawing had Me), a CH2OH drawn with its OH at an angle */
+    for (const c of cyc)
+      for (const s of exo(c))
+        if (withH) {
+          if (s.el === 'C' && !s.pjH) projCondense(s, (branch(c, s) || []).filter(a => a !== s), o => o.id !== c.id);
+        } else if (s.el === 'C' && !s.label && !s.chg && !s.iso && neighbors(s).length === 1 && implicitH(s) === 3)
+          setLabel(s, PJ_ABBR.Me ? 'Me' : 'CH3');
+    f2 = projFrag(cyc[0].id);
+    if (projKey(f2) !== key0) {
+      projDrop(f2);
+      projRestore([], orig, true);
+      return 'Haworth: the projection did not keep the configuration; nothing was changed';
+    }
+    for (const a of f2) delete a.nd;
+    projKeep(f2, 'haworth', orig);
+    return null;
+  }
   /* back from a projection: the drawing it was made from, or (changed since) a flat drawing with its configuration */
   function projBack(f) {
     const piv = f.find(a => a.pjo);
@@ -58843,7 +59313,18 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       delete a.pjo;
       delete a.nd;
       delete a.pjH;
+      if (a.hwh) {
+        delete a.hPos;
+        delete a.hwh;
+      }
     }
+    /* a Haworth ring's front edge: plain again */
+    for (const b of mol.bonds)
+      if (b.hwf && ids.has(b.a)) {
+        if (b.stereo === 'bold') b.stereo = null;
+        delete b.hwf;
+        delete b.hwt;
+      }
     /* the H written for the projection go again: in 3D at once (the centres are read from the other atoms' places); on a
        flat drawing after the layout, each only where taking it keeps the configuration */
     const dropH = (h, check) => {
@@ -58932,6 +59413,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       if (!ids.has(b.a)) continue;
       delete b.nm;
       delete b.fis;
+      delete b.hwv;
       delete b.sh;
     }
     /* a Newman projection turned a little first, so no bond is seen end-on when it is laid flat */
@@ -58994,7 +59476,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       frs = a ? frs.filter(f => f.includes(a)) : [];
     }
     newmanScan();
-    if (!frs.length || !frs.every(f => isNewman(f) || isSawhorse(f) || isFischer(f))) return false;
+    if (!frs.length || !frs.every(f => isNewman(f) || isSawhorse(f) || isFischer(f) || isHaworth(f))) return false;
     snap();
     let bad = 0;
     for (const f of frs) if (projBack(f) === 'changed') bad++;
@@ -59009,6 +59491,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (isNewman(f)) return 'newman';
     if (isSawhorse(f)) return 'sawhorse';
     if (isFischer(f)) return 'fischer';
+    if (isHaworth(f)) return 'haworth';
     return null;
   }
   function projTargets() {
@@ -59016,6 +59499,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       .filter(f => f.length > 1)
       .filter(f => f.some(a => sel.has(a.id)));
   }
+  /* a Haworth projection made with its H written (the right-click menu's Show H) */
+  let HW_WITH_H = false;
   function projAct(kind, shift, frs0, turnBy, front) {
     let frs = frs0 || projTargets();
     let ax = null;
@@ -59023,7 +59508,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast('Select a structure (or point at one; for Newman, at the bond to look along)', true);
       return;
     }
-    if (kind !== 'fischer' && sel.size === 2) {
+    const flatK = kind === 'fischer' || kind === 'haworth';
+    if (!flatK && sel.size === 2) {
       const [p, q] = [...sel].map(atomById);
       if (p && q) ax = bondBetween(p, q) || null;
     }
@@ -59053,7 +59539,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     for (const f0 of frs) {
       let f = f0;
       const now = projKind(f);
-      if (kind !== 'fischer' && (now === 'newman' || now === 'sawhorse') && (shift || turnBy)) {
+      if (!flatK && (now === 'newman' || now === 'sawhorse') && (shift || turnBy)) {
         const m = newmanTurn(f, turnBy || 60, !!front);
         if (m) msgs.push(m);
         else turned++;
@@ -59077,7 +59563,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         if (!f.length) continue;
       }
       const useAx = ax && f.some(a => a.id === ax.a) && mol.bonds.includes(ax) ? ax : null;
-      let m = kind === 'fischer' ? fischerMake(f) : newmanMake(f, useAx);
+      let m = kind === 'fischer' ? fischerMake(f) : kind === 'haworth' ? haworthMake(f, HW_WITH_H) : newmanMake(f, useAx);
       if (!m && kind === 'sawhorse') {
         const f2 = projFrag(useAx ? useAx.a : f[0].id);
         newmanScan();
@@ -59122,6 +59608,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       toast(
         kind === 'fischer'
           ? 'Fischer projection: the groups left and right come toward you; Fischer again brings the drawing back'
+          : kind === 'haworth'
+          ? 'Haworth projection: the ring seen from a little above, its front edge bold, the groups up and down; Haworth again brings the drawing back'
           : (kind === 'newman' ? 'Newman' : 'Sawhorse') +
               ' projection: right-click it to turn the back carbon or change the projection; ' +
               (kind === 'newman' ? 'Newman' : 'Sawhorse') +
@@ -59133,7 +59621,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
      Newman and sawhorse: ethane, staggered, its H written out to be typed over; Fischer: D-glyceraldehyde, a chain with
      CHO at the top, a centre with H and OH, CH2OH at the bottom (its groups typed over as needed) */
   let PJBLANK = null;
-  const PJ_BLANKS = { newman: 'CC', sawhorse: 'CC', fischer: 'O=C[C@H](O)CO' };
+  /* Haworth: β-D-glucopyranose */
+  const PJ_BLANKS = { newman: 'CC', sawhorse: 'CC', fischer: 'O=C[C@H](O)CO', haworth: 'OC[C@H]1O[C@@H](O)[C@H](O)[C@@H](O)[C@@H]1O' };
   /* a projection's H as bare bonds (sticks), the H they stand for kept in mind (a.stk): a Newman's 1.3 bonds long from the
      middle, so that past the circle its back bonds stand out and a group written on a stick stays off the circle */
   function projSticks(f, kind) {
@@ -59659,11 +60148,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     $('mol').style.cursor = 'copy';
     const btn = document.querySelector('[data-act=' + kind + ']');
     if (btn) btn.setAttribute('aria-pressed', 'true');
-    const nm = { newman: 'Newman', sawhorse: 'sawhorse', fischer: 'Fischer' }[kind],
+    const nm = { newman: 'Newman', sawhorse: 'sawhorse', fischer: 'Fischer', haworth: 'Haworth' }[kind],
       opt = (v, t) => `<button type="button" class="btn ghost sm" data-pjc="${v}" aria-pressed="${PJCONF === v}">${t}</button>`;
     pjBlankPop.innerHTML =
       `<span style="font-size:12px;opacity:.7;padding:0 4px">Blank ${nm}</span>` +
-      (kind === 'fischer' ? '' : opt('st', 'Staggered') + opt('ec', 'Eclipsed')) +
+      (kind === 'fischer' || kind === 'haworth' ? '' : opt('st', 'Staggered') + opt('ec', 'Eclipsed')) +
       '<button type="button" class="btn ghost sm" data-pjc="end" title="Stop (Esc)">Done</button>';
     pjBlankPop.hidden = false;
     const R = btn && btn.getBoundingClientRect();
@@ -59722,7 +60211,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       /* Newman and sawhorse blanks: bare bonds (sticks), not H, to write the groups on; a Newman's 1.3 bonds long from the
          middle, so that past the circle its back bonds stand out and a group written on a stick stays off the circle;
          eclipsed when so chosen (the back carbon turned by 60°) */
-      if (kind !== 'fischer') {
+      if (kind !== 'fischer' && kind !== 'haworth') {
         if (PJCONF === 'ec') {
           newmanScan();
           newmanTurn(projFrag(fresh[0].id), 60);
@@ -59806,11 +60295,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     e.preventDefault();
     e.stopPropagation();
     projAt = a.id;
-    const X = k === 'fischer' ? null : projAxis(f),
+    const X = k === 'fischer' || k === 'haworth' ? null : projAxis(f),
       it = (d, t, off) => `<button type="button" class="btn ghost sm" style="justify-content:flex-start" data-pj="${d}"${off ? ' disabled' : ''}>${t}</button>`;
     projPop.innerHTML =
-      `<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">${{ newman: 'Newman', sawhorse: 'Sawhorse', fischer: 'Fischer' }[k]} projection</span>` +
-      (k === 'fischer'
+      `<span class="ttl" style="font-size:12px;opacity:.7;padding:2px 4px">${{ newman: 'Newman', sawhorse: 'Sawhorse', fischer: 'Fischer', haworth: 'Haworth' }[k]} projection</span>` +
+      (k === 'fischer' || k === 'haworth'
         ? ''
         : [
             ['turn', 'Turn the back carbon'],
@@ -59828,7 +60317,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
             .join('')) +
       (k === 'newman' ? it('sawhorse', 'Sawhorse projection', !(X && X.side)) : '') +
       (k === 'sawhorse' ? it('newman', 'Newman projection') : '') +
-      (k === 'fischer' ? it('newman', 'Newman projection') + it('sawhorse', 'Sawhorse projection') : it('fischer', 'Fischer projection')) +
+      (k === 'fischer' || k === 'haworth' ? it('newman', 'Newman projection') + it('sawhorse', 'Sawhorse projection') : '') +
+      (k === 'fischer' ? '' : it('fischer', 'Fischer projection')) +
+      (k === 'haworth' ? '' : it('haworth', 'Haworth projection')) +
+      (k === 'haworth' ? it('hwH', f.some(a => a.pjH) ? 'Hide H' : 'Show H (as books draw it)') : '') +
       (k === 'fischer' ? it('fisins', 'Add H–C–OH to the chain (below this carbon)') : '') +
       it('back', 'Back to the drawing');
     Object.assign(projPop.style, { position: 'fixed', left: e.clientX + 2 + 'px', top: e.clientY + 2 + 'px', zIndex: 60 });
@@ -59856,6 +60348,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       } else {
         commit();
         toast('One carbon more in the chain');
+      }
+      return;
+    }
+    if (d === 'hwH') {
+      /* the same Haworth projection made again with its H written, or without */
+      const withH = !f.some(a => a.pjH),
+        id = (f.find(a => !a.pjH) || f[0]).id;
+      snap();
+      projBack(f);
+      const m = haworthMake(projFrag(id), withH);
+      if (m) {
+        undo();
+        redoSt.pop();
+        toast(m, true);
+      } else {
+        clearSel();
+        commit();
+        toast(withH ? 'Haworth projection with its H written' : 'Haworth projection without H');
       }
       return;
     }
@@ -63974,7 +64484,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const bg = document.createElement('div');
     bg.className = 'licbg';
     bg.innerHTML =
-      '<div class="licbox" role="dialog" aria-label="Licenses"><button type="button" class="btn ghost sm" data-x>Close</button><h3>Licenses</h3><p class="note">Reactio Draw © 2026 Pavel Sakharov and contributors, GNU Affero General Public License v3.0 or later (LICENSE beside the program, or gnu.org/licenses/agpl-3.0). Parts by others inside this page:</p>' +
+      '<div class="licbox" role="dialog" aria-label="Licenses"><button type="button" class="btn ghost sm" data-x>Close</button><h3>Licenses</h3><p class="note">Reactio Draw © 2026 Pavel Sakharov and contributors, Mozilla Public License 2.0 (LICENSE beside the program, or mozilla.org/MPL/2.0). Parts by others inside this page:</p>' +
       Object.keys(d)
         .map(k => `<h4>${esc(k)}</h4><pre>${esc(d[k])}</pre>`)
         .join('') +
@@ -75629,6 +76139,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const num = new Map(fr.slice().sort((p, q) => p.id - q.id).map((q, k) => [q.id, k + 1]));
         for (const b of mol.bonds) {
           if (b.stereo !== 'wedge' && b.stereo !== 'hash') continue;
+          /* drawn as a plain line (a Fischer cross, a bond up or down in a Haworth projection) */
+          if ((b.fis && fisCross(b)) || (b.hwv && hwVert(b))) continue;
           if (!num.has(b.a)) continue;
           const A = atomById(b.a),
             B = atomById(b.b),
@@ -79944,6 +80456,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const sg = document.querySelector('#topbar [aria-label="Structure"]');
     if (sg) {
       sg.appendChild(tb.firstElementChild);
+      /* Haworth, added after it, at the end of the group */
+      const hw = sg.querySelector('[data-act=haworth]');
+      if (hw) sg.appendChild(hw);
     } else $('topbar').appendChild(tb);
   }
   {

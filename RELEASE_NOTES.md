@@ -1,4 +1,4 @@
-# Next version
+# Reactio Draw 1.15
 
 ## New
 
@@ -15,7 +15,7 @@
 
 - **Copy for LaTeX: the compound numbers of a wide figure.** A figure wider than the line was shrunk, but its numbers kept their size and could overlap the structures. Now they shrink with it by default, the whole picture scaled as one; or, chosen by right-clicking the Copy for LaTeX button (or with the two commands Copy for LaTeX, numbers shrink with a wide figure / numbers at the text size, which can have keys of their own), they keep the document's text size, centred where they were. The choice is kept in the drawing, so saving rewrites the figure the same way. A figure that fits the line is as before.
 - **Copy for LaTeX in XeLaTeX and LuaLaTeX**: the compound numbers in a figure were set in Latin Modern (Helvetica has no Unicode-font version by that name) and lost their bold in XeLaTeX; they are set in the document's sans, roman or typewriter font, bold kept.
-- **An empty .reactio or CDXML file** (a .reactio of 0 bytes, or a CDXML with nothing on its page, as Lattice, the VS Code extension or ChemDraw make for a new figure) could not be opened ("That file could not be read", "Nothing to draw in…"). It opens as an empty drawing in a tab of its own, linked to the file; saving writes the drawing into it. A CDXML that is damaged or truncated is still reported as not read.
+- **An empty .reactio or CDXML file** (a .reactio of 0 bytes, or a CDXML with nothing on its page, as Lattice or the VS Code extension make for a new figure, or another drawing program saves an empty page) could not be opened ("That file could not be read", "Nothing to draw in…"). It opens as an empty drawing in a tab of its own, linked to the file; saving writes the drawing into it. A CDXML that is damaged or truncated is still reported as not read.
 - **R/S labels** could be read from the wrong atom when a structure had H atoms drawn with a wedge or hash on them among its first atoms; they are read in the order OpenChemLib numbers the atoms.
 
 # Reactio Draw 1.14.1
