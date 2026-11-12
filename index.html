@@ -40661,6 +40661,19 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       fills: (mol.fills || []).filter(f => f.ids.every(x => ids.has(x)))
     });
   }
+  /* what a document needs for a figure, as comment lines straight after its source line: an editor (Lattice, the VS Code
+     extension) adds what is missing when the figure changes on disk, as when marks are added after the first paste. Each
+     preamble line exactly as it goes into the preamble (an empty one left out) */
+  function figNeedsLines(packages, preamble) {
+    return (
+      `% editable-figure packages: ${packages.join(' ')}\n` +
+      (preamble || [])
+        .map(l => String(l).replace(/\s+$/, ''))
+        .filter(l => l)
+        .map(l => `% editable-figure preamble: ${l}\n`)
+        .join('')
+    );
+  }
   async function latexFigureOf0(name, src) {
     const T = mol.texts.filter(t => t.fchg == null && !t.fsym && hasMark(t.ctpl || t.text));
     let svg;
@@ -40684,7 +40697,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       '\\edef\\rdh{\\the\\ifdim\\ht0>.8\\textheight\\dimexpr.8\\textheight\\relax\\else\\ht0\\fi}%\n',
       fitted = `\\includegraphics[width=\\rdw,height=\\rdh,keepaspectratio]{${name}.pdf}`;
     if (!T.length)
-      return { pdf, tex: head + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
+      return { pdf, tex: head + figNeedsLines(['graphicx']) + fit + fitted + '%\n\\endgroup%\n', packages: ['graphicx'] };
     /* the numbers the series and the 7.1-style subs get on this drawing, in the order of its marks */
     const N = cmpdNumberer('{n}', 1);
     for (const t of cmpdTexts()) for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) N.take(m[1], m[2] || '');
@@ -40725,8 +40738,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       `  \\begin{scope}[x={(rdfig.south east)},y={(rdfig.north west)},every node/.style={inner sep=0pt,anchor=${atText ? 'center' : 'base'}}]\n` +
       nodes.join('\n') +
       '\n  \\end{scope}\n\\end{tikzpicture}';
-    const tex =
-      head +
+    const body =
       `% Made by Reactio Draw: the drawing is ${name}.pdf, its compound numbers are set here with \\cmpd (chemnum)\n` +
       fit +
       /* the labels' font family, local to the figure; a document can set its own for all figures in the preamble. XeLaTeX
@@ -40749,7 +40761,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           pic(`\\includegraphics{${name}.pdf}`) +
           '}%\n') +
       '\\endgroup%\n';
-    return { pdf, tex, packages: ['graphicx', 'tikz', 'chemnum'], preamble: tex.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined };
+    const packages = ['graphicx', 'tikz', 'chemnum'],
+      preamble = body.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined,
+      tex = head + figNeedsLines(packages, preamble) + body;
+    return { pdf, tex, packages, preamble };
   }
   /* Copy for LaTeX (File → Copy to clipboard, the button after Pages, Edit in the Mac app's menu bar): the drawing as a
      figure a LaTeX editor pastes, without changing Ctrl+C. The clipboard gets HTML holding the editable-figure manifest (a

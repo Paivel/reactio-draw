@@ -8,6 +8,7 @@
 
 - **Licence: Mozilla Public License 2.0** (MPL-2.0) instead of the GNU Affero General Public License v3.0 or later. Reactio Draw can now be used as part of another program, open or closed; changes to its own files are published under the MPL-2.0 by whoever distributes them. The contributor whose code is in it agreed (issue #1). Versions up to 1.14.1 stay under the AGPL.
 - **Keys of their own** (Settings → Hotkeys, each can be changed): Clean Up 2D Ctrl+Shift+F; rotate 90° right Ctrl+Shift+. , left Ctrl+Shift+, , 180° Ctrl+Shift+; ; Copy for LaTeX Ctrl+Shift+E; bold, italic, underline of the selected text Ctrl+B, Ctrl+I, Ctrl+U (Cmd on a Mac). The Hotkeys list no longer shows a second, keyless line for a File menu item that is a command of its own (Save, Open, Copy as a picture…).
+- **Copy for LaTeX: the figure says what it needs.** The first lines of a figure's `.tex`, after its source line, are comments that list the packages and, with compound numbers, the `\rcmpd` preamble lines it needs (`% editable-figure packages:` / `% editable-figure preamble:`). Lattice and the VS Code extension add what is missing when a figure changes on disk, as when marks are added to a drawing pasted without them and saved; older ones ignore the comments.
 - **Highlight colors** has a clearer icon: bonds under a yellow marker.
 
 ## Fixed

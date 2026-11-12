@@ -27,6 +27,13 @@ For a drawing saved as `scheme.reactio` it writes, next to it:
   `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
   the same on the drawing and in the text.
 
+The first lines of `scheme.tex` say which drawing it came from and what the document needs for it
+(`% editable-figure packages:` and `% editable-figure preamble:`), so an editor can add what is missing when marks
+are added later.
+
+An empty `scheme.reactio` (an editor can make one for a new figure) opens in Reactio Draw as an empty drawing; saved,
+it gets the drawing.
+
 The texts set over the PDF use the drawing's font: Helvetica for Arial and other sans-serif fonts, Times, or Courier
 (in XeLaTeX and LuaLaTeX, whose Unicode fonts have no Helvetica by that name, the document's sans, roman or typewriter font).
 To set them in another font in every figure, define `\reactiofigurefont` in the preamble, e.g.
