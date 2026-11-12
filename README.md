@@ -7,10 +7,10 @@ and PowerPoint or to and from other chemistry editors as CDXML and CDX files. It
 | [▶ Open in the browser](https://paivel.github.io/reactio-draw/web/) | [⬇ Apps for Windows, Mac and Linux](https://github.com/Paivel/reactio-draw/releases/latest) | [📖 Guide (PDF)](docs/Reactio%20Draw%20-%20Getting%20started.pdf) |
 | :---: | :---: | :---: |
 | nothing to install | work fully offline | every function and button explained |
-| [📝 Word test file](examples/Reactio%20Draw%20-%20marks%20test.docx) | [📄 LaTeX: Lattice](https://github.com/leo1oel/lattice) | [🧩 LaTeX: VS Code extension](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) |
-| compound numbers in Word, every kind of mark | a LaTeX editor with a review mode: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-vs-code-and-overleaf)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it |
-| [🍃 LaTeX: Overleaf](https://github.com/Paivel/reactio-overleaf) | [🧩 ONLYOFFICE plugin](onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin) | [📝 ONLYOFFICE test file](examples/Reactio%20Draw%20-%20marks%20test%20(ONLYOFFICE).docx) |
-| a Chrome and Edge extension for Overleaf: paste a figure, its files, float and preamble come along; double-click to edit it in Reactio Draw | draw in ONLYOFFICE, double-click to edit, compound numbers as in Word | compound numbers in ONLYOFFICE, drawings and text |
+| [📝 Word test file](examples/Reactio%20Draw%20-%20marks%20test.docx) | [🧩 ONLYOFFICE plugin](onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin) | [📝 ONLYOFFICE test file](examples/Reactio%20Draw%20-%20marks%20test%20(ONLYOFFICE).docx) |
+| compound numbers in Word, every kind of mark | draw in ONLYOFFICE, double-click to edit, compound numbers as in Word | compound numbers in ONLYOFFICE, drawings and text |
+| [📄 LaTeX: Lattice](https://github.com/leo1oel/lattice) | [🧩 LaTeX: VS Code extension](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) | [🍃 LaTeX: Overleaf](https://github.com/Paivel/reactio-overleaf) |
+| a LaTeX editor with a review mode: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-vs-code-and-overleaf)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it | a Chrome and Edge extension for Overleaf: paste a figure, its files, float and preamble come along; double-click to edit it in Reactio Draw |
 
 ![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview-1.5.1.png)
 
