@@ -49072,7 +49072,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     return d && d.state && docStateOk(d.state) ? d : null;
   }
-  function importText(name, text) {
+  /* asFile: a file being opened (not the API, a paste or a part of one): an empty .reactio or an empty CDXML opens as an
+     empty drawing (an editor made it for a new figure), not as an error */
+  function importText(name, text, asFile) {
     if (/\.cif$/i.test(name) || /^\s*(#.*\n\s*)*data_/i.test(text)) {
       importCif(text, name);
       return;
@@ -49100,7 +49102,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     }
     if (ext === 'json' || ext === 'reactio') {
       /* an empty .reactio (an editor made it for a new figure): an empty drawing, its tab linked to the file */
-      if (ext === 'reactio' && !text.trim()) {
+      if (asFile && ext === 'reactio' && !text.trim()) {
         openInTab(blankDoc(), name);
         toast('Opened ' + name + ': empty, ready to draw');
         return;
@@ -49140,7 +49142,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         return;
       }
       if (mol.next === n0) {
-        toast('Nothing to draw in ' + name, true);
+        if (asFile && ext === 'cdxml') toast('Opened ' + name + ': empty, ready to draw');
+        else toast('Nothing to draw in ' + name, true);
         return;
       }
       toast('Opened ' + name);
@@ -50544,7 +50547,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const ok = openInFileTab(name, whole, () => {
       if (/\.cdx$/i.test(name)) importCdxBytes(u, name);
       else if (/\.zip$/i.test(name)) openZip(u.buffer.slice(u.byteOffset, u.byteOffset + u.byteLength), name);
-      else importText(name, text);
+      else importText(name, text, true);
     });
     /* the tab now stands for this file: Save writes back to it (zips are only a container, so they stay unlinked) */
     if (ok && !/\.zip$/i.test(name)) linkTab(curTab(), name, path);

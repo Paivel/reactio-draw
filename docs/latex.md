@@ -31,8 +31,8 @@ The first lines of `scheme.tex` say which drawing it came from and what the docu
 (`% editable-figure packages:` and `% editable-figure preamble:`), so an editor can add what is missing when marks
 are added later.
 
-An empty `scheme.reactio` (an editor can make one for a new figure) opens in Reactio Draw as an empty drawing; saved,
-it gets the drawing.
+An empty `scheme.reactio`, or a CDXML with nothing on its page (an editor can make one for a new figure), opens in
+Reactio Draw as an empty drawing; saved, it gets the drawing.
 
 The texts set over the PDF use the drawing's font: Helvetica for Arial and other sans-serif fonts, Times, or Courier
 (in XeLaTeX and LuaLaTeX, whose Unicode fonts have no Helvetica by that name, the document's sans, roman or typewriter font).
