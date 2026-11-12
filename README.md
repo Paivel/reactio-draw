@@ -8,7 +8,9 @@ and PowerPoint or to and from other chemistry editors as CDXML and CDX files. It
 | :---: | :---: | :---: |
 | nothing to install | work fully offline | every function and button explained |
 | [📝 Word test file](examples/Reactio%20Draw%20-%20marks%20test.docx) | [📄 LaTeX: Lattice](https://github.com/leo1oel/lattice) | [🧩 LaTeX: VS Code extension](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) |
-| compound numbers in Word, every kind of mark | a LaTeX editor with a review mode: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-and-vs-code)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it |
+| compound numbers in Word, every kind of mark | a LaTeX editor with a review mode: compound numbers on schemes match the text; double-click a figure to edit it in Reactio Draw ([how](#figures-for-latex-lattice-vs-code-and-overleaf)) | LaTeX in VS Code: compound numbers on schemes match the text; one click opens a figure in Reactio Draw to edit it |
+| [🍃 LaTeX: Overleaf](https://github.com/Paivel/reactio-overleaf) | [🧩 ONLYOFFICE plugin](onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin) | [📝 ONLYOFFICE test file](examples/Reactio%20Draw%20-%20marks%20test%20(ONLYOFFICE).docx) |
+| a Chrome and Edge extension for Overleaf: paste a figure, its files, float and preamble come along; double-click to edit it in Reactio Draw | draw in ONLYOFFICE, double-click to edit, compound numbers as in Word | compound numbers in ONLYOFFICE, drawings and text |
 
 ![Reactio Draw: a reaction with its reagent table, a crystal structure in 3D and a sensitivity radar chart](docs/overview-1.5.1.png)
 
@@ -25,7 +27,7 @@ https://github.com/user-attachments/assets/1637fe6d-b6d1-4ec5-9d68-9a41d62ef0c8
 | **Files** | its own .reactio documents; CDXML, CDX, MOL and SDF (V2000 and V3000, 3D kept), RXN, CML, SMILES and CXSMILES, ORD; crystal structures from CIF (a test version); XYZ for quantum chemistry (several geometries: pick one in a 3D view, the lowest energy or all); pictures as SVG, PNG, EPS, TIFF, PDF; figures for LaTeX (PDF + .tex with the compound numbers); a scheme as an animation (GIF or video); printing with a preview; pictures on the sheet travel in CDXML and CDX; Word and PowerPoint |
 | **Word and PowerPoint** | Ctrl+C → Ctrl+V into Word or PowerPoint on Windows and on Mac. **Double-click a drawing in Word to edit it, on Windows and on Mac alike**; Save in Reactio Draw puts the new drawing back in its place (Edit drawing on the Reactio Draw tab does the same). A document can travel between the two: a drawing put in on Windows is an object, one put in on a Mac a picture, so on the other system double-click does not open it — copy it instead (Ctrl+C in Word, Ctrl+V in Reactio Draw) or use Open in Reactio Draw on the tab, and it comes back complete: structures, reagent table, roles and conditions, nothing lost. The tab (Windows and Mac) also makes plain vector pictures without Reactio Draw data, puts all structures of a document into one CDXML file, and marks pictures that hold Reactio Draw data with hidden, non-printing marks. **Compound numbers in Word**: marks such as [[aldehyde]], [[amine.OMe.letter]] or [[A:catalyst]] in the text and in the drawings become 1, 3a, A… with one click, renumbered after every change, chapters numbered on their own; try it on the [test document](examples/Reactio%20Draw%20-%20marks%20test.docx) |
 | **ONLYOFFICE** | a plugin for the Document, Spreadsheet and Presentation editors, desktop and server ([ReactioDraw-ONLYOFFICE.plugin](onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin): download it, then Plugins → Plugin Manager → install from the file). Plugins → Reactio Draw draws in a window; OK puts the drawing into the document, and it keeps the whole Reactio Draw document inside. **Double-click a drawing to edit it** in Reactio Draw again, on any computer with the plugin. **Compound numbers**: Reactio Draw ⌄ → Number compounds turns the marks [[aldehyde]], [[amine.OMe]], [[A:catalyst]] of the text and the drawings into 1, 3a, A… with one click, drawings first, chapters numbered on their own, as on the Word tab; Show marks, Remove marks and Final copy too; try it on the [ONLYOFFICE test document](examples/Reactio%20Draw%20-%20marks%20test%20(ONLYOFFICE).docx). Follows ONLYOFFICE's light and dark themes; works offline |
-| **LaTeX** | Copy for LaTeX makes a figure whose compound numbers match the text (chemnum), in the drawing's font. Pasted into [Lattice](https://github.com/leo1oel/lattice) or VS Code with the extension [Reactio Draw figures for LaTeX](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) (install it from VS Code: Extensions, search for Reactio Draw), it brings its files and preamble and opens in Reactio Draw for editing ([docs/latex.md](docs/latex.md)) |
+| **LaTeX** | Copy for LaTeX makes a figure whose compound numbers match the text (chemnum), in the drawing's font. Pasted into [Lattice](https://github.com/leo1oel/lattice), VS Code with the extension [Reactio Draw figures for LaTeX](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) (install it from VS Code: Extensions, search for Reactio Draw) or Overleaf with the browser extension [Reactio Draw figures for Overleaf](https://github.com/Paivel/reactio-overleaf), it brings its files and preamble and opens in Reactio Draw for editing ([docs/latex.md](docs/latex.md)) |
 | **Charts** | sensitivity screens — the radar diagrams of the condition-based sensitivity assessment of Glorius and co-workers ([Angew. Chem. Int. Ed. 2019, 58, 8572](https://doi.org/10.1002/anie.201901935)), editable on the sheet; product ratio pie and ring charts; Jablonski diagrams, with the transition arrows tied to their levels; reaction energy diagrams from a table of states (typed or from Excel), several paths, editable on the sheet |
 | **Working fast** | scrolling in every direction (two fingers, or Shift+wheel sideways) and zoom to the pointer; a hotkey for every button and command, all reassignable, with search by name or by key; your own templates and labels on keys |
 | **API and command line** | a local API for scripts (Python, R, curl) in the desktop apps; a command line, `reactio`, that renders, converts and checks files without opening a window ([Command line.txt](Command%20line.txt)); and the same commands for web pages that embed the editor ([EMBEDDING.md](EMBEDDING.md)) |
@@ -33,13 +35,13 @@ https://github.com/user-attachments/assets/1637fe6d-b6d1-4ec5-9d68-9a41d62ef0c8
 | **Light** | the whole editor is one web page of 6.5 MB (about 2.1 MB over the network; 13 MB as a single offline file with the NMR tables and the name reader), with no server and nothing to install; the apps are about 24–32 MB to download. The NMR tables (2.2 MB) come only when you first predict a spectrum, the name reader (3.1 MB) only with the first name it is needed for. |
 
 
-## Figures for LaTeX: Lattice and VS Code
+## Figures for LaTeX: Lattice, VS Code and Overleaf
 
 Schemes go into a LaTeX paper the same way they go into Word: with their compound numbers kept in step with the text.
 
 - **Number compounds once, in the drawing.** Put a mark under a structure, `[[ketone]]`, and write the same key in the
-  text, `\rcmpd{ketone}`. LaTeX numbers the compounds (with `chemnum`) in the order they are first mentioned, so the
-  figure and the text always agree, also after you reorder paragraphs or add a compound. Letters, sub-numbers (2a, 3.1,
+  text, `\rcmpd{ketone}`. LaTeX numbers the compounds (with `chemnum`): the figures' first, in each drawing's order,
+  then those only in the text, in the order they are mentioned, so the figure and the text always agree, also after you reorder paragraphs or add a compound. Letters, sub-numbers (2a, 3.1,
   4-1) and series (A, B…; I, II…) are written in the mark ([docs/latex-marks.md](docs/latex-marks.md)).
 - **Copy for LaTeX, paste into the paper.** File → Copy to clipboard → Figure for LaTeX (Edit → Copy for LaTeX on the
   Mac). The figure is the drawing as a PDF with its numbers set by LaTeX in the drawing's font; with something
@@ -51,6 +53,10 @@ Schemes go into a LaTeX paper the same way they go into Word: with their compoun
     [Reactio Draw figures for LaTeX](https://marketplace.visualstudio.com/items?itemName=paivel.reactio-latex) does the
     same, and the compound numbers on the scheme match the text and are shown in the editor. One click opens the
     figure in Reactio Draw to edit it. Install it from VS Code itself: Extensions (Ctrl+Shift+X), search for Reactio Draw.
+  - In [Overleaf](https://www.overleaf.com), the Chrome and Edge extension
+    [Reactio Draw figures for Overleaf](https://github.com/Paivel/reactio-overleaf) uploads the figure's drawing, PDF and `.tex` to
+    the project's `figures/` folder on paste, inserts the figure and adds what the preamble lacks; double-click the
+    figure to open it in Reactio Draw (with its small helper on Mac or Windows).
   - In any other LaTeX editor: copy the `.pdf` and `.tex` written beside the saved drawing into `figures/`
     ([docs/latex.md](docs/latex.md)).
 - **Edit the scheme later.** The drawing itself (`.reactio`) travels with the figure, so it can be opened in Reactio
