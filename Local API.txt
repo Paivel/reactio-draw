@@ -275,7 +275,8 @@ an id given as "index" is taken as the id when no structure has that number: giv
                                                        the order a numbering takes them: mark, key, sub, format
   showCompoundNumbers {"numbers": {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"}, "bold": false}   numbers in place of
                                                        the marks (the texts keep their marks, centred where they were;
-                                                       a mark not given stays); {"marks": true} shows the marks again
+                                                       a mark not given stays); {"marks": true} shows the marks again;
+                                                       "strip": true keeps the numbers as plain text, the marks gone
   order           {"id": 12, "to": "back"}             front, back, forward, backward
 
 Look
