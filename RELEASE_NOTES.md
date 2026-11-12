@@ -1,7 +1,8 @@
-# Next version
+# Reactio Draw 1.15.1
 
 ## New
 
+- **Reactio Draw in ONLYOFFICE**: a plugin (ReactioDraw-ONLYOFFICE.plugin with the release; Plugins → Plugin Manager → install from the file) for the Document, Spreadsheet and Presentation editors, desktop and server. Plugins → Reactio Draw draws in a window that keeps its size and follows ONLYOFFICE's theme; OK puts the drawing in as an object that keeps the Reactio Draw document, and a double-click edits it. Reactio Draw ⌄ → Number compounds numbers the [[key]] marks of the text and the drawings as the Word tab does, chapters too, with Show marks, Remove marks and Final copy. It carries Reactio Draw with it and works offline. The guide's chapter 9 tells more; Reactio Draw - marks test (ONLYOFFICE).docx, with the release, is the marks test for it.
 - **Local API: compound numbers of one drawing.** `compoundMarks` answers the drawing's `[[key]]` marks in the order a numbering takes them; `showCompoundNumbers` shows numbers in their place (the texts keep their marks and stay centred) or the marks again, or keeps the numbers as plain text with the marks gone (`strip`). An editor that numbers a whole document uses them for each of its drawings.
 - **Gray theme** (Settings → Theme): dark, in neutral greys as office suites draw their dark themes, instead of blue-black; the sheet stays white.
 - **Embedded, in the page's theme**: `?embed&theme=dark` (or light, gray, system) gives the editor the look of the page that embeds it, and the Local API's `uiTheme` changes it while it runs; the sheet and the pictures made from it stay as they are. A theme chosen in Settings → Theme of the embedded editor wins and is remembered apart from the app's own ("As the page around it" follows the page again).
