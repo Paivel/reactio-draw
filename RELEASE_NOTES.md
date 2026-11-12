@@ -1,3 +1,13 @@
+# Next version
+
+## Changed
+
+- **An isotope typed on an atom** (15N, ¹³C, 18O−, 15NH2) is that element with its mass number, small and raised beside the symbol (¹⁵N), and the symbol stays on its atom; before, "15N" became a text label that started at the atom and pushed the N aside.
+
+## Fixed
+
+- **NMR, the bigger spectrum**: pointing at an atom lit its peak only in the panel's spectrum; it lights it in the bigger one over the page too, and keeps it lit while you zoom or pan.
+
 # Reactio Draw 1.15
 
 ## New

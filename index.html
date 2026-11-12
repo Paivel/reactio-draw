@@ -1002,10 +1002,12 @@ input.tgl:focus-visible {
 #nmrBig g.nmrhot rect {
   fill: var(--accent-soft);
 }
-#nmrOut g.nmrhot text {
+#nmrOut g.nmrhot text,
+#nmrBig g.nmrhot text {
   font-weight: 700;
 }
-#nmrOut line.nmrhot {
+#nmrOut line.nmrhot,
+#nmrBig line.nmrhot {
   stroke: var(--warn);
   stroke-width: 3;
 }
@@ -22614,9 +22616,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!safe || /^(F|Cl|Br|I)$/.test(r0)) return t;
     return (gr && at0(gr) === r0) || knownLabel(r) ? r : t;
   }
+  /* the mass number typed before an element (15N), set with it */
+  let ISO_NEXT = 0;
   function applyLabel0(a, t) {
     t = labelFrontFirst(t);
     lastLabel = t;
+    /* an isotope typed with its mass number first (15N, ¹³C, 2H, 18O−): the element on its atom, where it was, and the
+       mass number as a superscript beside it, not a label that starts at the atom and pushes the symbol aside */
+    {
+      const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹',
+        u = t.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => String(SUP.indexOf(c))),
+        im = /^(\d{1,3})([A-Z][a-z]?)((?:H\d*)?(?:[+\-−]\d*)?)$/.exec(u);
+      if (im && im[2] in AW && +im[1] >= 1 && +im[1] <= 300 && im[2] !== 'D') {
+        ISO_NEXT = +im[1];
+        try {
+          applyLabel0(a, im[2] + im[3]);
+        } finally {
+          ISO_NEXT = 0;
+        }
+        return;
+      }
+    }
     {
       /* element with its hydrogens and charge as typed: NH2, N (no H), NH2+, O−; the hydrogens typed are kept as given */
       const eh = /^([A-Z][a-z]?)(?:H(\d*))?(?:([+\-−])(\d*))?$/.exec(t);
@@ -22626,6 +22646,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const same = eh[1] === a.el && !a.label,
           q0 = a.chg || 0;
         setEl(a, eh[1]);
+        if (ISO_NEXT) a.iso = ISO_NEXT;
         a.chg = eh[3] ? (eh[3] === '+' ? 1 : -1) * (eh[4] ? +eh[4] : 1) : same ? q0 : 0;
         const typedH = t.includes('H') && eh[1] !== 'H' ? (eh[2] ? +eh[2] : 1) : 0,
           auto = implicitH(a);
@@ -35780,6 +35801,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (big && !big.closest('[hidden]')) big.innerHTML = nspecSVG(L0.nuc, L0.res, Math.min(innerWidth - 80, 1100), 360);
     NMRCOL = NSPEC.col ? new Map() : null;
     if (NMRCOL) L0.res.forEach((g, gi) => g.shift != null && g.ids.forEach(id => NMRCOL.set(id, NSPEC_COLS[gi % NSPEC_COLS.length])));
+    /* drawn anew (zoom, pan, line width): the lit shift lit again */
+    try {
+      nmrLightMarks();
+    } catch (e) {}
   }
   /* zoom and pan on either spectrum */
   function nspecWire(host) {
@@ -36071,10 +36096,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     nmrHotG = gi;
     const out = $('nmrOut');
     if (!out) return;
-    out.querySelectorAll('[data-ng]').forEach(el => {
-      const on = +el.dataset.ng === gi;
-      el.classList.toggle('nmrhot', on);
-    });
+    nmrLightMarks();
     /* keep the row in view: the panel scrolls up or down only, never sideways */
     if (gi >= 0) {
       const r = out.querySelector('tr[data-ng="' + gi + '"]');
@@ -36092,6 +36114,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         else if (b.bottom > pb.bottom) sc.scrollTop += b.bottom - pb.bottom + 8;
       }
     }
+  }
+  /* the lit shift: in the panel (its row and stick) and in the bigger spectrum over the page */
+  function nmrLightMarks() {
+    for (const host of [$('nmrOut'), document.getElementById('nmrBig')])
+      if (host) host.querySelectorAll('[data-ng]').forEach(el => el.classList.toggle('nmrhot', +el.dataset.ng === nmrHotG));
   }
   function nmrSyncHover() {
     try {
