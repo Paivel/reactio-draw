@@ -40,7 +40,7 @@
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme='light']):not([data-theme='gray']) {
     --bg: #0e131a;
     --panel: #151c26;
     --ink: #e2e8f1;
@@ -70,6 +70,27 @@
   --grid: #1b2430;
   --accent: #86a2ff;
   --accent-soft: #24315a;
+  --ok: #5cc792;
+  --warn: #f08c5e;
+  --err: #ff6b6b;
+  --el-n: #7d9cff;
+  --el-o: #ff6b6b;
+  --el-s: #e8c046;
+  --el-hal: #58d08f;
+  --el-p: #f2a04b;
+  --el-other: #c39bf0;
+  color-scheme: dark;
+}
+/* gray: dark, in neutral greys rather than blue-black, as an office suite's dark theme (the sheet stays white) */
+:root[data-theme='gray'] {
+  --bg: #333333;
+  --panel: #404040;
+  --ink: #e8e8e8;
+  --muted: #b0b0b0;
+  --line: #575757;
+  --grid: #3a3a3a;
+  --accent: #8fb0ff;
+  --accent-soft: #3d4866;
   --ok: #5cc792;
   --warn: #f08c5e;
   --err: #ff6b6b;
@@ -1016,10 +1037,12 @@ input.tgl:focus-visible {
 #nmrBig g.nmrhot rect {
   fill: var(--accent-soft);
 }
-#nmrOut g.nmrhot text {
+#nmrOut g.nmrhot text,
+#nmrBig g.nmrhot text {
   font-weight: 700;
 }
-#nmrOut line.nmrhot {
+#nmrOut line.nmrhot,
+#nmrBig line.nmrhot {
   stroke: var(--warn);
   stroke-width: 3;
 }
@@ -3520,7 +3543,7 @@ html {
           <div class="row" style="align-items:center;flex-wrap:nowrap;gap:8px"><input type="range" id="zoomSpeed" min="1" max="11" step="0.1" style="flex:1;margin:0" aria-label="Zoom speed for the wheel and trackpad pinch"><span id="zoomSpeedV" style="font:12px var(--mono);min-width:34px;text-align:right"></span></div>
           <p class="note">How fast Ctrl+wheel and the trackpad pinch zoom the sheet (6× by default).</p></div>
         <div class="setg"><label class="tlabel" for="uiTheme">Theme</label>
-          <select id="uiTheme" style="width:100%;padding:4px 6px;font-size:13px"><option value="system">As the system</option><option value="light">Light</option><option value="dark">Dark</option><option value="paper">Match the paper</option></select>
+          <select id="uiTheme" style="width:100%;padding:4px 6px;font-size:13px"><option value="system">As the system</option><option value="light">Light</option><option value="gray">Gray</option><option value="dark">Dark</option><option value="paper">Match the paper</option></select>
           <p class="note">Colours of the panels and buttons. As the system follows the light or dark mode of your computer; Match the paper turns the panels dark on a dark paper (night blue, dark grey, black, blueprint) and light on a light one. The sheet keeps its own paper colour in every theme.</p></div>
         <div class="setg"><span class="tlabel" id="accLab">Accent colour</span>
           <div class="row accrow" role="radiogroup" aria-labelledby="accLab" id="accRow"></div>
@@ -4467,7 +4490,7 @@ function kdOf(st) {
     SMI_WAIT = 300;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.15';
+  const RD_VERSION = '1.15.1';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -22284,7 +22307,7 @@ function kdOf(st) {
         ? ''
         : `:root{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}}
-:root[data-theme="dark"]{--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}
+:root[data-theme="dark"],:root[data-theme="gray"]{--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}
 svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const row = $('accRow');
     if (row)
@@ -22331,9 +22354,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   try {
     uiTheme = localStorage.getItem('rd-uitheme') || 'light';
   } catch (e) {}
+  /* embedded: the theme of the page around it (?embed&theme=dark, or uiTheme from the page), unless one was chosen here
+     in Settings → Theme, which is kept apart from the app's own (rd-uitheme-embed) and wins: the page dark, the editor
+     light, say. "As the page around it" follows the page again */
+  var hostTheme = 'light',
+    embedTheme = 'host';
+  if (EMBED) {
+    const th = new URLSearchParams(location.search).get('theme');
+    if (th === 'light' || th === 'gray' || th === 'dark' || th === 'system') hostTheme = th;
+    try {
+      embedTheme = localStorage.getItem('rd-uitheme-embed') || 'host';
+    } catch (e) {}
+    uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
+  }
   function syncUiTheme() {
     const want =
-      uiTheme === 'light' || uiTheme === 'dark'
+      uiTheme === 'light' || uiTheme === 'dark' || uiTheme === 'gray'
         ? uiTheme
         : uiTheme === 'paper'
           ? darkPaper()
@@ -22348,12 +22384,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   {
     const s = document.getElementById('uiTheme');
     if (s) {
-      s.value = uiTheme;
+      if (EMBED) {
+        const o = document.createElement('option');
+        o.value = 'host';
+        o.textContent = 'As the page around it';
+        s.insertBefore(o, s.firstChild);
+      }
+      s.value = EMBED ? embedTheme : uiTheme;
       s.addEventListener('change', () => {
-        uiTheme = s.value;
-        try {
-          localStorage.setItem('rd-uitheme', uiTheme);
-        } catch (e) {}
+        if (EMBED) {
+          embedTheme = s.value;
+          uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
+          try {
+            localStorage.setItem('rd-uitheme-embed', embedTheme);
+          } catch (e) {}
+        } else {
+          uiTheme = s.value;
+          try {
+            localStorage.setItem('rd-uitheme', uiTheme);
+          } catch (e) {}
+        }
         syncUiTheme();
         render();
       });
@@ -22628,9 +22678,27 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (!safe || /^(F|Cl|Br|I)$/.test(r0)) return t;
     return (gr && at0(gr) === r0) || knownLabel(r) ? r : t;
   }
+  /* the mass number typed before an element (15N), set with it */
+  let ISO_NEXT = 0;
   function applyLabel0(a, t) {
     t = labelFrontFirst(t);
     lastLabel = t;
+    /* an isotope typed with its mass number first (15N, ¹³C, 2H, 18O−): the element on its atom, where it was, and the
+       mass number as a superscript beside it, not a label that starts at the atom and pushes the symbol aside */
+    {
+      const SUP = '⁰¹²³⁴⁵⁶⁷⁸⁹',
+        u = t.replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]/g, c => String(SUP.indexOf(c))),
+        im = /^(\d{1,3})([A-Z][a-z]?)((?:H\d*)?(?:[+\-−]\d*)?)$/.exec(u);
+      if (im && im[2] in AW && +im[1] >= 1 && +im[1] <= 300 && im[2] !== 'D') {
+        ISO_NEXT = +im[1];
+        try {
+          applyLabel0(a, im[2] + im[3]);
+        } finally {
+          ISO_NEXT = 0;
+        }
+        return;
+      }
+    }
     {
       /* element with its hydrogens and charge as typed: NH2, N (no H), NH2+, O−; the hydrogens typed are kept as given */
       const eh = /^([A-Z][a-z]?)(?:H(\d*))?(?:([+\-−])(\d*))?$/.exec(t);
@@ -22640,6 +22708,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         const same = eh[1] === a.el && !a.label,
           q0 = a.chg || 0;
         setEl(a, eh[1]);
+        if (ISO_NEXT) a.iso = ISO_NEXT;
         a.chg = eh[3] ? (eh[3] === '+' ? 1 : -1) * (eh[4] ? +eh[4] : 1) : same ? q0 : 0;
         const typedH = t.includes('H') && eh[1] !== 'H' ? (eh[2] ? +eh[2] : 1) : 0,
           auto = implicitH(a);
@@ -35794,6 +35863,10 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (big && !big.closest('[hidden]')) big.innerHTML = nspecSVG(L0.nuc, L0.res, Math.min(innerWidth - 80, 1100), 360);
     NMRCOL = NSPEC.col ? new Map() : null;
     if (NMRCOL) L0.res.forEach((g, gi) => g.shift != null && g.ids.forEach(id => NMRCOL.set(id, NSPEC_COLS[gi % NSPEC_COLS.length])));
+    /* drawn anew (zoom, pan, line width): the lit shift lit again */
+    try {
+      nmrLightMarks();
+    } catch (e) {}
   }
   /* zoom and pan on either spectrum */
   function nspecWire(host) {
@@ -36085,10 +36158,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     nmrHotG = gi;
     const out = $('nmrOut');
     if (!out) return;
-    out.querySelectorAll('[data-ng]').forEach(el => {
-      const on = +el.dataset.ng === gi;
-      el.classList.toggle('nmrhot', on);
-    });
+    nmrLightMarks();
     /* keep the row in view: the panel scrolls up or down only, never sideways */
     if (gi >= 0) {
       const r = out.querySelector('tr[data-ng="' + gi + '"]');
@@ -36106,6 +36176,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         else if (b.bottom > pb.bottom) sc.scrollTop += b.bottom - pb.bottom + 8;
       }
     }
+  }
+  /* the lit shift: in the panel (its row and stick) and in the bigger spectrum over the page */
+  function nmrLightMarks() {
+    for (const host of [$('nmrOut'), document.getElementById('nmrBig')])
+      if (host) host.querySelectorAll('[data-ng]').forEach(el => el.classList.toggle('nmrhot', +el.dataset.ng === nmrHotG));
   }
   function nmrSyncHover() {
     try {
@@ -40646,6 +40721,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function figSrcLine(name) {
     return '% editable-figure source: ' + String(name).replace(/[\r\n\u0085\u2028\u2029^\\]/g, '_');
   }
+  /* chemnum numbers a compound where it first comes; this makes the drawings come first. A figure writes its compounds,
+     in its own order, to the .aux when its page is printed; the next run numbers them at \begin{document}, figure after
+     figure in the order they are printed, before any text cites them (compounds only in the text are numbered after).
+     Written so that the .aux line does nothing without chemnum or LaTeX's hooks, and once only (the .aux is read again at
+     the end) */
+  function cmpdOrderLine(nodes) {
+    const keys = [];
+    for (const n of nodes)
+      for (const m of n.matchAll(/\\rcmpd\{([^{}]*)\}/g)) {
+        const k = m[1].replace(/\.(?:num|dash|letter)$/, '');
+        if (!/^[AaIi]:/.test(k) && /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?$/.test(k) && !keys.includes(k)) keys.push(k);
+      }
+    if (!keys.length) return '';
+    return (
+      '\\write\\csname @auxout\\endcsname{\\unexpanded{\\ifdefined\\AddToHook\\ifdefined\\rcmpdOrderDone\\else' +
+      `\\AddToHook{begindocument/end}{\\ifdefined\\labelcmpd\\labelcmpd{${keys.join(',')}}\\fi\\gdef\\rcmpdOrderDone{}}\\fi\\fi}}%\n`
+    );
+  }
   /* only: the selection when Copy for LaTeX was given (the first paste takes just that part); a Save afterwards makes
      the figure of the whole drawing again (refreshLatexFigure) */
   async function latexFigureOf(name, src, only) {
@@ -40720,7 +40813,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
        is as drawn either way */
     const atText = texMarksMode() === 'text',
       nodes = [];
-    for (const t of T) {
+    /* written in the order the drawing numbers its marks (reading order, or the order set by hand): chemnum numbers a
+       compound where it first comes, so the figure's numbers follow the drawing's, not the order the texts were made in */
+    const markOrder = new Map(cmpdTexts().map((t, i) => [t.id, i]));
+    const rank = t => (markOrder.has(t.id) ? markOrder.get(t.id) : 1e9);
+    for (const t of [...T].sort((a, b) => rank(a) - rank(b))) {
       const tpl = String(t.ctpl || t.text),
         lines = tLines({ ...t, text: tpl }),
         /* where the lines are: as shown on the sheet (numbers, once numbered for Word), else as written */
@@ -40774,6 +40871,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           '\\resizebox{\\rdW}{!}{%\n' +
           pic(`\\includegraphics{${name}.pdf}`) +
           '}%\n') +
+      cmpdOrderLine(nodes) +
       '\\endgroup%\n';
     const packages = ['graphicx', 'tikz', 'chemnum'],
       preamble = body.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined,
@@ -45550,6 +45648,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (mk >= 0) plain = plain.slice(0, mk);
     const o = {};
     for (const m of plain.matchAll(CMPD_SET)) if (!(m[1] in o)) o[m[1]] = m[2];
+    /* the same kept out of sight as content controls (rdset:#format S{n}, from the ONLYOFFICE plugin) */
+    const cut = Math.min(...[head.search(/<w:tag w:val="rdcmpd:/), head.search(/\[\[(?!#)/)].map(i => (i < 0 ? head.length : i)));
+    for (const m of head.slice(0, cut).matchAll(/<w:tag w:val="rdset:#(format|start)\s+([^"]+)"\/>/g)) if (!(m[1] in o)) o[m[1]] = m[2].replace(/&amp;/g, '&').trim();
     /* the style and first number set on the Word tab (kept in the document as its variables rdFormat, rdStart) come before
        the [[#format …]] and [[#start …]] lines */
     if (setXml) {
@@ -45834,13 +45935,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* the plain text runs of each paragraph, with the marks in them: [[…]] in a run (or across runs) becomes a content control */
     const N = cmpdNumberer(tpl, start),
       order = [];
-    const PIECE = /<w:sdt>(?:(?!<\/w:sdt>)[\s\S])*?<w:tag w:val="rdcmpd:([^"]+)"\/>[\s\S]*?<\/w:sdt>|<w:r(?:\s[^>]*)?>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>|<\/w:p>|\u0000D\d+\u0000|<w:(?:proofErr|bookmarkStart|bookmarkEnd)\b[^>]*\/>/g;
+    const PIECE = /<w:sdt>(?:(?!<\/w:sdt>)[\s\S])*?<w:tag w:val="(rdcmpd|rdset):([^"]+)"\/>[\s\S]*?<\/w:sdt>|<w:r(?:\s[^>]*)?>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>|<\/w:p>|\u0000D\d+\u0000|<w:(?:proofErr|bookmarkStart|bookmarkEnd)\b[^>]*\/>/g;
     /* first pass: what comes where (marks, existing content controls, drawings), to number by first appearance */
     const pieces = [];
     let last = 0;
     for (const m of doc.matchAll(PIECE)) {
       if (m.index > last) pieces.push({ xml: doc.slice(last, m.index), other: true });
-      pieces.push({ xml: m[0], sdt: m[1] || null });
+      /* rdset: a settings line an editor kept out of sight as a content control (the ONLYOFFICE plugin) */
+      pieces.push({ xml: m[0], sdt: m[1] === 'rdcmpd' ? m[2] : null, set: m[1] === 'rdset' ? m[2] : null });
       last = m.index + m[0].length;
     }
     if (last < doc.length) pieces.push({ xml: doc.slice(last), other: true });
@@ -45935,6 +46037,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       group = [];
     };
     for (const p of pieces) {
+      if (p.set) {
+        flush();
+        const line = '[[' + p.set.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') + ']]';
+        setting(line);
+        /* numbers: it stays as it is; Show marks: written out as a line of text (Word hides it as its own lines when
+           numbered again); Remove marks: gone */
+        if (mode === true) out.push({ xml: wT('', line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) });
+        else if (mode !== 'strip') out.push({ xml: p.xml });
+        continue;
+      }
       if (p.sdt) {
         flush();
         const q = parseSpec(p.sdt);
@@ -75011,6 +75123,72 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       commit();
       return { ok: true, boxes: T.map(t => ({ id: t.id, box: apiTextBox(t) })) };
     },
+    /* the look of the editor itself (light, dark, or as the system), as a page that embeds it has it; the drawing is not
+       changed. keep: true remembers it as the Theme setting does */
+    uiTheme: a => {
+      const t = String(a.theme || '');
+      if (!/^(light|gray|dark|system|paper)$/.test(t)) throw new Error('uiTheme: theme light, gray, dark, system or paper');
+      const sel = document.getElementById('uiTheme');
+      if (EMBED) {
+        /* the page's theme: followed unless a theme was chosen in the editor (keep: true chooses this one) */
+        hostTheme = t;
+        if (a.keep) {
+          embedTheme = t;
+          try {
+            localStorage.setItem('rd-uitheme-embed', t);
+          } catch (e) {}
+        }
+        uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
+        if (sel) sel.value = embedTheme;
+      } else {
+        uiTheme = t;
+        if (a.keep)
+          try {
+            localStorage.setItem('rd-uitheme', t);
+          } catch (e) {}
+        if (sel) sel.value = t;
+      }
+      syncUiTheme();
+      render();
+      return { theme: uiTheme, page: EMBED ? hostTheme : undefined, chosen: EMBED && embedTheme !== 'host' ? embedTheme : undefined };
+    },
+    /* the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]…) in the order the numbering takes them (an order set
+       by hand first, then reading order), each text's marks in its order: a document numbers its drawings from these */
+    compoundMarks: () => {
+      const marks = [];
+      for (const t of cmpdTexts())
+        for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) marks.push({ mark: m[0], key: m[1], sub: m[2] || '', format: m[3] || (m[2] ? 'letter' : '') });
+      return { marks };
+    },
+    /* the numbers shown in place of the marks ({"[[ketone]]": "1", "[[ketone.OMe]]": "1a"}; a mark not given stays a mark), or
+       the marks again (marks: true); the texts keep their marks, so numbering again or editing a text starts from them, and
+       each text stays centred where it was */
+    showCompoundNumbers: a => {
+      const num = a.numbers && typeof a.numbers === 'object' && !Array.isArray(a.numbers) ? a.numbers : null;
+      if (!a.marks && !num) throw new Error('showCompoundNumbers needs numbers ({"[[ketone]]": "1"}) or marks: true');
+      const T = cmpdTexts();
+      if (!T.length) return { texts: 0 };
+      snap();
+      for (const t of T) {
+        if (!t.ctpl) t.ctpl = t.text;
+        /* a compound number (and a mark) is no formula: S1 stays S1, not S with a subscript 1 */
+        t.nochem = true;
+        t.fs = false;
+        const cx = t.x + textW(t) / 2;
+        t.text = a.marks
+          ? t.ctpl
+          : t.ctpl.replace(CMPD_RX, m0 => {
+              const n = num[m0];
+              if (n == null || n === '') return m0;
+              return a.bold ? '\\b{' + n + '}' : String(n);
+            });
+        /* strip: the numbers stay as plain text, the marks go (a copy to send, not numbered again) */
+        if (a.strip && !a.marks) delete t.ctpl;
+        t.x = cx - textW(t) / 2;
+      }
+      commit();
+      return { texts: T.length };
+    },
     /* the groups round an atom moved round by one place (steps), the biggest group staying: a sulfonamide's N and O's */
     rotateGroups: a => {
       const fr = apiAtomsOf(a.index),
@@ -76327,6 +76505,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       setArrow: { d: 'change an arrow (one end given: the other stays)', a: { id: 'its id (required)', from: '', to: '', points: '', smooth: '', curve: '', bend: '', side: '', head: '', tail: '', type: '', color: '', width: '' } },
       setColor: { d: 'colour a structure (its bonds and labels) or some of its atoms (their labels; bonds: true for the bonds between them too); "" takes the colour away', a: { index: IX, color: 'e.g. #d32f2f', atoms: 'only these atoms (from 1)', bonds: 'with atoms: true to colour the bonds between them too' } },
       setText: { d: 'change texts already drawn', a: { id: 'a text', ids: 'or several', bold: 'true or false: the whole text bold', italic: 'true or false', underline: 'true or false', size: 'text size (0: the style\'s)', color: 'colour ("" for the usual)', text: 'new words', keepCentre: 'true: keep each text centred where it was' } },
+      uiTheme: { d: 'the look of the editor itself as a page embedding it has it (the drawing is not changed); embedded, a theme chosen in Settings → Theme wins over it (answered in chosen)', a: { theme: 'light, gray, dark, system or paper', keep: 'true: remember it as the Theme setting' } },
+      compoundMarks: { d: 'the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in the order a numbering takes them: mark, key, sub, format (letter, num, dash)', a: {} },
+      showCompoundNumbers: { d: 'show numbers in place of the compound marks (the texts keep their marks, centred where they were), or the marks again', a: { numbers: 'the number of each mark: {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"} (a mark not given stays)', bold: 'true: the numbers bold', marks: 'true: show the marks again', strip: 'true: the numbers stay as plain text and the marks go' } },
       rotateGroups: { d: 'move the groups round an open-chain atom by one place or more (the biggest group stays): an N and two O\'s round an S', a: { index: IX, atom: 'the atom (from 1)', steps: '1 (default), 2, or -1 the other way' } },
       saveTemplate: { d: 'keep a skeleton drawn by hand for the fit (a norbornene as your journal draws it): the ring atoms of a structure with their places, bold bonds, wedges and hashes; the fit tries it wherever the same skeleton is found', a: { index: IX, name: 'its name', atoms: 'only these atoms (ring atoms, from 1)' } },
       listTemplates: { d: 'the skeleton templates the fit tries (built in and yours)', a: {} },
