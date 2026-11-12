@@ -10,6 +10,7 @@
 
 ## Changed
 
+- **Copy for LaTeX numbers the figures' compounds first**, as the Word tab does: each figure gives chemnum its compounds in the drawing's order (reading order, or the order set by hand), so a compound the text names before its figure gets the figure's number, and compounds only in the text come after them. Its marks are also set in that order. (LaTeX from 2020 on; otherwise by first mention, as before.)
 - **An isotope typed on an atom** (15N, ¹³C, 18O−, 15NH2) is that element with its mass number, small and raised beside the symbol (¹⁵N), and the symbol stays on its atom; before, "15N" became a text label that started at the atom and pushed the N aside.
 
 ## Fixed

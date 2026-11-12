@@ -24,8 +24,11 @@ For a drawing saved as `scheme.reactio` it writes, next to it:
 
 - `scheme.pdf`: the drawing, without the texts that carry `[[key]]` compound marks;
 - `scheme.tex`: a `tikzpicture` that places that PDF and sets those texts over it, each mark as
-  `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX, in the order the compounds are first mentioned, and are
-  the same on the drawing and in the text.
+  `\rcmpd{key}` (numbered by chemnum). The numbers are then given by LaTeX and are the same on the drawing and in the text.
+  The figures' compounds come first, as the Word tab numbers them: each figure writes its keys, in the drawing's order (reading
+  order, or the order set by hand), to the `.aux`, and the next run numbers them at `\begin{document}`, figure after figure;
+  a compound the text names before its figure gets the figure's number, and compounds only in the text come after. (It needs a
+  LaTeX from 2020 or later; with an older one, or without chemnum, the numbers go by first mention as before.)
 
 The first lines of `scheme.tex` say which drawing it came from and what the document needs for it
 (`% editable-figure packages:` and `% editable-figure preamble:`), so an editor can add what is missing when marks

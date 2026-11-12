@@ -40707,6 +40707,24 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   function figSrcLine(name) {
     return '% editable-figure source: ' + String(name).replace(/[\r\n\u0085\u2028\u2029^\\]/g, '_');
   }
+  /* chemnum numbers a compound where it first comes; this makes the drawings come first. A figure writes its compounds,
+     in its own order, to the .aux when its page is printed; the next run numbers them at \begin{document}, figure after
+     figure in the order they are printed, before any text cites them (compounds only in the text are numbered after).
+     Written so that the .aux line does nothing without chemnum or LaTeX's hooks, and once only (the .aux is read again at
+     the end) */
+  function cmpdOrderLine(nodes) {
+    const keys = [];
+    for (const n of nodes)
+      for (const m of n.matchAll(/\\rcmpd\{([^{}]*)\}/g)) {
+        const k = m[1].replace(/\.(?:num|dash|letter)$/, '');
+        if (!/^[AaIi]:/.test(k) && /^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?$/.test(k) && !keys.includes(k)) keys.push(k);
+      }
+    if (!keys.length) return '';
+    return (
+      '\\write\\csname @auxout\\endcsname{\\unexpanded{\\ifdefined\\AddToHook\\ifdefined\\rcmpdOrderDone\\else' +
+      `\\AddToHook{begindocument/end}{\\ifdefined\\labelcmpd\\labelcmpd{${keys.join(',')}}\\fi\\gdef\\rcmpdOrderDone{}}\\fi\\fi}}%\n`
+    );
+  }
   /* only: the selection when Copy for LaTeX was given (the first paste takes just that part); a Save afterwards makes
      the figure of the whole drawing again (refreshLatexFigure) */
   async function latexFigureOf(name, src, only) {
@@ -40781,7 +40799,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
        is as drawn either way */
     const atText = texMarksMode() === 'text',
       nodes = [];
-    for (const t of T) {
+    /* written in the order the drawing numbers its marks (reading order, or the order set by hand): chemnum numbers a
+       compound where it first comes, so the figure's numbers follow the drawing's, not the order the texts were made in */
+    const markOrder = new Map(cmpdTexts().map((t, i) => [t.id, i]));
+    const rank = t => (markOrder.has(t.id) ? markOrder.get(t.id) : 1e9);
+    for (const t of [...T].sort((a, b) => rank(a) - rank(b))) {
       const tpl = String(t.ctpl || t.text),
         lines = tLines({ ...t, text: tpl }),
         /* where the lines are: as shown on the sheet (numbers, once numbered for Word), else as written */
@@ -40835,6 +40857,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
           '\\resizebox{\\rdW}{!}{%\n' +
           pic(`\\includegraphics{${name}.pdf}`) +
           '}%\n') +
+      cmpdOrderLine(nodes) +
       '\\endgroup%\n';
     const packages = ['graphicx', 'tikz', 'chemnum'],
       preamble = body.includes('\\rcmpd{') ? RCMPD_PREAMBLE : undefined,
