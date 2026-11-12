@@ -49084,6 +49084,12 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return;
     }
     if (ext === 'json' || ext === 'reactio') {
+      /* an empty .reactio (an editor made it for a new figure): an empty drawing, its tab linked to the file */
+      if (ext === 'reactio' && !text.trim()) {
+        openInTab(blankDoc(), name);
+        toast('Opened ' + name + ': empty, ready to draw');
+        return;
+      }
       let d;
       try {
         d = JSON.parse(text);
