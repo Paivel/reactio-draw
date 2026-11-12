@@ -1,5 +1,9 @@
 # Next version
 
+## New
+
+- **Local API: compound numbers of one drawing.** `compoundMarks` answers the drawing's `[[key]]` marks in the order a numbering takes them; `showCompoundNumbers` shows numbers in their place (the texts keep their marks and stay centred) or the marks again. An editor that numbers a whole document uses them for each of its drawings.
+
 ## Changed
 
 - **An isotope typed on an atom** (15N, ¹³C, 18O−, 15NH2) is that element with its mass number, small and raised beside the symbol (¹⁵N), and the symbol stays on its atom; before, "15N" became a text label that started at the atom and pushed the N aside.

@@ -75024,6 +75024,41 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       commit();
       return { ok: true, boxes: T.map(t => ({ id: t.id, box: apiTextBox(t) })) };
     },
+    /* the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]…) in the order the numbering takes them (an order set
+       by hand first, then reading order), each text's marks in its order: a document numbers its drawings from these */
+    compoundMarks: () => {
+      const marks = [];
+      for (const t of cmpdTexts())
+        for (const m of String(t.ctpl || t.text).matchAll(CMPD_RX)) marks.push({ mark: m[0], key: m[1], sub: m[2] || '', format: m[3] || (m[2] ? 'letter' : '') });
+      return { marks };
+    },
+    /* the numbers shown in place of the marks ({"[[ketone]]": "1", "[[ketone.OMe]]": "1a"}; a mark not given stays a mark), or
+       the marks again (marks: true); the texts keep their marks, so numbering again or editing a text starts from them, and
+       each text stays centred where it was */
+    showCompoundNumbers: a => {
+      const num = a.numbers && typeof a.numbers === 'object' && !Array.isArray(a.numbers) ? a.numbers : null;
+      if (!a.marks && !num) throw new Error('showCompoundNumbers needs numbers ({"[[ketone]]": "1"}) or marks: true');
+      const T = cmpdTexts();
+      if (!T.length) return { texts: 0 };
+      snap();
+      for (const t of T) {
+        if (!t.ctpl) t.ctpl = t.text;
+        /* a compound number (and a mark) is no formula: S1 stays S1, not S with a subscript 1 */
+        t.nochem = true;
+        t.fs = false;
+        const cx = t.x + textW(t) / 2;
+        t.text = a.marks
+          ? t.ctpl
+          : t.ctpl.replace(CMPD_RX, m0 => {
+              const n = num[m0];
+              if (n == null || n === '') return m0;
+              return a.bold ? '\\b{' + n + '}' : String(n);
+            });
+        t.x = cx - textW(t) / 2;
+      }
+      commit();
+      return { texts: T.length };
+    },
     /* the groups round an atom moved round by one place (steps), the biggest group staying: a sulfonamide's N and O's */
     rotateGroups: a => {
       const fr = apiAtomsOf(a.index),
@@ -76340,6 +76375,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       setArrow: { d: 'change an arrow (one end given: the other stays)', a: { id: 'its id (required)', from: '', to: '', points: '', smooth: '', curve: '', bend: '', side: '', head: '', tail: '', type: '', color: '', width: '' } },
       setColor: { d: 'colour a structure (its bonds and labels) or some of its atoms (their labels; bonds: true for the bonds between them too); "" takes the colour away', a: { index: IX, color: 'e.g. #d32f2f', atoms: 'only these atoms (from 1)', bonds: 'with atoms: true to colour the bonds between them too' } },
       setText: { d: 'change texts already drawn', a: { id: 'a text', ids: 'or several', bold: 'true or false: the whole text bold', italic: 'true or false', underline: 'true or false', size: 'text size (0: the style\'s)', color: 'colour ("" for the usual)', text: 'new words', keepCentre: 'true: keep each text centred where it was' } },
+      compoundMarks: { d: 'the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in the order a numbering takes them: mark, key, sub, format (letter, num, dash)', a: {} },
+      showCompoundNumbers: { d: 'show numbers in place of the compound marks (the texts keep their marks, centred where they were), or the marks again', a: { numbers: 'the number of each mark: {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"} (a mark not given stays)', bold: 'true: the numbers bold', marks: 'true: show the marks again' } },
       rotateGroups: { d: 'move the groups round an open-chain atom by one place or more (the biggest group stays): an N and two O\'s round an S', a: { index: IX, atom: 'the atom (from 1)', steps: '1 (default), 2, or -1 the other way' } },
       saveTemplate: { d: 'keep a skeleton drawn by hand for the fit (a norbornene as your journal draws it): the ring atoms of a structure with their places, bold bonds, wedges and hashes; the fit tries it wherever the same skeleton is found', a: { index: IX, name: 'its name', atoms: 'only these atoms (ring atoms, from 1)' } },
       listTemplates: { d: 'the skeleton templates the fit tries (built in and yours)', a: {} },

@@ -271,6 +271,11 @@ an id given as "index" is taken as the id when no structure has that number: giv
   scale           {"index": 2} or {"index": [2, 3], "bond": 40}   structures made to the document's bond length (or bond),
                                                        about their centres
   setText         {"ids": [12, 13], "size": 25.4, "color": "", "text": "…"}   change texts already drawn
+  compoundMarks                                        the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in
+                                                       the order a numbering takes them: mark, key, sub, format
+  showCompoundNumbers {"numbers": {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"}, "bold": false}   numbers in place of
+                                                       the marks (the texts keep their marks, centred where they were;
+                                                       a mark not given stays); {"marks": true} shows the marks again
   order           {"id": 12, "to": "back"}             front, back, forward, backward
 
 Look
