@@ -271,6 +271,8 @@ an id given as "index" is taken as the id when no structure has that number: giv
   scale           {"index": 2} or {"index": [2, 3], "bond": 40}   structures made to the document's bond length (or bond),
                                                        about their centres
   setText         {"ids": [12, 13], "size": 25.4, "color": "", "text": "…"}   change texts already drawn
+  uiTheme         {"theme": "dark"}                    the look of the editor itself (light, dark, system, paper), as a page
+                                                       embedding it has it; the drawing is not changed; "keep": true saves it
   compoundMarks                                        the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in
                                                        the order a numbering takes them: mark, key, sub, format
   showCompoundNumbers {"numbers": {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"}, "bold": false}   numbers in place of

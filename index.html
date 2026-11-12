@@ -22319,6 +22319,11 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   try {
     uiTheme = localStorage.getItem('rd-uitheme') || 'light';
   } catch (e) {}
+  /* a page that embeds Reactio Draw gives its own theme (?embed&theme=dark): the editor matches it, nothing is saved */
+  if (EMBED) {
+    const th = new URLSearchParams(location.search).get('theme');
+    if (th === 'light' || th === 'dark' || th === 'system') uiTheme = th;
+  }
   function syncUiTheme() {
     const want =
       uiTheme === 'light' || uiTheme === 'dark'
@@ -75038,6 +75043,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       commit();
       return { ok: true, boxes: T.map(t => ({ id: t.id, box: apiTextBox(t) })) };
     },
+    /* the look of the editor itself (light, dark, or as the system), as a page that embeds it has it; the drawing is not
+       changed. keep: true remembers it as the Theme setting does */
+    uiTheme: a => {
+      const t = String(a.theme || '');
+      if (!/^(light|dark|system|paper)$/.test(t)) throw new Error('uiTheme: theme light, dark, system or paper');
+      uiTheme = t;
+      if (a.keep)
+        try {
+          localStorage.setItem('rd-uitheme', t);
+        } catch (e) {}
+      const sel = document.getElementById('uiTheme');
+      if (sel) sel.value = t;
+      syncUiTheme();
+      render();
+      return { theme: t };
+    },
     /* the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]…) in the order the numbering takes them (an order set
        by hand first, then reading order), each text's marks in its order: a document numbers its drawings from these */
     compoundMarks: () => {
@@ -76391,6 +76412,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       setArrow: { d: 'change an arrow (one end given: the other stays)', a: { id: 'its id (required)', from: '', to: '', points: '', smooth: '', curve: '', bend: '', side: '', head: '', tail: '', type: '', color: '', width: '' } },
       setColor: { d: 'colour a structure (its bonds and labels) or some of its atoms (their labels; bonds: true for the bonds between them too); "" takes the colour away', a: { index: IX, color: 'e.g. #d32f2f', atoms: 'only these atoms (from 1)', bonds: 'with atoms: true to colour the bonds between them too' } },
       setText: { d: 'change texts already drawn', a: { id: 'a text', ids: 'or several', bold: 'true or false: the whole text bold', italic: 'true or false', underline: 'true or false', size: 'text size (0: the style\'s)', color: 'colour ("" for the usual)', text: 'new words', keepCentre: 'true: keep each text centred where it was' } },
+      uiTheme: { d: 'the look of the editor itself as a page embedding it has it (the drawing is not changed)', a: { theme: 'light, dark, system or paper', keep: 'true: remember it as the Theme setting' } },
       compoundMarks: { d: 'the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in the order a numbering takes them: mark, key, sub, format (letter, num, dash)', a: {} },
       showCompoundNumbers: { d: 'show numbers in place of the compound marks (the texts keep their marks, centred where they were), or the marks again', a: { numbers: 'the number of each mark: {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"} (a mark not given stays)', bold: 'true: the numbers bold', marks: 'true: show the marks again', strip: 'true: the numbers stay as plain text and the marks go' } },
       rotateGroups: { d: 'move the groups round an open-chain atom by one place or more (the biggest group stays): an N and two O\'s round an S', a: { index: IX, atom: 'the atom (from 1)', steps: '1 (default), 2, or -1 the other way' } },

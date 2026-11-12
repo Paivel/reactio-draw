@@ -3,6 +3,7 @@
 ## New
 
 - **Local API: compound numbers of one drawing.** `compoundMarks` answers the drawing's `[[key]]` marks in the order a numbering takes them; `showCompoundNumbers` shows numbers in their place (the texts keep their marks and stay centred) or the marks again, or keeps the numbers as plain text with the marks gone (`strip`). An editor that numbers a whole document uses them for each of its drawings.
+- **Embedded, in the page's theme**: `?embed&theme=dark` (or light, system) gives the editor the look of the page that embeds it, and the Local API's `uiTheme` changes it while it runs; the sheet and the pictures made from it stay as they are, and nothing is saved.
 - **Number compounds (Word) reads settings kept as content controls** (tag `rdset:#format 2-{n}`, as the ONLYOFFICE plugin keeps a `[[#format …]]` line out of sight): the document's style or a chapter, as the line was; Show marks writes the line out again, Remove marks takes it away.
 
 ## Changed
