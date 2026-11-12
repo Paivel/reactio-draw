@@ -26,7 +26,7 @@
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
 }
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
+  :root:not([data-theme='light']):not([data-theme='gray']) {
     --bg: #0e131a;
     --panel: #151c26;
     --ink: #e2e8f1;
@@ -56,6 +56,27 @@
   --grid: #1b2430;
   --accent: #86a2ff;
   --accent-soft: #24315a;
+  --ok: #5cc792;
+  --warn: #f08c5e;
+  --err: #ff6b6b;
+  --el-n: #7d9cff;
+  --el-o: #ff6b6b;
+  --el-s: #e8c046;
+  --el-hal: #58d08f;
+  --el-p: #f2a04b;
+  --el-other: #c39bf0;
+  color-scheme: dark;
+}
+/* gray: dark, in neutral greys rather than blue-black, as an office suite's dark theme (the sheet stays white) */
+:root[data-theme='gray'] {
+  --bg: #333333;
+  --panel: #404040;
+  --ink: #e8e8e8;
+  --muted: #b0b0b0;
+  --line: #575757;
+  --grid: #3a3a3a;
+  --accent: #8fb0ff;
+  --accent-soft: #3d4866;
   --ok: #5cc792;
   --warn: #f08c5e;
   --err: #ff6b6b;
@@ -3508,7 +3529,7 @@ html {
           <div class="row" style="align-items:center;flex-wrap:nowrap;gap:8px"><input type="range" id="zoomSpeed" min="1" max="11" step="0.1" style="flex:1;margin:0" aria-label="Zoom speed for the wheel and trackpad pinch"><span id="zoomSpeedV" style="font:12px var(--mono);min-width:34px;text-align:right"></span></div>
           <p class="note">How fast Ctrl+wheel and the trackpad pinch zoom the sheet (6× by default).</p></div>
         <div class="setg"><label class="tlabel" for="uiTheme">Theme</label>
-          <select id="uiTheme" style="width:100%;padding:4px 6px;font-size:13px"><option value="system">As the system</option><option value="light">Light</option><option value="dark">Dark</option><option value="paper">Match the paper</option></select>
+          <select id="uiTheme" style="width:100%;padding:4px 6px;font-size:13px"><option value="system">As the system</option><option value="light">Light</option><option value="gray">Gray</option><option value="dark">Dark</option><option value="paper">Match the paper</option></select>
           <p class="note">Colours of the panels and buttons. As the system follows the light or dark mode of your computer; Match the paper turns the panels dark on a dark paper (night blue, dark grey, black, blueprint) and light on a light one. The sheet keeps its own paper colour in every theme.</p></div>
         <div class="setg"><span class="tlabel" id="accLab">Accent colour</span>
           <div class="row accrow" role="radiogroup" aria-labelledby="accLab" id="accRow"></div>
@@ -22272,7 +22293,7 @@ function kdOf(st) {
         ? ''
         : `:root{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}}
-:root[data-theme="dark"]{--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}
+:root[data-theme="dark"],:root[data-theme="gray"]{--accent:${D};--accent-soft:${accMix(D, '#151c26', 0.74)}}
 svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     const row = $('accRow');
     if (row)
@@ -22319,14 +22340,22 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   try {
     uiTheme = localStorage.getItem('rd-uitheme') || 'light';
   } catch (e) {}
-  /* a page that embeds Reactio Draw gives its own theme (?embed&theme=dark): the editor matches it, nothing is saved */
+  /* embedded: the theme of the page around it (?embed&theme=dark, or uiTheme from the page), unless one was chosen here
+     in Settings → Theme, which is kept apart from the app's own (rd-uitheme-embed) and wins: the page dark, the editor
+     light, say. "As the page around it" follows the page again */
+  var hostTheme = 'light',
+    embedTheme = 'host';
   if (EMBED) {
     const th = new URLSearchParams(location.search).get('theme');
-    if (th === 'light' || th === 'dark' || th === 'system') uiTheme = th;
+    if (th === 'light' || th === 'gray' || th === 'dark' || th === 'system') hostTheme = th;
+    try {
+      embedTheme = localStorage.getItem('rd-uitheme-embed') || 'host';
+    } catch (e) {}
+    uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
   }
   function syncUiTheme() {
     const want =
-      uiTheme === 'light' || uiTheme === 'dark'
+      uiTheme === 'light' || uiTheme === 'dark' || uiTheme === 'gray'
         ? uiTheme
         : uiTheme === 'paper'
           ? darkPaper()
@@ -22341,12 +22370,26 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
   {
     const s = document.getElementById('uiTheme');
     if (s) {
-      s.value = uiTheme;
+      if (EMBED) {
+        const o = document.createElement('option');
+        o.value = 'host';
+        o.textContent = 'As the page around it';
+        s.insertBefore(o, s.firstChild);
+      }
+      s.value = EMBED ? embedTheme : uiTheme;
       s.addEventListener('change', () => {
-        uiTheme = s.value;
-        try {
-          localStorage.setItem('rd-uitheme', uiTheme);
-        } catch (e) {}
+        if (EMBED) {
+          embedTheme = s.value;
+          uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
+          try {
+            localStorage.setItem('rd-uitheme-embed', embedTheme);
+          } catch (e) {}
+        } else {
+          uiTheme = s.value;
+          try {
+            localStorage.setItem('rd-uitheme', uiTheme);
+          } catch (e) {}
+        }
         syncUiTheme();
         render();
       });
@@ -75047,17 +75090,30 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
        changed. keep: true remembers it as the Theme setting does */
     uiTheme: a => {
       const t = String(a.theme || '');
-      if (!/^(light|dark|system|paper)$/.test(t)) throw new Error('uiTheme: theme light, dark, system or paper');
-      uiTheme = t;
-      if (a.keep)
-        try {
-          localStorage.setItem('rd-uitheme', t);
-        } catch (e) {}
+      if (!/^(light|gray|dark|system|paper)$/.test(t)) throw new Error('uiTheme: theme light, gray, dark, system or paper');
       const sel = document.getElementById('uiTheme');
-      if (sel) sel.value = t;
+      if (EMBED) {
+        /* the page's theme: followed unless a theme was chosen in the editor (keep: true chooses this one) */
+        hostTheme = t;
+        if (a.keep) {
+          embedTheme = t;
+          try {
+            localStorage.setItem('rd-uitheme-embed', t);
+          } catch (e) {}
+        }
+        uiTheme = embedTheme === 'host' ? hostTheme : embedTheme;
+        if (sel) sel.value = embedTheme;
+      } else {
+        uiTheme = t;
+        if (a.keep)
+          try {
+            localStorage.setItem('rd-uitheme', t);
+          } catch (e) {}
+        if (sel) sel.value = t;
+      }
       syncUiTheme();
       render();
-      return { theme: t };
+      return { theme: uiTheme, page: EMBED ? hostTheme : undefined, chosen: EMBED && embedTheme !== 'host' ? embedTheme : undefined };
     },
     /* the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]…) in the order the numbering takes them (an order set
        by hand first, then reading order), each text's marks in its order: a document numbers its drawings from these */
@@ -76412,7 +76468,7 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       setArrow: { d: 'change an arrow (one end given: the other stays)', a: { id: 'its id (required)', from: '', to: '', points: '', smooth: '', curve: '', bend: '', side: '', head: '', tail: '', type: '', color: '', width: '' } },
       setColor: { d: 'colour a structure (its bonds and labels) or some of its atoms (their labels; bonds: true for the bonds between them too); "" takes the colour away', a: { index: IX, color: 'e.g. #d32f2f', atoms: 'only these atoms (from 1)', bonds: 'with atoms: true to colour the bonds between them too' } },
       setText: { d: 'change texts already drawn', a: { id: 'a text', ids: 'or several', bold: 'true or false: the whole text bold', italic: 'true or false', underline: 'true or false', size: 'text size (0: the style\'s)', color: 'colour ("" for the usual)', text: 'new words', keepCentre: 'true: keep each text centred where it was' } },
-      uiTheme: { d: 'the look of the editor itself as a page embedding it has it (the drawing is not changed)', a: { theme: 'light, dark, system or paper', keep: 'true: remember it as the Theme setting' } },
+      uiTheme: { d: 'the look of the editor itself as a page embedding it has it (the drawing is not changed); embedded, a theme chosen in Settings → Theme wins over it (answered in chosen)', a: { theme: 'light, gray, dark, system or paper', keep: 'true: remember it as the Theme setting' } },
       compoundMarks: { d: 'the compound marks of the drawing ([[key]], [[key.sub]], [[A:key]]) in the order a numbering takes them: mark, key, sub, format (letter, num, dash)', a: {} },
       showCompoundNumbers: { d: 'show numbers in place of the compound marks (the texts keep their marks, centred where they were), or the marks again', a: { numbers: 'the number of each mark: {"[[ketone]]": "1", "[[ketone.OMe]]": "1a"} (a mark not given stays)', bold: 'true: the numbers bold', marks: 'true: show the marks again', strip: 'true: the numbers stay as plain text and the marks go' } },
       rotateGroups: { d: 'move the groups round an open-chain atom by one place or more (the biggest group stays): an N and two O\'s round an S', a: { index: IX, atom: 'the atom (from 1)', steps: '1 (default), 2, or -1 the other way' } },

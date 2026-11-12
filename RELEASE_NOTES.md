@@ -3,7 +3,8 @@
 ## New
 
 - **Local API: compound numbers of one drawing.** `compoundMarks` answers the drawing's `[[key]]` marks in the order a numbering takes them; `showCompoundNumbers` shows numbers in their place (the texts keep their marks and stay centred) or the marks again, or keeps the numbers as plain text with the marks gone (`strip`). An editor that numbers a whole document uses them for each of its drawings.
-- **Embedded, in the page's theme**: `?embed&theme=dark` (or light, system) gives the editor the look of the page that embeds it, and the Local API's `uiTheme` changes it while it runs; the sheet and the pictures made from it stay as they are, and nothing is saved.
+- **Gray theme** (Settings → Theme): dark, in neutral greys as office suites draw their dark themes, instead of blue-black; the sheet stays white.
+- **Embedded, in the page's theme**: `?embed&theme=dark` (or light, gray, system) gives the editor the look of the page that embeds it, and the Local API's `uiTheme` changes it while it runs; the sheet and the pictures made from it stay as they are. A theme chosen in Settings → Theme of the embedded editor wins and is remembered apart from the app's own ("As the page around it" follows the page again).
 - **Number compounds (Word) reads settings kept as content controls** (tag `rdset:#format 2-{n}`, as the ONLYOFFICE plugin keeps a `[[#format …]]` line out of sight): the document's style or a chapter, as the line was; Show marks writes the line out again, Remove marks takes it away.
 
 ## Changed
