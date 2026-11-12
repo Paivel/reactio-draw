@@ -45563,6 +45563,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     if (mk >= 0) plain = plain.slice(0, mk);
     const o = {};
     for (const m of plain.matchAll(CMPD_SET)) if (!(m[1] in o)) o[m[1]] = m[2];
+    /* the same kept out of sight as content controls (rdset:#format S{n}, from the ONLYOFFICE plugin) */
+    const cut = Math.min(...[head.search(/<w:tag w:val="rdcmpd:/), head.search(/\[\[(?!#)/)].map(i => (i < 0 ? head.length : i)));
+    for (const m of head.slice(0, cut).matchAll(/<w:tag w:val="rdset:#(format|start)\s+([^"]+)"\/>/g)) if (!(m[1] in o)) o[m[1]] = m[2].replace(/&amp;/g, '&').trim();
     /* the style and first number set on the Word tab (kept in the document as its variables rdFormat, rdStart) come before
        the [[#format …]] and [[#start …]] lines */
     if (setXml) {
@@ -45847,13 +45850,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     /* the plain text runs of each paragraph, with the marks in them: [[…]] in a run (or across runs) becomes a content control */
     const N = cmpdNumberer(tpl, start),
       order = [];
-    const PIECE = /<w:sdt>(?:(?!<\/w:sdt>)[\s\S])*?<w:tag w:val="rdcmpd:([^"]+)"\/>[\s\S]*?<\/w:sdt>|<w:r(?:\s[^>]*)?>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>|<\/w:p>|\u0000D\d+\u0000|<w:(?:proofErr|bookmarkStart|bookmarkEnd)\b[^>]*\/>/g;
+    const PIECE = /<w:sdt>(?:(?!<\/w:sdt>)[\s\S])*?<w:tag w:val="(rdcmpd|rdset):([^"]+)"\/>[\s\S]*?<\/w:sdt>|<w:r(?:\s[^>]*)?>(?:(?!<\/w:r>)[\s\S])*?<\/w:r>|<\/w:p>|\u0000D\d+\u0000|<w:(?:proofErr|bookmarkStart|bookmarkEnd)\b[^>]*\/>/g;
     /* first pass: what comes where (marks, existing content controls, drawings), to number by first appearance */
     const pieces = [];
     let last = 0;
     for (const m of doc.matchAll(PIECE)) {
       if (m.index > last) pieces.push({ xml: doc.slice(last, m.index), other: true });
-      pieces.push({ xml: m[0], sdt: m[1] || null });
+      /* rdset: a settings line an editor kept out of sight as a content control (the ONLYOFFICE plugin) */
+      pieces.push({ xml: m[0], sdt: m[1] === 'rdcmpd' ? m[2] : null, set: m[1] === 'rdset' ? m[2] : null });
       last = m.index + m[0].length;
     }
     if (last < doc.length) pieces.push({ xml: doc.slice(last), other: true });
@@ -45948,6 +45952,16 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       group = [];
     };
     for (const p of pieces) {
+      if (p.set) {
+        flush();
+        const line = '[[' + p.set.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') + ']]';
+        setting(line);
+        /* numbers: it stays as it is; Show marks: written out as a line of text (Word hides it as its own lines when
+           numbered again); Remove marks: gone */
+        if (mode === true) out.push({ xml: wT('', line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')) });
+        else if (mode !== 'strip') out.push({ xml: p.xml });
+        continue;
+      }
       if (p.sdt) {
         flush();
         const q = parseSpec(p.sdt);
