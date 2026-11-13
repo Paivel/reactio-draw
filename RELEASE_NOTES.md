@@ -1,3 +1,14 @@
+# Reactio Draw 1.15.2
+
+## Changed
+
+- **ONLYOFFICE plugin: one plugin, on the Insert tab.** Insert → Reactio Draw draws (its arrow: Number compounds), Insert → Paste Reactio pastes a drawing copied in Reactio Draw as an editable object, without opening the editor; the right-click menu has Paste Reactio drawing, and Edit Reactio drawing on a drawing; Alt+Shift+V (Control+Shift+V on a Mac) pastes too. The plugin now runs in the background (Plugins → Background plugins), so its buttons, menu and keys are there from the start; it needs ONLYOFFICE 8.1 or later. Drawings made with 1.15.1 open as before. [ReactioDraw-ONLYOFFICE.plugin](https://github.com/Paivel/reactio-draw/raw/main/onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin)
+- **The H of a group label in its atom's colour**, as on an atom drawn with its H: NHPh and NHBoc with a blue NH, CO2H and SO3H with a red OH, CONH2 with a blue NH2; a carbon's H (CH2OH) stays black. Turned round (PhHN, HO2C) the same.
+
+## Fixed
+
+- **Clean Up pressed again** (Layout 2 of …, the next layouts) could offer layouts with bent rings in a crowded structure (the phenyls of a peri-substituted naphthalene); only layouts with rings as true as the best one's are offered now.
+
 # Reactio Draw 1.15.1
 
 ## New

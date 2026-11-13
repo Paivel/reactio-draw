@@ -4490,7 +4490,7 @@ function kdOf(st) {
     SMI_WAIT = 300;
   const $ = id => document.getElementById(id);
   /* the version of this release: shown in Info, given by the API (version) and by reactio --version; the Windows and Mac builds take theirs from here */
-  const RD_VERSION = '1.15.1';
+  const RD_VERSION = '1.15.2';
   {
     const e = document.getElementById('rdVerLine');
     if (e)
@@ -5618,15 +5618,33 @@ function kdOf(st) {
     return k && k.length > 1 ? k.reverse().join('') : t;
   }
   /* a label's element symbols in their element colours (the O and N of OEt, NHBoc, CO2Me), abbreviations such as Et in ink */
-  function labColored(t, fs) {
+  function labColored(t, fs, rev) {
     const k = labTokens(t);
     if (!k || k.some(x => x.includes('('))) return null;
+    const col = k.map(x => {
+      const s = x.replace(/\d+$/, ''),
+        c = !REV_ABBR.has(s) && s !== 'C' && s !== 'H' ? elColor(s) : null;
+      return c && c !== 'var(--ink)' ? c : null;
+    });
+    /* an H is its atom's, coloured as on an atom drawn with its H (NH, OH): the element before it (NHPh, CO2H, SO3H), or,
+       the label turned round (rev), the one after it (PhHN, HO2C); a carbon's H stays in ink (CH2OH, HOH2C) */
+    const isEl = x => {
+      const s = x && x.replace(/\d+$/, '');
+      return !!s && s[0] !== '(' && !REV_ABBR.has(s) && s !== 'H';
+    };
+    /* a halogen holds no H: the H after F2 is the carbon's (OCF2H), and stays in ink */
+    const HAL = new Set(['F', 'Cl', 'Br', 'I', 'At']);
+    k.forEach((x, i) => {
+      if (x.replace(/\d+$/, '') !== 'H') return;
+      const own = rev ? [k[i + 1], k[i - 1]] : [k[i - 1], k[i + 1]];
+      if (own[0] && HAL.has(own[0].replace(/\d+$/, ''))) return;
+      const j = isEl(own[0]) ? (rev ? i + 1 : i - 1) : isEl(own[1]) ? (rev ? i - 1 : i + 1) : -1;
+      if (j >= 0) col[i] = col[j];
+    });
     return k
-      .map(x => {
-        const s = x.replace(/\d+$/, '');
-        const c = !REV_ABBR.has(s) && s !== 'C' && s !== 'H' ? elColor(s) : null;
+      .map((x, i) => {
         const body = subTs(esc(x), fs);
-        return c && c !== 'var(--ink)' ? `<tspan style="fill:${c}">${body}</tspan>` : body;
+        return col[i] ? `<tspan style="fill:${col[i]}">${body}</tspan>` : body;
       })
       .join('');
   }
@@ -12435,6 +12453,40 @@ function kdOf(st) {
         const uniq = [],
           seen = new Set();
         cands.sort((a, b) => a.sc - b.sc);
+        /* a layout from some starts bends its rings to make room (the phenyls of a crowded peri-naphthalene): only the
+           layouts with rings as true as the truest are offered, the best of them first */
+        {
+          const adj = fr.map(() => []);
+          g.edges.forEach((e, k) => {
+            adj[e.a].push([e.b, k]);
+            adj[e.b].push([e.a, k]);
+          });
+          const rings = findRingsG(fr.length, g.edges, adj),
+            bend = P => {
+              let w = 0;
+              for (const r of rings) {
+                const n = r.length,
+                  want = 180 - 360 / n;
+                for (let i = 0; i < n; i++) {
+                  const a = P[r[(i + n - 1) % n]],
+                    b = P[r[i]],
+                    c = P[r[(i + 1) % n]];
+                  if (!a || !b || !c) continue;
+                  let t = Math.abs(Math.atan2(a.y - b.y, a.x - b.x) - Math.atan2(c.y - b.y, c.x - b.x)) * (180 / Math.PI);
+                  if (t > 180) t = 360 - t;
+                  w = Math.max(w, Math.abs(t - want), (Math.abs(Math.hypot(b.x - c.x, b.y - c.y) / L - 1) * 100) / 2);
+                }
+              }
+              return w;
+            };
+          if (rings.length) {
+            const ws = cands.map(c => bend(c.P)),
+              wmin = Math.min(...ws),
+              keep = cands.filter((c, i) => ws[i] <= wmin + 4);
+            cands.length = 0;
+            cands.push(...keep);
+          }
+        }
         /* besides other starts: the best layout with one branch turned over across a single bond outside the rings (the
            pyridine of nicotine with its N on the other side, the acetoxy of aspirin the other way), where nothing then
            lands on anything else */
@@ -17041,7 +17093,7 @@ function kdOf(st) {
                 : (!a.col &&
                     a.grp &&
                     bondsOf(a).length <= grpSlots(a.grp) &&
-                    labColored(shownL, STYo(a).label)) ||
+                    labColored(shownL, STYo(a).label, right && shownL !== a.label)) ||
                   subTs(esc(shownL), STYo(a).label)) +
               (gq
                 ? `<tspan dy="${-(STYo(a).label * 0.38).toFixed(2)}" font-size="70%">${chgStr(gq)}</tspan>`
