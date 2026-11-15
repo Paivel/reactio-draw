@@ -48259,9 +48259,14 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       }
     return E;
   }
-  /* the energy written in a frame's comment line ("energy: -12.3", "E -123.4", or the line a number alone) */
+  /* the energy written in a frame's comment line ("energy: -12.3", "E -123.4", the line a number alone, or a line that
+     starts with a number with decimals and goes on with others, as CREST writes its conformers and rotamers:
+     "-81.82588667 1.4376E-012 !") */
   function xyzEnergy(t) {
-    const m = /(?:energy|\bE)\s*[:=]?\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)/i.exec(t || '') || /^\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)\s*$/.exec(t || '');
+    const m =
+      /(?:energy|\bE)\s*[:=]?\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)/i.exec(t || '') ||
+      /^\s*(-?\d+\.\d+(?:[eE][-+]?\d+)?)\s*$/.exec(t || '') ||
+      /^\s*(-?\d+\.\d{3,}(?:[eE][-+]?\d+)?)(?:\s+[-+]?[\d.]+(?:[eE][-+]?\d+)?)+\s*!?\s*$/.exec(t || '');
     return m ? +m[1] : null;
   }
   /* a file with several geometries (an optimisation, a scan, a trajectory, conformers): which to open. pick(k) with a
