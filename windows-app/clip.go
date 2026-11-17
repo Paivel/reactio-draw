@@ -93,6 +93,15 @@ func clipOle(hwnd uintptr, kd, png, emf, cdx []byte, wHi, hHi int32) error {
 	}
 	clipInit()
 	clipCur = cb
+	/* a new data object for each copy, as other programs give: with one object for every copy, Word was seen to paste
+	   the drawing copied before (A again after B had been copied); the last few are kept, as OLE may still hold them */
+	clipObj = &comObj{vtbl: uintptr(unsafe.Pointer(&vtClip[0]))}
+	clipKeep = append(clipKeep, clipObj)
+	if len(clipKeep) > 8 {
+		clipKeep = clipKeep[len(clipKeep)-8:]
+	}
+	t0 := time.Now()
+	seq0, _, _ := pGetClipboardSequenceNumber.Call()
 	var hr uintptr
 	for i := 0; i < 20; i++ {
 		hr, _, _ = pOleSetClipboard.Call(ptr(clipObj))
@@ -104,8 +113,11 @@ func clipOle(hwnd uintptr, kd, png, emf, cdx []byte, wHi, hHi int32) error {
 	if failed(hr) {
 		return fmt.Errorf("the clipboard is busy (%x)", hr)
 	}
+	seq1, _, _ := pGetClipboardSequenceNumber.Call()
 	hr, _, _ = pOleFlushClipboard.Call() // everything rendered now: the copy stays when Reactio Draw closes
-	logf("clipboard: object %d bytes, picture %dx%d, flush %x", len(kd), pic.pw, pic.ph, hr)
+	seq2, _, _ := pGetClipboardSequenceNumber.Call()
+	logf("clipboard: object %d bytes, picture %dx%d, flush %x; sequence %d→%d→%d, %d ms; %s", len(kd), pic.pw, pic.ph, hr,
+		seq0, seq1, seq2, time.Since(t0).Milliseconds(), clipCheck(hwnd, kd))
 	return nil
 }
 
@@ -121,14 +133,16 @@ type clipData struct {
 }
 
 var (
-	pOleSetClipboard       = ole32.NewProc("OleSetClipboard")
-	pOleFlushClipboard     = ole32.NewProc("OleFlushClipboard")
-	pSHCreateStdEnumFmtEtc = windows.NewLazySystemDLL("shell32.dll").NewProc("SHCreateStdEnumFmtEtc")
-	clipObj                = &comObj{}
-	vtClip                 [12]uintptr
-	clipCur                *clipData
-	clipRefs               int
-	clipReady              bool
+	pOleSetClipboard            = ole32.NewProc("OleSetClipboard")
+	pOleFlushClipboard          = ole32.NewProc("OleFlushClipboard")
+	pSHCreateStdEnumFmtEtc      = windows.NewLazySystemDLL("shell32.dll").NewProc("SHCreateStdEnumFmtEtc")
+	clipObj                     = &comObj{}
+	clipKeep                    []*comObj
+	pGetClipboardSequenceNumber = user32.NewProc("GetClipboardSequenceNumber")
+	vtClip                      [12]uintptr
+	clipCur                     *clipData
+	clipRefs                    int
+	clipReady                   bool
 )
 
 // the drawing's storage (Reactio Draw class, \1Ole, RDData, RDSize) written into stg
@@ -332,6 +346,22 @@ func clipOwnTag(hwnd uintptr) string {
 }
 
 var tagRe = regexp.MustCompile(`RDRAW1:[A-Za-z0-9+/=]+`)
+
+// what the clipboard holds after a copy: this drawing's object, or another (a part of the drawing's data looked for in it)
+func clipCheck(hwnd uintptr, kd []byte) string {
+	b := clipOwn(hwnd)
+	if b == nil {
+		return "read back: no Reactio Draw object on the clipboard"
+	}
+	part := kd
+	if len(part) > 48 {
+		part = kd[len(kd)/2-24 : len(kd)/2+24]
+	}
+	if bytes.Contains(b, part) {
+		return fmt.Sprintf("read back: this drawing (%d bytes)", len(b))
+	}
+	return fmt.Sprintf("read back: ANOTHER object (%d bytes)", len(b))
+}
 
 // a Reactio Draw object copied from Word (or from Reactio Draw): the compound file bytes
 func clipOwn(hwnd uintptr) []byte {
