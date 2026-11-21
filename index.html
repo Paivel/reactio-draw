@@ -25933,7 +25933,9 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
         e.preventDefault();
         const r = svg.getBoundingClientRect(),
           k = e.deltaMode === 1 ? 16 : 1;
-        panAcc.x += ((e.shiftKey ? e.deltaY : e.deltaX) * k * view.w) / r.width;
+        /* Shift turns the wheel sideways: Windows and Linux still send it as deltaY, macOS already as deltaX */
+        const sx = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        panAcc.x += ((e.shiftKey ? sx : e.deltaX) * k * view.w) / r.width;
         panAcc.y += ((e.shiftKey ? 0 : e.deltaY) * k * view.h) / r.height;
         if (!panAcc.raf)
           panAcc.raf = requestAnimationFrame(() => {
