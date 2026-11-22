@@ -37,6 +37,11 @@ Basics
   saved, markSaved                                     unsaved changes? / mark the drawing as saved
   readOnly        {"on": true}                         view only (toolbars hidden, nothing can be changed)
   zoom            {"value": 1.5} or {"fit": true}      zoom (1 = 100 %) or fit the drawing in the window
+  action          {"id": "ring6"} / {"id": "clean"} / {"id": "cmd:undo"} / {"id": "element:N"} / {"id": "nameIt"} /
+                  {"id": "rotate", "angle": 15}         a command of the editor, as its button or hotkey runs it: a tool
+                                                       chosen, Clean Up, Undo, Copy, zoom in…; for a mouse button, a dial
+                                                       or a keypad (the Logi Actions plugin)
+  actions                                              the ids action takes, each with what it does
 
 Documents
   newDocument     {"name": "Compare"}                  a new empty document in its own tab, shown at once

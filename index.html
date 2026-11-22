@@ -72443,6 +72443,42 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
       return { moved: tgs.length, dx, dy };
     },
     version: () => ({ name: 'Reactio Draw', version: RD_VERSION }),
+    /* a command of the editor, as its button or hotkey runs it (for a mouse button, a dial, a keypad: the Logi Actions
+       plugin): the ids of the Hotkeys list (actions lists them), "element:N" an atom of the Atoms bar, "nameIt" the name
+       of the selected structure, "rotate" the selection (or the drawing) turned by angle */
+    action: a => {
+      const id = String(a.id || '').replace(/^tool:/, '');
+      if (!id) throw new Error('action: give id (actions lists them)');
+      const el = /^element:([A-Z][a-z]?)$/.exec(id);
+      if (el) {
+        const b = [...document.querySelectorAll('#els [data-el]')].find(x => x.dataset.el === el[1]);
+        if (!b) throw new Error('action: ' + el[1] + ' is not in the Atoms bar (' + ELS.join(', ') + ')');
+        b.click();
+        return { done: id, tool };
+      }
+      if (id === 'nameIt') {
+        const b = $('nameIt');
+        if (!b || b.disabled) throw new Error('action: Name it is not available here');
+        b.click();
+        return { done: id };
+      }
+      if (id === 'rotate') {
+        const d = +a.angle;
+        if (!Number.isFinite(d) || !d) throw new Error('action rotate: give angle, degrees clockwise (negative: anticlockwise)');
+        rotateSel(d);
+        return { done: id, angle: d };
+      }
+      if (!ACTIONS.some(x => x.ctx === 'tool' && x.id === 'tool:' + id))
+        throw new Error('action: unknown id "' + id + '" (actions lists them)');
+      const r = runTool(id);
+      return r === false ? { done: id, nothing: true } : { done: id };
+    },
+    actions: () => [
+      ...ACTIONS.filter(x => x.ctx === 'tool').map(x => ({ id: x.id.slice(5), label: x.label })),
+      ...ELS.map(e => ({ id: 'element:' + e, label: 'Atom: ' + e })),
+      { id: 'nameIt', label: 'Name the selected structure (Name it)' },
+      { id: 'rotate', label: 'Turn the selection, or the drawing, by angle (degrees, clockwise)' }
+    ],
     list: () => fragments().map((fr, i) => ({ id: apiFragId(fr), ...apiDescribe(fr, i) })),
     scheme: () => {
       const s = schemeOrder(),
@@ -76487,6 +76523,8 @@ svg#mol{--accent:${L};--accent-soft:${accMix(L, '#ffffff', 0.86)}}`;
     API_SPEC = {
       help: { d: 'the list of commands; with op: what that command does and its arguments', a: { op: 'a command name, or "guide": how to copy a figure (read it before drawing one)' } },
       version: { d: 'the name and version of Reactio Draw', a: {} },
+      action: { d: 'run a command of the editor as its button or hotkey does: choose a tool, Clean Up, Undo, Copy, zoom… (ids: actions)', a: { id: 'the command: an id of actions, e.g. "ring6", "clean", "cmd:undo", "act:zoomIn", "element:N", "nameIt", "rotate"', angle: 'with rotate: degrees clockwise (negative: anticlockwise)' } },
+      actions: { d: 'the commands action runs: id and what it does', a: {} },
       list: { d: 'the structures: index, id, SMILES (stereo as drawn), formula, MW, role, box', a: {} },
       objects: { d: 'every object of the sheet (structures, arrows, + signs, texts, charts) with type, id and box; texts with their text', a: { type: 'only these types', ids: 'only these ids', fields: 'only these fields, e.g. ["id", "box"]' } },
       scheme: { d: 'the reaction scheme: reactants, products, reagents and conditions in order', a: {} },
