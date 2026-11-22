@@ -135,6 +135,13 @@ func main() {
 				handOver(files)
 				return
 			}
+			/* started again with nothing to open (a shortcut, a mouse button, the taskbar): the open window comes to
+			   the front as it was (maximized again when it was), not a second window */
+			if h, _ := mainWindow(); h != 0 {
+				logf("already open: its window brought to the front")
+				focusMain()
+				return
+			}
 		} else {
 			app.owner = true // the first window: it takes files and drawings from Word handed over by other processes
 		}

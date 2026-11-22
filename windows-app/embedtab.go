@@ -79,10 +79,11 @@ func mainWindow() (uintptr, uint32) {
 }
 
 func focusMain() {
-	h, _ := mainWindow()
+	h, pid := mainWindow()
 	if h == 0 {
 		return
 	}
+	pAllowSetForegroundWindow.Call(uintptr(pid)) // this process was just started: it may pass the front on
 	if r, _, _ := pIsIconic.Call(uintptr(h)); r != 0 {
 		pShowWindow.Call(uintptr(h), 9) // SW_RESTORE
 	}
