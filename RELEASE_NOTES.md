@@ -1,3 +1,17 @@
+# Reactio Draw 1.15.3
+
+## New
+
+- **Local API: `action` runs a command of the editor** as its button or hotkey does: a tool or an atom chosen, Clean Up, Undo, Copy, zoom, Name it, the selection turned by an angle; `actions` lists the ids. For a mouse button, a dial or a keypad (Local API.txt).
+- **ONLYOFFICE plugin: right-click a drawing → Marks in this drawing…**: its compound marks ([[aldehyde]], [[amine.OMe]]…); a click copies one, to paste into the text where its number goes. [ReactioDraw-ONLYOFFICE.plugin](https://github.com/Paivel/reactio-draw/raw/main/onlyoffice-plugin/ReactioDraw-ONLYOFFICE.plugin)
+
+## Fixed
+
+- **XYZ with several geometries from CREST** (crest_conformers.xyz, crest_rotamers.xyz): their energies are read again, so the energy curve and Lowest energy are back in the window that picks the geometry.
+- **Shift + mouse wheel moves the zoomed sheet sideways on a Mac** too (macOS turns the wheel sideways itself, which was lost).
+- **Windows: Word could paste the drawing copied before** (copy A, paste, copy B, paste: A again). Each copy now gives Windows a new object; the log (%LOCALAPPDATA%\ReactioDraw\ReactioDraw.log) says what the clipboard holds after a copy.
+- **Windows: started again with nothing to open** (a shortcut, a mouse button, the taskbar), Reactio Draw opened a second window, not full screen; now the open window comes to the front as it was.
+
 # Reactio Draw 1.15.2
 
 ## Changed
